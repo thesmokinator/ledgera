@@ -1,0 +1,60 @@
+; Ledgera sample journal for local testing.
+; The file intentionally covers common hledger scenarios: commodities,
+; statuses, transaction codes, multi-posting entries, balancing postings,
+; and comments attached to transactions/postings.
+
+commodity €
+commodity $
+
+2026-01-02 * (INV-2026-001) Client retainer
+    assets:bank:checking                         €2,400.00
+    income:consulting                           -€2,400.00
+
+2026-01-03 * Grocery store
+    expenses:food:groceries                        €86.45
+    liabilities:credit-card                       -€86.45
+
+2026-01-05 ! Rent payment
+    expenses:rent                               €1,250.00
+    assets:bank:checking                       -€1,250.00
+
+2026-01-10 * Salary
+    assets:bank:checking                         €3,200.00
+    income:salary                               -€3,200.00
+
+2026-02-01 * (FX-001) USD SaaS subscription
+    expenses:software                              $29.00
+    assets:bank:checking
+
+2026-02-14 * Team dinner
+    expenses:meals                                €142.30
+    liabilities:credit-card                      -€142.30
+    ; reimbursable through project Alpha
+
+2026-03-05 * Split hardware purchase
+    assets:equipment:laptop                     €1,899.00
+    expenses:software                             €199.00
+    liabilities:credit-card                    -€2,098.00
+
+2026-03-20 * Credit card payment
+    liabilities:credit-card                     €2,326.75
+    assets:bank:checking                       -€2,326.75
+
+2026-04-01 * Consulting milestone
+    assets:bank:checking                         €4,500.00
+    income:consulting                           -€4,500.00
+
+2026-04-17 * Tax provision
+    expenses:tax:vat                              €990.00
+    liabilities:tax:vat                          -€990.00
+
+2026-05-02 ! Office supplies
+    expenses:office                          €74.80
+    assets:cash                              -€74.80
+2026-05-15 * Dividends received
+    assets:brokerage                              €128.40
+    income:investments                           -€128.40
+
+2026-05-29 Grocery store
+    assets:cash                              -€55.00
+    expenses:food:groceries
