@@ -5,10 +5,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
 import type { JournalTransaction } from "./types";
-
-function formatCount(value: number): string {
-  return new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value);
-}
+import { formatCount } from "../utils/format";
 
 export function TransactionsRoute({
   monthlyTransactions,

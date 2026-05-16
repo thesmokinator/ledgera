@@ -2,6 +2,7 @@ import { Card, Select, Space, Table, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
 import type { AccountActivityRange, AccountSummary, JournalTransaction } from "./types";
+import { formatCount } from "../utils/format";
 
 export function AccountsRoute({
   accounts,
@@ -77,7 +78,7 @@ export function AccountsRoute({
               dataIndex: "transactions",
               width: 180,
               align: "right",
-              render: (count: number) => new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(count),
+              render: (count: number) => formatCount(count),
             },
           ]}
         />
