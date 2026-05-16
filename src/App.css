@@ -18,11 +18,33 @@
 
 * {
     box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+html,
+body,
+#root {
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 body {
     margin: 0;
     background: #050505;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"],
+.ant-input,
+.ant-select-selection-search-input,
+.ant-picker-input input,
+.transaction-raw,
+.courtesy-details {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 button {
@@ -45,17 +67,41 @@ button {
     border-right: 1px solid #242424;
 }
 
-.sidebar-brand {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
+.platform-macos .app-sidebar {
+    padding-top: 54px;
 }
 
-.sidebar-brand .ant-typography {
-    margin: 0;
+.sidebar-context {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 6px 8px;
+}
+
+.sidebar-app-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+}
+
+.sidebar-context span,
+.sidebar-context small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-context span {
     color: #f5f5f5;
-    font-size: 17px;
+    font-weight: 650;
+}
+
+.sidebar-context small {
+    color: #a3a3a3;
+    font-size: 12px;
 }
 
 .sidebar-mail-button,
@@ -104,8 +150,8 @@ button {
 
 .nav-item:hover:not(:disabled),
 .nav-item.is-active {
-    color: #111111;
-    background: #e7e7e7;
+    color: #052e16;
+    background: #d1fae5;
 }
 
 .nav-item:disabled {
@@ -681,7 +727,7 @@ button {
     border-right-color: #e5e7eb;
 }
 
-.theme-light .sidebar-brand .ant-typography,
+.theme-light .sidebar-context span,
 .theme-light .app-header .ant-typography,
 .theme-light .bridge-card h4.ant-typography,
 .theme-light .chart-card h4.ant-typography,
@@ -696,10 +742,14 @@ button {
     color: #374151;
 }
 
+.theme-light .sidebar-context small {
+    color: #6b7280;
+}
+
 .theme-light .nav-item:hover:not(:disabled),
 .theme-light .nav-item.is-active {
-    color: #111827;
-    background: #f3f4f6;
+    color: #064e3b;
+    background: #d1fae5;
 }
 
 .theme-light .app-main,

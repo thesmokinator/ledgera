@@ -141,7 +141,6 @@ type AccountSummary = {
 
 
 
-const projectName = packageJson.name;
 const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
 const journalDateFormat = "YYYY-MM-DD";
 
@@ -241,6 +240,11 @@ function isValidJournalDate(value: string): boolean {
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatJournalName(path: string): string {
+  const trimmedPath = path.trim();
+  return trimmedPath.split(/[\\/]/).filter(Boolean).pop() ?? trimmedPath;
 }
 
 function isSameJournalMonth(date: string, month: dayjs.Dayjs): boolean {
@@ -596,6 +600,7 @@ function App() {
   const [messageApi, contextHolder] = message.useMessage();
   const { t } = useTranslation();
   const systemPrefersDark = useSystemTheme();
+  const isMacOs = navigator.userAgent.includes("Mac");
 
   const settingsQuery = useQuery({
     queryKey: ["settings"],
@@ -789,15 +794,19 @@ function App() {
         algorithm: isDarkTheme ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           borderRadius: 10,
-          colorPrimary: "#1677ff",
+          colorPrimary: "#10b981",
         },
       }}
     >
-      <Layout className={`app-shell ${isDarkTheme ? "theme-dark" : "theme-light"}`}>
+      <Layout className={`app-shell ${isDarkTheme ? "theme-dark" : "theme-light"} ${isMacOs ? "platform-macos" : ""}`}>
         {contextHolder}
         <Layout.Sider className="app-sidebar" width={288}>
-          <div className="sidebar-brand">
-            <Typography.Title level={3}>⌘ {projectName}</Typography.Title>
+          <div className="sidebar-context">
+            <img src="/hledger-icon.png" alt="" className="sidebar-app-icon" />
+            <div>
+              <span>{activeSettings.journalPath ? formatJournalName(activeSettings.journalPath) : t("settings.noJournalSelected")}</span>
+              <small>{activeSettings.journalPath ? t("settings.journal") : t("settings.noJournalConfigured")}</small>
+            </div>
           </div>
 
           <NavigationGroup

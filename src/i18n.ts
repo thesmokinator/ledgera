@@ -85,6 +85,7 @@ const resources = {
         configureJournalTitle: "Configure your journal",
         configureJournalDescription: "Ledgera needs a readable hledger journal and the hledger CLI before it can show your dashboard.",
         noJournalConfigured: "No journal file is configured yet.",
+        noJournalSelected: "No journal selected",
         journalReadFailed: "The configured journal could not be loaded.",
         hledgerNotFound: "The hledger CLI is not available.",
       },
