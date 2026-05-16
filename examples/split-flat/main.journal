@@ -1,0 +1,6 @@
+; Flat split journal sample.
+; Ledgera routes new 2026-05 transactions to 2026-05.journal
+; and creates sorted YYYY-MM.journal includes for missing months.
+
+include 2026-04.journal
+include 2026-05.journal

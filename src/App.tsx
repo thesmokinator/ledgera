@@ -71,6 +71,7 @@ type TransactionDisplay = {
 
 type JournalTransaction = {
   id: string;
+  sourceFile: string;
   date: string;
   status: string;
   code: string;

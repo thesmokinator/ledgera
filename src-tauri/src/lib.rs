@@ -6,7 +6,8 @@
 use chrono::{Datelike, Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
+    collections::HashSet,
+    env, fs,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -61,6 +62,7 @@ struct AutocompleteSuggestions {
 #[serde(rename_all = "camelCase")]
 struct JournalTransaction {
     id: String,
+    source_file: String,
     date: String,
     status: String,
     code: String,
@@ -114,6 +116,19 @@ struct PostingInput {
 #[derive(Debug, Clone)]
 struct TransactionBlock {
     transaction: JournalTransaction,
+}
+
+#[derive(Debug, Clone)]
+struct JournalFile {
+    path: PathBuf,
+    content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RoutingStrategy {
+    Glob(Vec<String>),
+    Flat(Vec<String>),
+    Fallback,
 }
 
 impl Default for AppSettings {
@@ -184,8 +199,7 @@ fn check_hledger(app: AppHandle) -> Result<HledgerStatus, String> {
 fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestions, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
-    let content = fs::read_to_string(&journal_path).map_err(|error| error.to_string())?;
-    let transactions = parse_transactions(&content);
+    let transactions = load_transactions_from_journal(&journal_path)?;
 
     Ok(AutocompleteSuggestions {
         codes: unique_sorted(
@@ -219,32 +233,14 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
 fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
-    let content = fs::read_to_string(&journal_path).map_err(|error| error.to_string())?;
-    let transactions = parse_transactions(&content);
-    let commodities = collect_commodities(&transactions);
-
-    let dashboard = build_dashboard_summary(&transactions);
-
-    Ok(JournalSummary {
-        path: journal_path.to_string_lossy().to_string(),
-        transactions,
-        commodities,
-        dashboard,
-    })
+    read_journal_summary(&journal_path)
 }
 
 /// Appends a new transaction using the existing journal style where possible.
 #[tauri::command]
 fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<JournalSummary, String> {
-    mutate_journal(app, |content| {
-        let mut updated = content.trim_end_matches(['\r', '\n']).to_string();
-        if !updated.is_empty() {
-            updated.push_str("\n\n");
-        }
-        updated.push_str(&format_transaction(&input));
-        updated.push('\n');
-        Ok(updated)
-    })
+    let settings = read_settings(&app)?;
+    create_transaction_for_settings(&settings, &input)
 }
 
 /// Replaces an existing transaction block by id.
@@ -254,32 +250,15 @@ fn update_transaction(
     id: String,
     input: TransactionInput,
 ) -> Result<JournalSummary, String> {
-    mutate_journal(app, |content| {
-        let lines = split_lines(content);
-        let block = find_block(content, &id)?;
-        let replacement = format_transaction(&input);
-        Ok(replace_line_range(
-            &lines,
-            block.transaction.start_line,
-            block.transaction.end_line,
-            &replacement,
-        ))
-    })
+    let settings = read_settings(&app)?;
+    update_transaction_for_settings(&settings, &id, &input)
 }
 
 /// Removes an existing transaction block by id.
 #[tauri::command]
 fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, String> {
-    mutate_journal(app, |content| {
-        let lines = split_lines(content);
-        let block = find_block(content, &id)?;
-        Ok(replace_line_range(
-            &lines,
-            block.transaction.start_line,
-            block.transaction.end_line,
-            "",
-        ))
-    })
+    let settings = read_settings(&app)?;
+    delete_transaction_for_settings(&settings, &id)
 }
 
 /// Starts the Tauri application and registers backend commands.
@@ -321,13 +300,71 @@ fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
     serde_json::from_str(&content).map_err(|error| error.to_string())
 }
 
-/// Resolves the hledger executable from settings.
+/// Resolves the hledger executable from settings or common macOS/user-shell locations.
 fn hledger_executable(settings: &AppSettings) -> String {
-    if settings.hledger_path.trim().is_empty() {
-        "hledger".to_string()
-    } else {
-        settings.hledger_path.trim().to_string()
+    let configured = settings.hledger_path.trim();
+    if !configured.is_empty() {
+        return configured.to_string();
     }
+
+    find_hledger_executable().unwrap_or_else(|| "hledger".to_string())
+}
+
+/// Finds hledger in common installation folders and in the user's login shell PATH.
+fn find_hledger_executable() -> Option<String> {
+    let mut candidates = vec![
+        PathBuf::from("/opt/homebrew/bin/hledger"),
+        PathBuf::from("/usr/local/bin/hledger"),
+        PathBuf::from("/usr/bin/hledger"),
+    ];
+
+    if let Some(home) = env::var_os("HOME") {
+        let home = PathBuf::from(home);
+        candidates.push(home.join(".local/bin/hledger"));
+        candidates.push(home.join(".cabal/bin/hledger"));
+    }
+
+    candidates
+        .into_iter()
+        .chain(
+            login_shell_path_dirs()
+                .into_iter()
+                .map(|path| path.join("hledger")),
+        )
+        .find(|path| is_executable_file(path))
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    path.is_file()
+        && Command::new(path)
+            .arg("--version")
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+}
+
+fn login_shell_path_dirs() -> Vec<PathBuf> {
+    let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    [["-li", "-c", "echo $PATH"], ["-l", "-c", "echo $PATH"]]
+        .into_iter()
+        .find_map(|args| {
+            Command::new(&shell)
+                .args(args)
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+        })
+        .and_then(|output| {
+            output
+                .lines()
+                .rev()
+                .map(str::trim)
+                .find(|line| line.contains('/') && !line.is_empty())
+                .map(|line| line.split(':').map(PathBuf::from).collect())
+        })
+        .unwrap_or_default()
 }
 
 /// Resolves the configured journal path.
@@ -345,23 +382,490 @@ fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Applies a journal mutation, validates it, and rolls back on hledger failure.
-fn mutate_journal<F>(app: AppHandle, mutate: F) -> Result<JournalSummary, String>
+fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
+    let transactions = load_transactions_from_journal(journal_path)?;
+    let commodities = collect_commodities(&transactions);
+    let dashboard = build_dashboard_summary(&transactions);
+
+    Ok(JournalSummary {
+        path: journal_path.to_string_lossy().to_string(),
+        transactions,
+        commodities,
+        dashboard,
+    })
+}
+
+fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
+    let files = load_journal_files(journal_path)?;
+    Ok(files
+        .iter()
+        .flat_map(|file| parse_transactions(&file.content, &file.path))
+        .collect())
+}
+
+fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {
+    let mut files = Vec::new();
+    let mut visited = HashSet::new();
+    load_journal_file_recursive(journal_path, &mut visited, &mut files)?;
+    Ok(files)
+}
+
+fn load_journal_file_recursive(
+    journal_path: &Path,
+    visited: &mut HashSet<PathBuf>,
+    files: &mut Vec<JournalFile>,
+) -> Result<(), String> {
+    let canonical_path =
+        fs::canonicalize(journal_path).unwrap_or_else(|_| journal_path.to_path_buf());
+    if !visited.insert(canonical_path.clone()) {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(&canonical_path).map_err(|error| error.to_string())?;
+    let include_paths = find_include_paths(&canonical_path, &content)?;
+    files.push(JournalFile {
+        path: canonical_path,
+        content,
+    });
+
+    for include_path in include_paths {
+        load_journal_file_recursive(&include_path, visited, files)?;
+    }
+
+    Ok(())
+}
+
+fn find_include_paths(journal_path: &Path, content: &str) -> Result<Vec<PathBuf>, String> {
+    let mut paths = Vec::new();
+    for line in content.lines() {
+        if let Some(include) = parse_include_directive(line) {
+            paths.extend(resolve_include_paths(journal_path, &include)?);
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn parse_include_directive(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.starts_with('#') {
+        return None;
+    }
+
+    let include = trimmed.strip_prefix("include")?.trim_start();
+    if include.is_empty() {
+        return None;
+    }
+
+    let include = split_inline_comment(include).0.trim();
+    Some(include.trim_matches('"').to_string())
+}
+
+fn resolve_include_paths(journal_path: &Path, include: &str) -> Result<Vec<PathBuf>, String> {
+    let base_dir = journal_path.parent().unwrap_or_else(|| Path::new("."));
+    let include_path = PathBuf::from(include);
+    let absolute_pattern = if include_path.is_absolute() {
+        include_path
+    } else {
+        base_dir.join(include_path)
+    };
+
+    if !include.contains('*') {
+        return if absolute_pattern.exists() {
+            Ok(vec![absolute_pattern])
+        } else {
+            Err(format!(
+                "Included journal file does not exist: {}",
+                absolute_pattern.display()
+            ))
+        };
+    }
+
+    expand_simple_glob(&absolute_pattern)
+}
+
+fn expand_simple_glob(pattern: &Path) -> Result<Vec<PathBuf>, String> {
+    let parent = pattern.parent().unwrap_or_else(|| Path::new("."));
+    let Some(file_pattern) = pattern.file_name().and_then(|name| name.to_str()) else {
+        return Ok(Vec::new());
+    };
+
+    if !parent.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut matches = fs::read_dir(parent)
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| wildcard_matches(file_pattern, name))
+                .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+    matches.sort();
+    Ok(matches)
+}
+
+fn wildcard_matches(pattern: &str, value: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+
+    let parts = pattern.split('*').collect::<Vec<_>>();
+    if parts.len() == 1 {
+        return pattern == value;
+    }
+
+    let mut remainder = value;
+    if let Some(first) = parts.first() {
+        if !first.is_empty() {
+            let Some(stripped) = remainder.strip_prefix(first) else {
+                return false;
+            };
+            remainder = stripped;
+        }
+    }
+
+    for part in parts.iter().skip(1).take(parts.len().saturating_sub(2)) {
+        if part.is_empty() {
+            continue;
+        }
+        let Some(index) = remainder.find(part) else {
+            return false;
+        };
+        remainder = &remainder[index + part.len()..];
+    }
+
+    if let Some(last) = parts.last() {
+        last.is_empty() || remainder.ends_with(last)
+    } else {
+        true
+    }
+}
+
+fn create_transaction_for_settings(
+    settings: &AppSettings,
+    input: &TransactionInput,
+) -> Result<JournalSummary, String> {
+    let journal_path = require_journal_path(settings)?;
+    append_transaction_routed(settings, &journal_path, input)?;
+    read_journal_summary(&journal_path)
+}
+
+fn update_transaction_for_settings(
+    settings: &AppSettings,
+    id: &str,
+    input: &TransactionInput,
+) -> Result<JournalSummary, String> {
+    let journal_path = require_journal_path(settings)?;
+    let block = find_block(&journal_path, id)?;
+    let source_path = PathBuf::from(&block.transaction.source_file);
+    let replacement = format_transaction(input);
+    mutate_existing_file(settings, &journal_path, &source_path, |content| {
+        let lines = split_lines(content);
+        Ok(replace_line_range(
+            &lines,
+            block.transaction.start_line,
+            block.transaction.end_line,
+            &replacement,
+        ))
+    })?;
+    read_journal_summary(&journal_path)
+}
+
+fn delete_transaction_for_settings(
+    settings: &AppSettings,
+    id: &str,
+) -> Result<JournalSummary, String> {
+    let journal_path = require_journal_path(settings)?;
+    let block = find_block(&journal_path, id)?;
+    let source_path = PathBuf::from(&block.transaction.source_file);
+    mutate_existing_file(settings, &journal_path, &source_path, |content| {
+        let lines = split_lines(content);
+        Ok(replace_line_range(
+            &lines,
+            block.transaction.start_line,
+            block.transaction.end_line,
+            "",
+        ))
+    })?;
+    read_journal_summary(&journal_path)
+}
+
+fn mutate_existing_file<F>(
+    settings: &AppSettings,
+    main_journal: &Path,
+    source_path: &Path,
+    mutate: F,
+) -> Result<(), String>
 where
     F: FnOnce(&str) -> Result<String, String>,
 {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let original = fs::read_to_string(&journal_path).map_err(|error| error.to_string())?;
+    let original = fs::read_to_string(source_path).map_err(|error| error.to_string())?;
     let updated = mutate(&original)?;
 
-    fs::write(&journal_path, &updated).map_err(|error| error.to_string())?;
-    if let Err(error) = validate_journal(&settings, &journal_path) {
-        fs::write(&journal_path, original).map_err(|rollback_error| rollback_error.to_string())?;
+    fs::write(source_path, &updated).map_err(|error| error.to_string())?;
+    if let Err(error) = validate_journal(settings, main_journal) {
+        fs::write(source_path, original).map_err(|rollback_error| rollback_error.to_string())?;
         return Err(error);
     }
 
-    list_transactions(app)
+    Ok(())
+}
+
+fn append_transaction_routed(
+    settings: &AppSettings,
+    main_journal: &Path,
+    input: &TransactionInput,
+) -> Result<(), String> {
+    let content = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
+    match detect_routing_strategy(&content) {
+        RoutingStrategy::Fallback => {
+            append_to_existing_file(settings, main_journal, main_journal, input)
+        }
+        RoutingStrategy::Flat(includes) => {
+            let target_name = target_subjournal_name(input);
+            let target_file = main_journal
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(&target_name);
+            if includes.contains(&target_name) || target_file.exists() {
+                append_to_existing_file(settings, main_journal, &target_file, input)
+            } else {
+                append_to_new_flat_subjournal(
+                    settings,
+                    main_journal,
+                    &target_file,
+                    &target_name,
+                    input,
+                )
+            }
+        }
+        RoutingStrategy::Glob(years) => {
+            let (target_file, year) = glob_target_path(main_journal, input);
+            if target_file.exists() {
+                append_to_existing_file(settings, main_journal, &target_file, input)
+            } else if years.contains(&year) {
+                append_to_new_glob_subjournal(settings, main_journal, &target_file, input)
+            } else {
+                append_to_new_glob_year(settings, main_journal, &target_file, &year, input)
+            }
+        }
+    }
+}
+
+fn append_to_existing_file(
+    settings: &AppSettings,
+    main_journal: &Path,
+    target_file: &Path,
+    input: &TransactionInput,
+) -> Result<(), String> {
+    mutate_existing_file(settings, main_journal, target_file, |content| {
+        Ok(append_transaction_text(content, input))
+    })
+}
+
+fn append_to_new_flat_subjournal(
+    settings: &AppSettings,
+    main_journal: &Path,
+    target_file: &Path,
+    target_name: &str,
+    input: &TransactionInput,
+) -> Result<(), String> {
+    let original_main = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
+    let updated_main = insert_include_sorted(&original_main, target_name);
+
+    fs::write(main_journal, updated_main).map_err(|error| error.to_string())?;
+    fs::write(target_file, format!("{}\n", format_transaction(input)))
+        .map_err(|error| error.to_string())?;
+
+    if let Err(error) = validate_journal(settings, main_journal) {
+        let _ = fs::remove_file(target_file);
+        fs::write(main_journal, original_main)
+            .map_err(|rollback_error| rollback_error.to_string())?;
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+fn append_to_new_glob_subjournal(
+    settings: &AppSettings,
+    main_journal: &Path,
+    target_file: &Path,
+    input: &TransactionInput,
+) -> Result<(), String> {
+    if let Some(parent) = target_file.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(target_file, format!("{}\n", format_transaction(input)))
+        .map_err(|error| error.to_string())?;
+
+    if let Err(error) = validate_journal(settings, main_journal) {
+        let _ = fs::remove_file(target_file);
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+fn append_to_new_glob_year(
+    settings: &AppSettings,
+    main_journal: &Path,
+    target_file: &Path,
+    year: &str,
+    input: &TransactionInput,
+) -> Result<(), String> {
+    let original_main = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
+    let year_dir = target_file
+        .parent()
+        .ok_or_else(|| "Unable to resolve target journal directory.".to_string())?;
+    let year_dir_created = !year_dir.exists();
+    let updated_main = insert_glob_include_sorted(&original_main, &format!("{}/*.journal", year));
+
+    fs::write(main_journal, updated_main).map_err(|error| error.to_string())?;
+    fs::create_dir_all(year_dir).map_err(|error| error.to_string())?;
+    fs::write(target_file, format!("{}\n", format_transaction(input)))
+        .map_err(|error| error.to_string())?;
+
+    if let Err(error) = validate_journal(settings, main_journal) {
+        let _ = fs::remove_file(target_file);
+        if year_dir_created {
+            let _ = fs::remove_dir(year_dir);
+        }
+        fs::write(main_journal, original_main)
+            .map_err(|rollback_error| rollback_error.to_string())?;
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+fn append_transaction_text(content: &str, input: &TransactionInput) -> String {
+    let mut updated = content.trim_end_matches(['\r', '\n']).to_string();
+    if !updated.is_empty() {
+        updated.push_str("\n\n");
+    }
+    updated.push_str(&format_transaction(input));
+    updated.push('\n');
+    updated
+}
+
+fn detect_routing_strategy(content: &str) -> RoutingStrategy {
+    let glob_years = content
+        .lines()
+        .filter_map(parse_glob_include_year)
+        .collect::<Vec<_>>();
+    if !glob_years.is_empty() {
+        return RoutingStrategy::Glob(glob_years);
+    }
+
+    let flat_files = content
+        .lines()
+        .filter_map(parse_flat_include_filename)
+        .collect::<Vec<_>>();
+    if !flat_files.is_empty() {
+        return RoutingStrategy::Flat(flat_files);
+    }
+
+    RoutingStrategy::Fallback
+}
+
+fn parse_flat_include_filename(line: &str) -> Option<String> {
+    let include = parse_include_directive(line)?;
+    let file_name = Path::new(&include).file_name()?.to_str()?;
+    if file_name.len() == "YYYY-MM.journal".len()
+        && file_name.ends_with(".journal")
+        && file_name
+            .chars()
+            .take(4)
+            .all(|character| character.is_ascii_digit())
+        && file_name.chars().nth(4) == Some('-')
+        && file_name
+            .chars()
+            .skip(5)
+            .take(2)
+            .all(|character| character.is_ascii_digit())
+    {
+        Some(include)
+    } else {
+        None
+    }
+}
+
+fn parse_glob_include_year(line: &str) -> Option<String> {
+    let include = parse_include_directive(line)?;
+    let (year, rest) = include.split_once('/')?;
+    if year.len() == 4
+        && year.chars().all(|character| character.is_ascii_digit())
+        && rest == "*.journal"
+    {
+        Some(year.to_string())
+    } else {
+        None
+    }
+}
+
+fn target_subjournal_name(input: &TransactionInput) -> String {
+    format!("{}.journal", input.date.chars().take(7).collect::<String>())
+}
+
+fn glob_target_path(main_journal: &Path, input: &TransactionInput) -> (PathBuf, String) {
+    let year = input.date.chars().take(4).collect::<String>();
+    let month = input.date.chars().skip(5).take(2).collect::<String>();
+    let target = main_journal
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(&year)
+        .join(format!("{}.journal", month));
+    (target, year)
+}
+
+fn insert_include_sorted(content: &str, new_include: &str) -> String {
+    insert_sorted_include(content, new_include, parse_flat_include_filename)
+}
+
+fn insert_glob_include_sorted(content: &str, new_include: &str) -> String {
+    insert_sorted_include(content, new_include, |line| {
+        parse_glob_include_year(line).map(|year| format!("{}/*.journal", year))
+    })
+}
+
+fn insert_sorted_include<F>(content: &str, new_include: &str, parser: F) -> String
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let mut lines = content.lines().map(ToString::to_string).collect::<Vec<_>>();
+    let include_positions = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| parser(line).map(|include| (index, include)))
+        .collect::<Vec<_>>();
+    let new_line = format!("include {}", new_include);
+
+    if include_positions.is_empty() {
+        lines.push(new_line);
+    } else {
+        let insert_index = include_positions
+            .iter()
+            .find(|(_, include)| new_include < include.as_str())
+            .map(|(index, _)| *index)
+            .unwrap_or_else(|| {
+                include_positions
+                    .last()
+                    .map(|(index, _)| index + 1)
+                    .unwrap_or(lines.len())
+            });
+        lines.insert(insert_index, new_line);
+    }
+
+    let mut updated = lines.join("\n");
+    updated.push('\n');
+    updated
 }
 
 /// Runs hledger check for the journal when hledger is available.
@@ -381,7 +885,7 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
 }
 
 /// Parses transaction blocks without attempting to reinterpret ledger semantics.
-fn parse_transactions(content: &str) -> Vec<JournalTransaction> {
+fn parse_transactions(content: &str, source_path: &Path) -> Vec<JournalTransaction> {
     let lines = split_lines(content);
     let mut transactions = Vec::new();
     let mut index = 0;
@@ -400,7 +904,8 @@ fn parse_transactions(content: &str) -> Vec<JournalTransaction> {
 
         let block_lines = &lines[index..end_index];
         let raw = block_lines.join("\n");
-        if let Some(transaction) = parse_transaction_block(start_line, end_index, &raw) {
+        if let Some(transaction) = parse_transaction_block(source_path, start_line, end_index, &raw)
+        {
             transactions.push(transaction);
         }
         index = end_index;
@@ -411,6 +916,7 @@ fn parse_transactions(content: &str) -> Vec<JournalTransaction> {
 
 /// Parses one transaction block.
 fn parse_transaction_block(
+    source_path: &Path,
     start_line: usize,
     end_line: usize,
     raw: &str,
@@ -442,8 +948,10 @@ fn parse_transaction_block(
 
     let display = summarize_transaction(&postings);
 
+    let source_file = source_path.to_string_lossy().to_string();
     Some(JournalTransaction {
-        id: format!("line-{}", start_line),
+        id: format!("{}:{}", source_file, start_line),
+        source_file,
         date: date.to_string(),
         status,
         code,
@@ -574,8 +1082,8 @@ fn is_transaction_header(line: &str) -> bool {
 }
 
 /// Finds a parsed transaction by id.
-fn find_block(content: &str, id: &str) -> Result<TransactionBlock, String> {
-    parse_transactions(content)
+fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlock, String> {
+    load_transactions_from_journal(journal_path)?
         .into_iter()
         .find(|transaction| transaction.id == id)
         .map(|transaction| TransactionBlock { transaction })
@@ -876,4 +1384,192 @@ fn collect_commodities(transactions: &[JournalTransaction]) -> Vec<String> {
     commodities.sort();
     commodities.dedup();
     commodities
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("ledgera-{}-{}", name, nanos));
+        fs::create_dir_all(&dir).expect("temp dir should be created");
+        dir
+    }
+
+    fn settings_for(journal_path: &Path) -> AppSettings {
+        AppSettings {
+            journal_path: journal_path.to_string_lossy().to_string(),
+            hledger_path: "true".to_string(),
+            theme: default_theme(),
+            power_user: false,
+        }
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("parent dir should be created");
+        }
+        fs::write(path, content).expect("sample file should be written");
+    }
+
+    fn input(date: &str, description: &str) -> TransactionInput {
+        TransactionInput {
+            date: date.to_string(),
+            status: "*".to_string(),
+            code: String::new(),
+            description: description.to_string(),
+            postings: vec![
+                PostingInput {
+                    account: "expenses:test".to_string(),
+                    amount: "10".to_string(),
+                    commodity: "EUR".to_string(),
+                    comment: String::new(),
+                },
+                PostingInput {
+                    account: "assets:cash".to_string(),
+                    amount: String::new(),
+                    commodity: "EUR".to_string(),
+                    comment: String::new(),
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn reads_transactions_from_flat_split_journal() {
+        let dir = temp_dir("read-flat");
+        let main = dir.join("main.journal");
+        let may = dir.join("2026-05.journal");
+        write_file(&main, "include 2026-05.journal\n\n2026-04-01 Main\n    assets:cash  1 EUR\n    equity:opening\n");
+        write_file(
+            &may,
+            "2026-05-02 Split\n    expenses:office  10 EUR\n    assets:cash\n",
+        );
+
+        let summary = read_journal_summary(&main).expect("split journal should load");
+
+        assert_eq!(summary.transactions.len(), 2);
+        assert!(summary
+            .transactions
+            .iter()
+            .any(|transaction| transaction.description == "Split"
+                && transaction.source_file.ends_with("2026-05.journal")));
+    }
+
+    #[test]
+    fn appends_to_existing_flat_subjournal_for_transaction_month() {
+        let dir = temp_dir("append-flat-existing");
+        let main = dir.join("main.journal");
+        let may = dir.join("2026-05.journal");
+        write_file(&main, "include 2026-05.journal\n");
+        write_file(
+            &may,
+            "2026-05-02 Existing\n    expenses:office  10 EUR\n    assets:cash\n",
+        );
+        let settings = settings_for(&main);
+
+        create_transaction_for_settings(&settings, &input("2026-05-20", "New split transaction"))
+            .expect("transaction should be routed to existing split file");
+
+        let main_content = fs::read_to_string(&main).expect("main should be readable");
+        let may_content = fs::read_to_string(&may).expect("may journal should be readable");
+        assert_eq!(main_content.matches("include 2026-05.journal").count(), 1);
+        assert!(may_content.contains("2026-05-20 * New split transaction"));
+    }
+
+    #[test]
+    fn creates_missing_flat_subjournal_and_sorted_include() {
+        let dir = temp_dir("append-flat-new");
+        let main = dir.join("main.journal");
+        write_file(&main, "include 2026-04.journal\ninclude 2026-06.journal\n");
+        write_file(&dir.join("2026-04.journal"), "");
+        write_file(&dir.join("2026-06.journal"), "");
+        let settings = settings_for(&main);
+
+        create_transaction_for_settings(&settings, &input("2026-05-03", "Inserted month"))
+            .expect("missing month journal should be created");
+
+        let main_content = fs::read_to_string(&main).expect("main should be readable");
+        let includes = main_content
+            .lines()
+            .filter(|line| line.starts_with("include"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            includes,
+            vec![
+                "include 2026-04.journal",
+                "include 2026-05.journal",
+                "include 2026-06.journal",
+            ]
+        );
+        assert!(fs::read_to_string(dir.join("2026-05.journal"))
+            .expect("new split file should exist")
+            .contains("2026-05-03 * Inserted month"));
+    }
+
+    #[test]
+    fn creates_new_glob_year_and_month_file() {
+        let dir = temp_dir("append-glob-new-year");
+        let main = dir.join("main.journal");
+        write_file(&main, "include 2025/*.journal\n");
+        write_file(&dir.join("2025/12.journal"), "");
+        let settings = settings_for(&main);
+
+        create_transaction_for_settings(&settings, &input("2026-01-15", "New glob year"))
+            .expect("new glob year should be created");
+
+        let main_content = fs::read_to_string(&main).expect("main should be readable");
+        assert!(main_content.contains("include 2026/*.journal"));
+        assert!(fs::read_to_string(dir.join("2026/01.journal"))
+            .expect("new glob month should exist")
+            .contains("2026-01-15 * New glob year"));
+    }
+
+    #[test]
+    fn update_and_delete_target_source_subjournal() {
+        let dir = temp_dir("mutate-source");
+        let main = dir.join("main.journal");
+        let may = dir.join("2026-05.journal");
+        write_file(&main, "include 2026-05.journal\n");
+        write_file(
+            &may,
+            "2026-05-02 Original\n    expenses:office  10 EUR\n    assets:cash\n",
+        );
+        let settings = settings_for(&main);
+        let summary = read_journal_summary(&main).expect("summary should load");
+        let transaction_id = summary.transactions[0].id.clone();
+
+        update_transaction_for_settings(
+            &settings,
+            &transaction_id,
+            &input("2026-05-02", "Updated"),
+        )
+        .expect("source subjournal transaction should update");
+        let updated_content = fs::read_to_string(&may).expect("may should be readable");
+        assert!(updated_content.contains("2026-05-02 * Updated"));
+        assert!(!updated_content.contains("Original"));
+
+        let updated_summary = read_journal_summary(&main).expect("updated summary should load");
+        delete_transaction_for_settings(&settings, &updated_summary.transactions[0].id)
+            .expect("source subjournal transaction should delete");
+        let deleted_content = fs::read_to_string(&may).expect("may should be readable");
+        assert!(!deleted_content.contains("2026-05-02"));
+    }
+
+    #[test]
+    fn configured_hledger_path_overrides_detection() {
+        let settings = AppSettings {
+            journal_path: String::new(),
+            hledger_path: "/custom/bin/hledger".to_string(),
+            theme: default_theme(),
+            power_user: false,
+        };
+
+        assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");
+    }
 }

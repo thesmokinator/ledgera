@@ -1,0 +1,8 @@
+; Custom hledger path sample.
+; Configure Settings > hledger executable to the absolute CLI path,
+; for example /opt/homebrew/bin/hledger, /usr/local/bin/hledger,
+; ~/.local/bin/hledger, or ~/.cabal/bin/hledger.
+
+2026-05-02 * Custom executable smoke test
+    expenses:software                   19.99 EUR
+    assets:bank:checking

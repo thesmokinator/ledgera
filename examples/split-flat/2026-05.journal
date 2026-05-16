@@ -1,0 +1,7 @@
+2026-05-02 ! Office supplies
+    expenses:office                     74.80 EUR
+    assets:bank:checking
+
+2026-05-15 * Dividends received
+    assets:bank:checking               128.40 EUR
+    income:investments
