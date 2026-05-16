@@ -1,15 +1,8 @@
 import {
-  AutoComplete,
   Button,
-  Card,
   ConfigProvider,
-  DatePicker,
   Form,
-  Input,
   Layout,
-  Modal,
-  Segmented,
-  Select,
   Space,
   Typography,
   message,
@@ -17,18 +10,22 @@ import {
 } from "antd";
 import {
   BankOutlined,
-  DeleteOutlined,
   HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
   SettingOutlined,
-  WarningOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  CourtesyState,
+  NavigationGroup,
+  TransactionModal,
+} from "./components";
+import { useSystemTheme } from "./hooks/useSystemTheme";
 import {
   AccountsRoute,
   SettingsRoute,
@@ -49,7 +46,6 @@ import {
   isExecutedTransaction,
   isInAccountActivityRange,
   isSameJournalMonth,
-  isValidJournalDate,
   journalDateFormat,
   todayJournalDate,
 } from "./utils/date";
@@ -87,81 +83,6 @@ function callCommand<TResponse, TPayload extends Record<string, unknown> = Recor
 ): Promise<TResponse> {
   return invoke<TResponse>(command, payload);
 }
-
-function useSystemTheme() {
-  const [isDark, setIsDark] = useState(() =>
-    window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = (event: MediaQueryListEvent) => setIsDark(event.matches);
-    mediaQuery.addEventListener("change", onChange);
-    return () => mediaQuery.removeEventListener("change", onChange);
-  }, []);
-
-  return isDark;
-}
-
-
-
-/** Renders one sidebar navigation block. */
-function NavigationGroup({ items, activeKey, onSelect }: {
-  items: NavigationItem[];
-  activeKey: string;
-  onSelect: (key: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="nav-group">
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          className={`nav-item ${activeKey === item.key ? "is-active" : ""}`}
-          onClick={() => onSelect(item.key)}
-        >
-          {item.icon}
-          <span>{t(item.label)}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function CourtesyState({
-  reasons,
-  details,
-  onConfigure,
-}: {
-  reasons: string[];
-  details?: string;
-  onConfigure: () => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <Card className="courtesy-card">
-      <div className="courtesy-icon">
-        <WarningOutlined />
-      </div>
-      <Typography.Title level={3}>{t("settings.configureJournalTitle")}</Typography.Title>
-      <Typography.Text>{t("settings.configureJournalDescription")}</Typography.Text>
-      <ul className="courtesy-reasons">
-        {reasons.map((reason) => (
-          <li key={reason}>{reason}</li>
-        ))}
-      </ul>
-      {details ? <pre className="courtesy-details">{details}</pre> : null}
-      <Button type="primary" icon={<SettingOutlined />} onClick={onConfigure}>
-        {t("common.configure")}
-      </Button>
-    </Card>
-  );
-}
-
-
 
 /** Renders the Ledgera desktop application. */
 function App() {
@@ -392,14 +313,6 @@ function App() {
       <Layout className={`app-shell ${isDarkTheme ? "theme-dark" : "theme-light"} ${isMacOs ? "platform-macos" : ""}`}>
         {contextHolder}
         <Layout.Sider className="app-sidebar" width={288}>
-          <div className="sidebar-context">
-            <img src="/hledger-icon.png" alt="" className="sidebar-app-icon" />
-            <div>
-              <span>{activeSettings.journalPath ? formatJournalName(activeSettings.journalPath) : t("settings.noJournalSelected")}</span>
-              <small>{activeSettings.journalPath ? t("settings.journal") : t("settings.noJournalConfigured")}</small>
-            </div>
-          </div>
-
           <NavigationGroup
             items={primaryNavigation}
             activeKey={activeView}
@@ -409,9 +322,9 @@ function App() {
 
         <Layout className="app-main">
           <Layout.Header className="app-header">
-            <Space size="middle">
+            <div className="titlebar-drag" data-tauri-drag-region>
               <Typography.Title level={3}>{activeTitle}</Typography.Title>
-            </Space>
+            </div>
             <Space>
               <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()}>
                 {t("common.refresh")}
@@ -465,109 +378,21 @@ function App() {
           </Layout.Content>
         </Layout>
 
-        <Modal
-          title={editingTransaction ? t("transactions.editTransaction") : t("transactions.newTransaction")}
+        <TransactionModal
           open={isTransactionModalOpen}
-          okText={editingTransaction ? t("common.save") : t("transactions.createTransaction")}
-          confirmLoading={isSavingTransaction}
-          onCancel={() => setTransactionModalOpen(false)}
-          onOk={() => transactionForm.submit()}
-        >
-          <Form<TransactionInput>
-            form={transactionForm}
-            layout="vertical"
-            initialValues={emptyTransaction}
-            onFinish={submitTransaction}
-          >
-            {!editingTransaction ? (
-              <Segmented<TransactionType>
-                className="transaction-type-selector"
-                block
-                value={transactionType}
-                onChange={applyTransactionType}
-                options={[
-                  { value: "expense", label: t("transactions.types.expense") },
-                  { value: "income", label: t("transactions.types.income") },
-                  { value: "transfer", label: t("transactions.types.transfer") },
-                  { value: "investment", label: t("transactions.types.investment") },
-                  { value: "custom", label: t("transactions.types.custom") },
-                ]}
-              />
-            ) : null}
-            <Space className="form-row" size="middle">
-              <Form.Item
-                label={t("transactions.date")}
-                name="date"
-                getValueProps={(value?: string) => ({
-                  value: value ? dayjs(value, journalDateFormat) : null,
-                })}
-                normalize={(value: dayjs.Dayjs | null) =>
-                  value ? value.format(journalDateFormat) : ""
-                }
-                rules={[
-                  { required: true, message: t("transactions.enterTransactionDate") },
-                  {
-                    validator: (_, value: string) =>
-                      !value || isValidJournalDate(value)
-                        ? Promise.resolve()
-                        : Promise.reject(new Error(t("transactions.invalidDate"))),
-                  },
-                ]}
-              >
-                <DatePicker format={journalDateFormat} className="full-width-control" />
-              </Form.Item>
-              <Form.Item label={t("transactions.status")} name="status">
-                <Select
-                  allowClear
-                  className="full-width-control"
-                  placeholder={t("transactions.statusPlaceholder")}
-                  options={[
-                    { value: "*", label: t("transactions.statusCleared") },
-                    { value: "!", label: t("transactions.statusPending") },
-                  ]}
-                />
-              </Form.Item>
-              <Form.Item label={t("transactions.code")} name="code">
-                <AutoComplete options={codeOptions} placeholder="(INV-001)" filterOption />
-              </Form.Item>
-            </Space>
-            <Form.Item label={t("transactions.description")} name="description">
-              <AutoComplete options={descriptionOptions} filterOption />
-            </Form.Item>
-            <Form.List name="postings">
-              {(fields, { add, remove }) => (
-                <Space direction="vertical" className="content-stack">
-                  {fields.map((field) => (
-                    <div key={field.key} className="posting-row">
-                      <Form.Item label={t("transactions.account")} name={[field.name, "account"]}>
-                        <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
-                      </Form.Item>
-                      <Form.Item label={t("transactions.commodity")} name={[field.name, "commodity"]}>
-                        <AutoComplete options={commodityOptions} placeholder="EUR" filterOption />
-                      </Form.Item>
-                      <Form.Item label={t("transactions.amount")} name={[field.name, "amount"]}>
-                        <Input placeholder="25.00" />
-                      </Form.Item>
-                      <Button
-                        danger
-                        className="posting-delete-button"
-                        aria-label={t("transactions.removePosting")}
-                        icon={<DeleteOutlined />}
-                        onClick={() => remove(field.name)}
-                      />
-                      <Form.Item className="posting-comment-field" name={[field.name, "comment"]}>
-                        <Input placeholder={t("transactions.commentPlaceholder")} />
-                      </Form.Item>
-                    </div>
-                  ))}
-                  <Button icon={<PlusOutlined />} onClick={() => add({ account: "", amount: "", commodity: defaultCommodity, comment: "" })}>
-                    {t("transactions.addPosting")}
-                  </Button>
-                </Space>
-              )}
-            </Form.List>
-          </Form>
-        </Modal>
+          editingTransaction={editingTransaction}
+          transactionForm={transactionForm}
+          isSaving={isSavingTransaction}
+          transactionType={transactionType}
+          codeOptions={codeOptions}
+          descriptionOptions={descriptionOptions}
+          accountOptions={accountOptions}
+          commodityOptions={commodityOptions}
+          defaultCommodity={defaultCommodity}
+          onClose={() => setTransactionModalOpen(false)}
+          onSubmit={submitTransaction}
+          onTransactionTypeChange={applyTransactionType}
+        />
       </Layout>
     </ConfigProvider>
   );

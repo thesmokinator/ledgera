@@ -304,6 +304,23 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let win_builder = tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::default(),
+            )
+            .title("Ledgera")
+            .inner_size(1400.0, 918.0)
+            .min_inner_size(1080.0, 720.0);
+
+            #[cfg(target_os = "macos")]
+            let win_builder = win_builder.title_bar_style(tauri::TitleBarStyle::Transparent);
+
+            let _window = win_builder.build().unwrap();
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_app_settings,
             update_app_settings,
