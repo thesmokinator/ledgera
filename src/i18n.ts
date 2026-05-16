@@ -11,6 +11,7 @@ const resources = {
         settings: "Settings",
         refresh: "Refresh",
         save: "Save",
+        cancel: "Cancel",
         saveSettings: "Save settings",
         available: "Available",
         unavailable: "Unavailable",
