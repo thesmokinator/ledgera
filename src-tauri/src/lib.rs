@@ -22,6 +22,8 @@ struct AppSettings {
     theme: String,
     #[serde(default)]
     power_user: bool,
+    #[serde(default)]
+    default_commodity: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,6 +60,13 @@ struct AutocompleteSuggestions {
     descriptions: Vec<String>,
     accounts: Vec<String>,
     commodities: Vec<String>,
+    default_commodity: String,
+    default_cash_account: String,
+    default_expense_account: String,
+    default_income_account: String,
+    default_transfer_account: String,
+    default_investment_account: String,
+    default_investment_commodity: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -133,6 +142,16 @@ enum RoutingStrategy {
     Fallback,
 }
 
+#[derive(Debug, Clone, Default)]
+struct JournalProfile {
+    default_cash_account: String,
+    default_expense_account: String,
+    default_income_account: String,
+    default_transfer_account: String,
+    default_investment_account: String,
+    default_investment_commodity: String,
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -140,6 +159,7 @@ impl Default for AppSettings {
             hledger_path: String::new(),
             theme: default_theme(),
             power_user: false,
+            default_commodity: String::new(),
         }
     }
 }
@@ -209,6 +229,8 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
     let journal_path = require_journal_path(&settings)?;
     let transactions = load_transactions_from_journal(&journal_path)?;
 
+    let profile = build_journal_profile(&transactions, settings.default_commodity.trim());
+
     Ok(AutocompleteSuggestions {
         codes: unique_sorted(
             transactions
@@ -233,6 +255,13 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
                 .collect(),
         ),
         commodities: collect_commodities(&transactions),
+        default_commodity: settings.default_commodity.trim().to_string(),
+        default_cash_account: profile.default_cash_account,
+        default_expense_account: profile.default_expense_account,
+        default_income_account: profile.default_income_account,
+        default_transfer_account: profile.default_transfer_account,
+        default_investment_account: profile.default_investment_account,
+        default_investment_commodity: profile.default_investment_commodity,
     })
 }
 
@@ -1466,6 +1495,88 @@ fn unique_sorted(mut values: Vec<String>) -> Vec<String> {
 }
 
 /// Extracts commodity-like tokens from posting amounts for display.
+fn build_journal_profile(
+    transactions: &[JournalTransaction],
+    default_commodity: &str,
+) -> JournalProfile {
+    let mut cash_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut expense_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut income_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut transfer_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut investment_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut investment_commodities = std::collections::HashMap::<String, usize>::new();
+
+    for transaction in transactions {
+        let has_income_or_expense = transaction.postings.iter().any(|posting| {
+            is_account_root(
+                &posting.account,
+                &["income", "revenue", "expenses", "expense"],
+            )
+        });
+
+        for posting in &transaction.postings {
+            let account = posting.account.trim();
+            let commodity = posting.commodity.trim();
+            if account.is_empty() {
+                continue;
+            }
+
+            if is_account_root(account, &["expenses", "expense"]) {
+                *expense_accounts.entry(account.to_string()).or_default() += 1;
+            } else if is_account_root(account, &["income", "revenue"]) {
+                *income_accounts.entry(account.to_string()).or_default() += 1;
+            } else if is_account_root(account, &["assets", "asset", "liabilities", "liability"]) {
+                if !has_income_or_expense {
+                    *transfer_accounts.entry(account.to_string()).or_default() += 1;
+                }
+
+                let is_non_monetary = !commodity.is_empty() && commodity != default_commodity;
+                let looks_like_investment = account.to_lowercase().contains("invest")
+                    || account.to_lowercase().contains("broker")
+                    || account.to_lowercase().contains("portfolio")
+                    || is_non_monetary;
+
+                if looks_like_investment && is_non_monetary {
+                    *investment_accounts.entry(account.to_string()).or_default() += 1;
+                    *investment_commodities
+                        .entry(commodity.to_string())
+                        .or_default() += 1;
+                } else {
+                    *cash_accounts.entry(account.to_string()).or_default() += 1;
+                }
+            }
+        }
+    }
+
+    JournalProfile {
+        default_cash_account: most_frequent(cash_accounts),
+        default_expense_account: most_frequent(expense_accounts),
+        default_income_account: most_frequent(income_accounts),
+        default_transfer_account: most_frequent(transfer_accounts),
+        default_investment_account: most_frequent(investment_accounts),
+        default_investment_commodity: most_frequent(investment_commodities),
+    }
+}
+
+fn is_account_root(account: &str, roots: &[&str]) -> bool {
+    let normalized = account.to_lowercase();
+    roots
+        .iter()
+        .any(|root| normalized == *root || normalized.starts_with(&format!("{}:", root)))
+}
+
+fn most_frequent(values: std::collections::HashMap<String, usize>) -> String {
+    values
+        .into_iter()
+        .max_by(|(left_value, left_count), (right_value, right_count)| {
+            left_count
+                .cmp(right_count)
+                .then_with(|| right_value.cmp(left_value))
+        })
+        .map(|(value, _)| value)
+        .unwrap_or_default()
+}
+
 fn collect_commodities(transactions: &[JournalTransaction]) -> Vec<String> {
     let mut commodities = transactions
         .iter()
@@ -1506,6 +1617,7 @@ mod tests {
             hledger_path: "true".to_string(),
             theme: default_theme(),
             power_user: false,
+            default_commodity: String::new(),
         }
     }
 
@@ -1783,12 +1895,93 @@ mod tests {
     }
 
     #[test]
+    fn builds_frequency_based_journal_profile() {
+        let transactions = vec![
+            JournalTransaction {
+                id: "test:1".to_string(),
+                source_file: "test".to_string(),
+                date: "2026-05-16".to_string(),
+                status: String::new(),
+                code: String::new(),
+                description: "Groceries".to_string(),
+                postings: vec![
+                    JournalPosting {
+                        account: "expenses:food".to_string(),
+                        amount: "25".to_string(),
+                        commodity: "€".to_string(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                    JournalPosting {
+                        account: "assets:bank:fineco".to_string(),
+                        amount: String::new(),
+                        commodity: String::new(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                ],
+                display: TransactionDisplay {
+                    account: "expenses:food".to_string(),
+                    amount: "-€25".to_string(),
+                    kind: "expense".to_string(),
+                },
+                raw: String::new(),
+                start_line: 1,
+                end_line: 3,
+            },
+            JournalTransaction {
+                id: "test:2".to_string(),
+                source_file: "test".to_string(),
+                date: "2026-05-17".to_string(),
+                status: String::new(),
+                code: String::new(),
+                description: "Buy fund".to_string(),
+                postings: vec![
+                    JournalPosting {
+                        account: "assets:investments:xeon".to_string(),
+                        amount: "10".to_string(),
+                        commodity: "XEON".to_string(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                    JournalPosting {
+                        account: "assets:bank:fineco".to_string(),
+                        amount: "1487".to_string(),
+                        commodity: "€".to_string(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                ],
+                display: TransactionDisplay {
+                    account: "assets:investments:xeon".to_string(),
+                    amount: "10 XEON".to_string(),
+                    kind: "transfer".to_string(),
+                },
+                raw: String::new(),
+                start_line: 5,
+                end_line: 7,
+            },
+        ];
+
+        let profile = build_journal_profile(&transactions, "€");
+
+        assert_eq!(profile.default_cash_account, "assets:bank:fineco");
+        assert_eq!(profile.default_expense_account, "expenses:food");
+        assert_eq!(
+            profile.default_investment_account,
+            "assets:investments:xeon"
+        );
+        assert_eq!(profile.default_investment_commodity, "XEON");
+    }
+
+    #[test]
     fn configured_hledger_path_overrides_detection() {
         let settings = AppSettings {
             journal_path: String::new(),
             hledger_path: "/custom/bin/hledger".to_string(),
             theme: default_theme(),
             power_user: false,
+            default_commodity: String::new(),
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");

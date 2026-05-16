@@ -717,6 +717,11 @@ button {
     margin-top: 30px;
 }
 
+.transaction-type-selector {
+    width: 100%;
+    margin-bottom: 18px;
+}
+
 .theme-light.app-shell {
     color: #111827;
     background: #f4f6f8;

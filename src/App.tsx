@@ -9,12 +9,11 @@ import {
   Input,
   Layout,
   Modal,
+  Segmented,
   Select,
   Space,
   Switch,
-  Table,
   Tooltip,
-  Tabs,
   Tag,
   Typography,
   message,
@@ -25,12 +24,9 @@ import {
   BankOutlined,
   CodeOutlined,
   DeleteOutlined,
-  EditOutlined,
   FileTextOutlined,
   HomeOutlined,
-  LeftOutlined,
   PlusOutlined,
-  RightOutlined,
   ReloadOutlined,
   SettingOutlined,
   UploadOutlined,
@@ -43,6 +39,8 @@ import dayjs from "dayjs";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import packageJson from "../package.json";
+import { AccountsRoute } from "./routes/AccountsRoute";
+import { TransactionsRoute } from "./routes/TransactionsRoute";
 import "./App.css";
 
 type ThemePreference = "system" | "dark" | "light";
@@ -52,6 +50,7 @@ type AppSettings = {
   hledgerPath: string;
   theme: ThemePreference;
   powerUser: boolean;
+  defaultCommodity: string;
 };
 
 type HledgerStatus = {
@@ -108,6 +107,13 @@ type AutocompleteSuggestions = {
   descriptions: string[];
   accounts: string[];
   commodities: string[];
+  defaultCommodity: string;
+  defaultCashAccount: string;
+  defaultExpenseAccount: string;
+  defaultIncomeAccount: string;
+  defaultTransferAccount: string;
+  defaultInvestmentAccount: string;
+  defaultInvestmentCommodity: string;
 };
 
 type PostingInput = {
@@ -124,6 +130,8 @@ type TransactionInput = {
   description: string;
   postings: PostingInput[];
 };
+
+type TransactionType = "expense" | "income" | "transfer" | "investment" | "custom";
 
 type NavigationItem = {
   key: string;
@@ -165,6 +173,7 @@ const defaultSettings: AppSettings = {
   hledgerPath: "",
   theme: "system",
   powerUser: false,
+  defaultCommodity: "",
 };
 
 const primaryNavigation: NavigationItem[] = [
@@ -184,6 +193,55 @@ const accountActivityRangeOptions: AccountActivityRange[] = [
 
 function toAutocompleteOptions(values: string[]) {
   return values.map((value) => ({ value }));
+}
+
+function findAccountByRoot(accounts: string[], roots: string[], offset = 0): string {
+  const matches = accounts.filter((account) =>
+    roots.some((root) => account.toLowerCase().startsWith(root)),
+  );
+  return matches[offset] ?? matches[0] ?? "";
+}
+
+function transactionTemplatePostings(
+  type: TransactionType,
+  suggestions: AutocompleteSuggestions,
+  defaultCommodity: string,
+): PostingInput[] {
+  const accounts = suggestions.accounts;
+  const fallbackAssetAccount = findAccountByRoot(accounts, ["assets", "asset"]);
+  const fallbackLiabilityAccount = findAccountByRoot(accounts, ["liabilities", "liability"]);
+  const fallbackCashAccount = fallbackAssetAccount || fallbackLiabilityAccount;
+  const cashAccount = suggestions.defaultCashAccount || fallbackCashAccount;
+  const transferAccount = suggestions.defaultTransferAccount || findAccountByRoot(accounts, ["assets", "asset", "liabilities", "liability"], 1) || cashAccount;
+  const investmentCommodity = suggestions.defaultInvestmentCommodity || "";
+
+  switch (type) {
+    case "expense":
+      return [
+        { account: suggestions.defaultExpenseAccount || findAccountByRoot(accounts, ["expenses", "expense"]), amount: "", commodity: defaultCommodity, comment: "" },
+        { account: cashAccount, amount: "", commodity: "", comment: "" },
+      ];
+    case "income":
+      return [
+        { account: cashAccount, amount: "", commodity: defaultCommodity, comment: "" },
+        { account: suggestions.defaultIncomeAccount || findAccountByRoot(accounts, ["income", "revenue"]), amount: "", commodity: "", comment: "" },
+      ];
+    case "transfer":
+      return [
+        { account: cashAccount, amount: "", commodity: defaultCommodity, comment: "" },
+        { account: transferAccount, amount: "", commodity: defaultCommodity, comment: "" },
+      ];
+    case "investment":
+      return [
+        { account: suggestions.defaultInvestmentAccount, amount: "", commodity: investmentCommodity, comment: "" },
+        { account: cashAccount, amount: "", commodity: defaultCommodity, comment: "" },
+      ];
+    case "custom":
+      return [
+        { account: "", amount: "", commodity: defaultCommodity, comment: "" },
+        { account: "", amount: "", commodity: "", comment: "" },
+      ];
+  }
 }
 
 
@@ -237,10 +295,6 @@ function isValidJournalDate(value: string): boolean {
     date.getUTCMonth() === month - 1 &&
     date.getUTCDate() === day
   );
-}
-
-function formatCount(value: number): string {
-  return new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value);
 }
 
 function formatJournalName(path: string): string {
@@ -385,100 +439,7 @@ function CourtesyState({
   );
 }
 
-function TransactionsTable({
-  transactions,
-  loading,
-  powerUser,
-  onEdit,
-  onDelete,
-}: {
-  transactions: JournalTransaction[];
-  loading: boolean;
-  powerUser: boolean;
-  onEdit: (transaction: JournalTransaction) => void;
-  onDelete: (id: string) => void;
-}) {
-  const { t } = useTranslation();
-  const [modal, modalContextHolder] = Modal.useModal();
 
-  function confirmDelete(transaction: JournalTransaction) {
-    modal.confirm({
-      title: t("transactions.deleteTransactionAction"),
-      content: t("transactions.deleteTransactionDescription"),
-      okText: t("transactions.delete"),
-      cancelText: t("common.cancel"),
-      okButtonProps: { danger: true },
-      centered: true,
-      onOk: () => onDelete(transaction.id),
-    });
-  }
-
-  return (
-    <>
-      {modalContextHolder}
-      <Table<JournalTransaction>
-        rowKey="id"
-        loading={loading}
-        dataSource={transactions}
-        pagination={{ pageSize: 8 }}
-        expandable={
-          powerUser
-            ? {
-              expandedRowRender: (transaction) => (
-                <pre className="transaction-raw">{transaction.raw}</pre>
-              ),
-            }
-            : undefined
-        }
-        columns={[
-          { title: t("transactions.date"), dataIndex: "date", width: 132 },
-          { title: t("transactions.status"), dataIndex: "status", width: 88, render: (status: string) => status || "-" },
-          { title: t("transactions.description"), dataIndex: "description" },
-          {
-            title: t("transactions.account"),
-            width: 260,
-            render: (_, transaction) => transaction.display.account,
-          },
-          {
-            title: t("transactions.amount"),
-            width: 160,
-            align: "right",
-            render: (_, transaction) => (
-              <span className={`transaction-amount transaction-amount-${transaction.display.kind}`}>
-                {transaction.display.amount}
-              </span>
-            ),
-          },
-          ...(powerUser
-            ? [
-              {
-                title: t("transactions.lines"),
-                width: 120,
-                render: (_: unknown, transaction: JournalTransaction) =>
-                  `${transaction.startLine}-${transaction.endLine}`,
-              },
-            ]
-            : []),
-          {
-            title: t("transactions.actions"),
-            width: 136,
-            render: (_, transaction) => (
-              <Space>
-                <Button aria-label={t("transactions.editTransactionAction")} icon={<EditOutlined />} onClick={() => onEdit(transaction)} />
-                <Button
-                  danger
-                  aria-label={t("transactions.deleteTransactionAction")}
-                  icon={<DeleteOutlined />}
-                  onClick={() => confirmDelete(transaction)}
-                />
-              </Space>
-            ),
-          },
-        ]}
-      />
-    </>
-  );
-}
 
 function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
   return (
@@ -525,7 +486,7 @@ function PathInput({
   );
 }
 
-function ApplicationSettingsCard() {
+function ApplicationSettingsCard({ commodityOptions }: { commodityOptions: { value: string }[] }) {
   const { t } = useTranslation();
   const licenseUrl = `${projectRepositoryUrl}/blob/main/LICENSE.md`;
 
@@ -543,6 +504,13 @@ function ApplicationSettingsCard() {
           <PathInput
             placeholder={t("settings.journalPathPlaceholder")}
             pickerTitle={t("settings.pickJournalFile")}
+          />
+        </Form.Item>
+        <Form.Item label={t("settings.defaultCommodity")} name="defaultCommodity">
+          <AutoComplete
+            options={commodityOptions}
+            placeholder={t("settings.defaultCommodityPlaceholder")}
+            filterOption
           />
         </Form.Item>
         <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
@@ -584,6 +552,7 @@ function App() {
   const [activeView, setActiveView] = useState("transactions");
   const [activeMonth, setActiveMonth] = useState(() => dayjs().startOf("month"));
   const [accountActivityRange, setAccountActivityRange] = useState<AccountActivityRange>("current-month");
+  const [transactionType, setTransactionType] = useState<TransactionType>("expense");
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [transactionForm] = Form.useForm<TransactionInput>();
@@ -680,6 +649,13 @@ function App() {
     descriptions: [],
     accounts: [],
     commodities: [],
+    defaultCommodity: "",
+    defaultCashAccount: "",
+    defaultExpenseAccount: "",
+    defaultIncomeAccount: "",
+    defaultTransferAccount: "",
+    defaultInvestmentAccount: "",
+    defaultInvestmentCommodity: "",
   };
   const codeOptions = useMemo(
     () => toAutocompleteOptions(autocompleteSuggestions.codes),
@@ -697,7 +673,7 @@ function App() {
     () => toAutocompleteOptions(autocompleteSuggestions.commodities),
     [autocompleteSuggestions.commodities],
   );
-  const defaultCommodity = autocompleteSuggestions.commodities[0] ?? "";
+  const defaultCommodity = autocompleteSuggestions.defaultCommodity || "";
   const hasConfiguredJournal = activeSettings.journalPath.trim().length > 0;
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
   const journalLoadError = transactionsQuery.isError ? String(transactionsQuery.error) : "";
@@ -730,21 +706,28 @@ function App() {
     }
   }, [settingsForm, settingsQuery.data]);
 
+  function applyTransactionType(type: TransactionType) {
+    setTransactionType(type);
+    transactionForm.setFieldValue(
+      "postings",
+      transactionTemplatePostings(type, autocompleteSuggestions, defaultCommodity),
+    );
+  }
+
   function openCreateTransaction() {
     setEditingTransaction(null);
+    setTransactionType("expense");
     transactionForm.setFieldsValue({
       ...emptyTransaction,
       date: todayJournalDate(),
-      postings: emptyTransaction.postings.map((posting) => ({
-        ...posting,
-        commodity: defaultCommodity,
-      })),
+      postings: transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity),
     });
     setTransactionModalOpen(true);
   }
 
   function openEditTransaction(transaction: JournalTransaction) {
     setEditingTransaction(transaction);
+    setTransactionType("custom");
     transactionForm.setFieldsValue(toTransactionInput(transaction));
     setTransactionModalOpen(true);
   }
@@ -760,7 +743,7 @@ function App() {
         .map((posting) => ({
           account: posting.account,
           amount: posting.amount ?? "",
-          commodity: posting.commodity ?? defaultCommodity,
+          commodity: posting.amount?.trim() ? (posting.commodity ?? defaultCommodity) : (posting.commodity ?? ""),
           comment: posting.comment ?? "",
         })),
     };
@@ -832,7 +815,7 @@ function App() {
                 onValuesChange={updateSettingsOnChange}
               >
                 <Space direction="vertical" size={24} className="content-stack settings-stack">
-                  <ApplicationSettingsCard />
+                  <ApplicationSettingsCard commodityOptions={commodityOptions} />
 
                   <Card
                     className="settings-card"
@@ -887,131 +870,29 @@ function App() {
                 onConfigure={() => setActiveView("settings")}
               />
             ) : activeView === "accounts" ? (
-              <Space direction="vertical" size={24} className="content-stack">
-                <Card
-                  className="settings-card accounts-card"
-                  title={t("accounts.allAccounts")}
-                  extra={(
-                    <Space className="accounts-range-control">
-                      <Typography.Text>{t("accounts.activityRange")}</Typography.Text>
-                      <Select<AccountActivityRange>
-                        value={accountActivityRange}
-                        onChange={setAccountActivityRange}
-                        options={accountActivityRangeOptions.map((range) => ({
-                          value: range,
-                          label: range === "current-month"
-                            ? t("accounts.currentMonth")
-                            : t("accounts.lastDays", { count: Number(range) }),
-                        }))}
-                      />
-                    </Space>
-                  )}
-                >
-                  <Table<AccountSummary>
-                    rowKey="account"
-                    loading={transactionsQuery.isFetching}
-                    dataSource={accounts}
-                    pagination={{ pageSize: 12 }}
-                    expandable={{
-                      expandedRowRender: (account) => (
-                        <div className="account-transactions-panel">
-                          <Typography.Text className="account-transactions-title">
-                            {t("accounts.accountActivity", {
-                              account: account.account,
-                              count: account.transactions,
-                            })}
-                          </Typography.Text>
-                          <TransactionsTable
-                            transactions={account.accountTransactions}
-                            loading={transactionsQuery.isFetching}
-                            powerUser={activeSettings.powerUser}
-                            onEdit={openEditTransaction}
-                            onDelete={(id) => deleteTransactionMutation.mutate(id)}
-                          />
-                        </div>
-                      ),
-                      rowExpandable: (account) => account.transactions > 0,
-                    }}
-                    columns={[
-                      { title: t("transactions.account"), dataIndex: "account" },
-                      {
-                        title: t("accounts.transactionsCount"),
-                        dataIndex: "transactions",
-                        width: 180,
-                        align: "right",
-                        render: (count: number) => formatCount(count),
-                      },
-                    ]}
-                  />
-                </Card>
-              </Space>
+              <AccountsRoute
+                accounts={accounts}
+                accountActivityRange={accountActivityRange}
+                accountActivityRangeOptions={accountActivityRangeOptions}
+                loading={transactionsQuery.isFetching}
+                powerUser={activeSettings.powerUser}
+                onActivityRangeChange={setAccountActivityRange}
+                onEditTransaction={openEditTransaction}
+                onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
+              />
             ) : (
-              <Space direction="vertical" size={24} className="content-stack">
-                <div className="metric-grid">
-                  <Card className="metric-card">
-                    <span>{t("dashboard.monthlyTransactions")}</span>
-                    <strong>{formatCount(monthlyTransactions.length)}</strong>
-                    <p>{t("dashboard.monthlyTransactionsDescription", { month: activeMonthLabel })}</p>
-                  </Card>
-                  <Card className="metric-card">
-                    <span>{t("dashboard.scheduledTransactions")}</span>
-                    <strong>{formatCount(scheduledTransactions.length)}</strong>
-                    <p>{t("dashboard.scheduledTransactionsDescription", { month: activeMonthLabel })}</p>
-                  </Card>
-                  <Card className="metric-card">
-                    <span>{t("dashboard.activeAccounts")}</span>
-                    <strong>{formatCount(accountsCount)}</strong>
-                    <p>{t("dashboard.activeAccountsDescription")}</p>
-                  </Card>
-                </div>
-
-                <Card className="settings-card month-toolbar-card">
-                  <Space className="month-toolbar" wrap>
-                    <Button icon={<LeftOutlined />} onClick={() => setActiveMonth((month) => month.subtract(1, "month"))}>
-                      {t("common.previous")}
-                    </Button>
-                    <Typography.Title level={4}>{activeMonthLabel}</Typography.Title>
-                    <Button icon={<RightOutlined />} onClick={() => setActiveMonth((month) => month.add(1, "month"))}>
-                      {t("common.next")}
-                    </Button>
-                    <Button onClick={() => setActiveMonth(dayjs().startOf("month"))}>
-                      {t("common.currentMonth")}
-                    </Button>
-                  </Space>
-                </Card>
-
-                <Tabs
-                  className="document-tabs"
-                  items={[
-                    {
-                      key: "executed",
-                      label: t("dashboard.monthlyTransactionsTab"),
-                      children: (
-                        <TransactionsTable
-                          transactions={monthlyTransactions}
-                          loading={transactionsQuery.isFetching}
-                          powerUser={activeSettings.powerUser}
-                          onEdit={openEditTransaction}
-                          onDelete={(id) => deleteTransactionMutation.mutate(id)}
-                        />
-                      ),
-                    },
-                    {
-                      key: "scheduled",
-                      label: t("dashboard.scheduledTransactionsTab"),
-                      children: (
-                        <TransactionsTable
-                          transactions={scheduledTransactions}
-                          loading={transactionsQuery.isFetching}
-                          powerUser={activeSettings.powerUser}
-                          onEdit={openEditTransaction}
-                          onDelete={(id) => deleteTransactionMutation.mutate(id)}
-                        />
-                      ),
-                    },
-                  ]}
-                />
-              </Space>
+              <TransactionsRoute
+                monthlyTransactions={monthlyTransactions}
+                scheduledTransactions={scheduledTransactions}
+                accountsCount={accountsCount}
+                activeMonth={activeMonth}
+                activeMonthLabel={activeMonthLabel}
+                loading={transactionsQuery.isFetching}
+                powerUser={activeSettings.powerUser}
+                onMonthChange={setActiveMonth}
+                onEditTransaction={openEditTransaction}
+                onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
+              />
             )}
           </Layout.Content>
         </Layout>
@@ -1030,6 +911,21 @@ function App() {
             initialValues={emptyTransaction}
             onFinish={submitTransaction}
           >
+            {!editingTransaction ? (
+              <Segmented<TransactionType>
+                className="transaction-type-selector"
+                block
+                value={transactionType}
+                onChange={applyTransactionType}
+                options={[
+                  { value: "expense", label: t("transactions.types.expense") },
+                  { value: "income", label: t("transactions.types.income") },
+                  { value: "transfer", label: t("transactions.types.transfer") },
+                  { value: "investment", label: t("transactions.types.investment") },
+                  { value: "custom", label: t("transactions.types.custom") },
+                ]}
+              />
+            ) : null}
             <Space className="form-row" size="middle">
               <Form.Item
                 label={t("transactions.date")}
