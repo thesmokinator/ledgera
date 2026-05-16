@@ -13,6 +13,7 @@ import {
   Space,
   Switch,
   Table,
+  Tooltip,
   Tabs,
   Tag,
   Typography,
@@ -20,22 +21,25 @@ import {
   theme,
 } from "antd";
 import {
+  AppstoreOutlined,
   BankOutlined,
+  CodeOutlined,
   DeleteOutlined,
   EditOutlined,
+  FileTextOutlined,
   HomeOutlined,
   LeftOutlined,
   PlusOutlined,
   RightOutlined,
   ReloadOutlined,
-  SaveOutlined,
   SettingOutlined,
+  UploadOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import packageJson from "../package.json";
 import "./App.css";
@@ -53,6 +57,8 @@ type HledgerStatus = {
   available: boolean;
   version: string;
   message: string;
+  resolvedPath: string;
+  source: "configured" | "detected" | "fallback";
 };
 
 type JournalPosting = {
@@ -469,34 +475,110 @@ function TransactionsTable({
   );
 }
 
-function AppRuntimeCard({
-  hledgerStatus,
+function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <Space className="settings-section-title">
+      {icon}
+      <span>{label}</span>
+    </Space>
+  );
+}
+
+function PathInput({
+  value,
+  onChange,
+  placeholder,
+  pickerTitle,
+  statusAddon,
 }: {
-  hledgerStatus?: HledgerStatus;
+  value?: string;
+  onChange?: (value: string) => void;
+  placeholder: string;
+  pickerTitle: string;
+  statusAddon?: ReactNode;
 }) {
-  const { t } = useTranslation();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function selectFile(file?: File) {
+    if (!file) {
+      return;
+    }
+
+    onChange?.(((file as File & { path?: string }).path || file.name));
+  }
 
   return (
-    <Card className="settings-card app-info-card" title={t("settings.appInfo")}>
-      <Descriptions column={3} size="small" className="settings-meta">
-        <Descriptions.Item label={t("settings.appVersion")}>{packageJson.version}</Descriptions.Item>
-        <Descriptions.Item label={t("settings.license")}>{packageJson.license}</Descriptions.Item>
-        <Descriptions.Item label={t("settings.project")}>
-          <Typography.Link href={projectRepositoryUrl} target="_blank">
-            {projectRepositoryUrl.replace("https://", "")}
-          </Typography.Link>
-        </Descriptions.Item>
-        <Descriptions.Item label={t("hledger.label")}>
-          {hledgerStatus?.available ? (
-            <Tag color="success">{t("common.available")}</Tag>
-          ) : (
-            <Tag color="error">{t("common.unavailable")}</Tag>
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label={t("hledger.version")}>
-          {hledgerStatus?.version || t("common.notDetected")}
-        </Descriptions.Item>
-      </Descriptions>
+    <>
+      <Space.Compact block className="path-input-group">
+        <Input value={value} onChange={(event) => onChange?.(event.target.value)} placeholder={placeholder} />
+        {statusAddon ? <div className="path-input-addon">{statusAddon}</div> : null}
+        <Tooltip title={pickerTitle}>
+          <Button icon={<UploadOutlined />} onClick={() => inputRef.current?.click()} />
+        </Tooltip>
+      </Space.Compact>
+      <input
+        ref={inputRef}
+        className="hidden-file-input"
+        type="file"
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{ display: "none" }}
+        onChange={(event) => selectFile(event.target.files?.[0])}
+      />
+    </>
+  );
+}
+
+function ApplicationSettingsCard() {
+  const { t } = useTranslation();
+  const licenseUrl = `${projectRepositoryUrl}/blob/main/LICENSE.md`;
+
+  return (
+    <Card
+      className="settings-card app-info-card"
+      title={<SectionTitle icon={<AppstoreOutlined />} label={t("settings.application")} />}
+    >
+      <div className="application-settings-card">
+        <Form.Item
+          label={<SectionTitle icon={<FileTextOutlined />} label={t("settings.journalPath")} />}
+          name="journalPath"
+          rules={[{ required: true, message: t("settings.journalPathRequired") }]}
+        >
+          <PathInput
+            placeholder={t("settings.journalPathPlaceholder")}
+            pickerTitle={t("settings.pickJournalFile")}
+          />
+        </Form.Item>
+        <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
+          <Select
+            options={[
+              { value: "system", label: t("settings.themeSystem") },
+              { value: "dark", label: t("settings.themeDark") },
+              { value: "light", label: t("settings.themeLight") },
+            ]}
+          />
+        </Form.Item>
+        <div className="developer-settings">
+          <div>
+            <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
+            <Typography.Paragraph>{t("settings.advancedModeHelp")}</Typography.Paragraph>
+          </div>
+          <Form.Item name="powerUser" valuePropName="checked" noStyle>
+            <Switch />
+          </Form.Item>
+        </div>
+        <div className="application-meta-row">
+          <Typography.Text>{t("settings.version", { version: packageJson.version })}</Typography.Text>
+          <Space wrap>
+            <Button href={projectRepositoryUrl} target="_blank">
+              {t("settings.repository")}
+            </Button>
+            <Button href={licenseUrl} target="_blank">
+              {t("settings.license", { license: packageJson.license })}
+            </Button>
+          </Space>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -548,9 +630,8 @@ function App() {
       callCommand<AppSettings, { settings: AppSettings }>("update_app_settings", {
         settings: normalizeSettings(settings),
       }),
-    onSuccess: async () => {
-      messageApi.success(t("messages.settingsSaved"));
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+    onSuccess: async (settings) => {
+      queryClient.setQueryData(["settings"], normalizeSettings(settings));
       await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
@@ -695,8 +776,8 @@ function App() {
     createTransactionMutation.mutate(normalizedValues);
   }
 
-  function submitSettings(values: AppSettings) {
-    updateSettingsMutation.mutate(values);
+  function updateSettingsOnChange(_: Partial<AppSettings>, values: AppSettings) {
+    updateSettingsMutation.mutate(normalizeSettings(values));
   }
 
   const isSavingTransaction =
@@ -743,48 +824,61 @@ function App() {
 
           <Layout.Content className="app-content">
             {activeView === "settings" ? (
-              <Space direction="vertical" size={24} className="content-stack settings-stack">
-                <Card className="settings-card" title={t("common.settings")}>
-                  <Form<AppSettings>
-                    form={settingsForm}
-                    layout="vertical"
-                    initialValues={activeSettings}
-                    onFinish={submitSettings}
+              <Form<AppSettings>
+                form={settingsForm}
+                layout="vertical"
+                initialValues={activeSettings}
+                onValuesChange={updateSettingsOnChange}
+              >
+                <Space direction="vertical" size={24} className="content-stack settings-stack">
+                  <ApplicationSettingsCard />
+
+                  <Card
+                    className="settings-card"
+                    title={<SectionTitle icon={<CodeOutlined />} label={t("settings.hledger")} />}
                   >
                     <Form.Item
-                      label={t("settings.journalPath")}
-                      name="journalPath"
-                      rules={[{ required: true, message: t("settings.journalPathRequired") }]}
+                      label={t("settings.hledgerExecutable")}
+                      name="hledgerPath"
                     >
-                      <Input placeholder={t("settings.journalPathPlaceholder")} />
-                    </Form.Item>
-                    <Form.Item label={t("settings.hledgerExecutable")} name="hledgerPath">
-                      <Input placeholder={t("settings.hledgerExecutablePlaceholder")} />
-                    </Form.Item>
-                    <Form.Item label={t("settings.advancedMode")} name="powerUser" valuePropName="checked" extra={t("settings.advancedModeHelp")}>
-                      <Switch />
-                    </Form.Item>
-                    <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
-                      <Select
-                        options={[
-                          { value: "system", label: t("settings.themeSystem") },
-                          { value: "dark", label: t("settings.themeDark") },
-                          { value: "light", label: t("settings.themeLight") },
-                        ]}
+                      <PathInput
+                        placeholder={hledgerQuery.data?.resolvedPath || t("settings.hledgerExecutablePlaceholder")}
+                        pickerTitle={t("settings.pickHledgerExecutable")}
+                        statusAddon={(
+                          <Tooltip
+                            title={hledgerQuery.data?.source === "configured"
+                              ? t("settings.hledgerUsingConfigured")
+                              : hledgerQuery.data?.resolvedPath
+                                ? t("settings.hledgerUsingDetected", { path: hledgerQuery.data.resolvedPath })
+                                : t("settings.hledgerExecutableHelp")}
+                          >
+                            <span>
+                              {hledgerQuery.data?.source === "configured"
+                                ? t("settings.configured")
+                                : hledgerQuery.data?.resolvedPath
+                                  ? t("settings.detected")
+                                  : t("settings.fallback")}
+                            </span>
+                          </Tooltip>
+                        )}
                       />
                     </Form.Item>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      icon={<SaveOutlined />}
-                      loading={updateSettingsMutation.isPending}
-                    >
-                      {t("common.saveSettings")}
-                    </Button>
-                  </Form>
-                </Card>
-                <AppRuntimeCard hledgerStatus={hledgerQuery.data} />
-              </Space>
+                    <Descriptions column={2} size="small" className="settings-meta">
+                      <Descriptions.Item label={t("settings.status")}>
+                        {hledgerQuery.data?.available ? (
+                          <Tag color="success">{t("common.available")}</Tag>
+                        ) : (
+                          <Tag color="error">{t("common.unavailable")}</Tag>
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label={t("hledger.version")}>
+                        {hledgerQuery.data?.version || t("common.notDetected")}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+
+                </Space>
+              </Form>
             ) : shouldShowCourtesy ? (
               <CourtesyState
                 reasons={courtesyReasons}

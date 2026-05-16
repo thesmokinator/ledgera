@@ -30,6 +30,8 @@ struct HledgerStatus {
     available: bool,
     version: String,
     message: String,
+    resolved_path: String,
+    source: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -169,7 +171,7 @@ fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetti
 #[tauri::command]
 fn check_hledger(app: AppHandle) -> Result<HledgerStatus, String> {
     let settings = read_settings(&app)?;
-    let executable = hledger_executable(&settings);
+    let (executable, source) = hledger_executable_with_source(&settings);
     let output = Command::new(&executable).arg("--version").output();
 
     match output {
@@ -179,17 +181,23 @@ fn check_hledger(app: AppHandle) -> Result<HledgerStatus, String> {
                 available: true,
                 version: version.clone(),
                 message: version,
+                resolved_path: executable,
+                source,
             })
         }
         Ok(output) => Ok(HledgerStatus {
             available: false,
             version: String::new(),
             message: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+            resolved_path: executable,
+            source,
         }),
         Err(error) => Ok(HledgerStatus {
             available: false,
             version: String::new(),
             message: error.to_string(),
+            resolved_path: executable,
+            source,
         }),
     }
 }
@@ -302,12 +310,20 @@ fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
 
 /// Resolves the hledger executable from settings or common macOS/user-shell locations.
 fn hledger_executable(settings: &AppSettings) -> String {
+    hledger_executable_with_source(settings).0
+}
+
+fn hledger_executable_with_source(settings: &AppSettings) -> (String, String) {
     let configured = settings.hledger_path.trim();
     if !configured.is_empty() {
-        return configured.to_string();
+        return (configured.to_string(), "configured".to_string());
     }
 
-    find_hledger_executable().unwrap_or_else(|| "hledger".to_string())
+    if let Some(detected) = find_hledger_executable() {
+        return (detected, "detected".to_string());
+    }
+
+    ("hledger".to_string(), "fallback".to_string())
 }
 
 /// Finds hledger in common installation folders and in the user's login shell PATH.

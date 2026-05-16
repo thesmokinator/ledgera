@@ -491,9 +491,80 @@ button {
     margin-right: 12px !important;
 }
 
+.settings-meta .ant-descriptions-item-label,
+.settings-meta .ant-descriptions-item-content,
 .app-info-card .ant-descriptions-item-label,
 .app-info-card .ant-descriptions-item-content {
     color: #d4d4d4 !important;
+}
+
+.settings-section-title {
+    gap: 8px;
+}
+
+.settings-section-title .anticon {
+    color: #a3a3a3;
+}
+
+.application-settings-card {
+    display: grid;
+    gap: 18px;
+}
+
+.application-meta-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.application-meta-row .ant-typography {
+    color: #d4d4d4;
+}
+
+.path-input-group .ant-input {
+    min-width: 0;
+}
+
+.path-input-addon {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    color: #d4d4d4;
+    white-space: nowrap;
+    background: #252525;
+    border: 1px solid #3a3a3a;
+    border-right: 0;
+    border-left: 0;
+}
+
+.hidden-file-input {
+    display: none;
+}
+
+.developer-settings {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid #2c2c2c;
+}
+
+.developer-settings .ant-typography {
+    color: #d4d4d4;
+}
+
+.developer-settings .ant-typography-secondary,
+.developer-settings .ant-typography p,
+.developer-settings .ant-typography + .ant-typography {
+    color: #a3a3a3;
+}
+
+.developer-settings .ant-typography.ant-typography-secondary,
+.developer-settings p.ant-typography {
+    margin: 4px 0 0;
+    color: #a3a3a3;
 }
 
 .courtesy-card.ant-card {
@@ -669,9 +740,30 @@ button {
 
 .theme-light .bridge-meta .ant-descriptions-item-label,
 .theme-light .bridge-meta .ant-descriptions-item-content,
+.theme-light .settings-meta .ant-descriptions-item-label,
+.theme-light .settings-meta .ant-descriptions-item-content,
 .theme-light .app-info-card .ant-descriptions-item-label,
 .theme-light .app-info-card .ant-descriptions-item-content {
     color: #374151 !important;
+}
+
+.theme-light .application-meta-row .ant-typography,
+.theme-light .developer-settings .ant-typography {
+    color: #111827;
+}
+
+.theme-light .developer-settings p.ant-typography {
+    color: #6b7280;
+}
+
+.theme-light .developer-settings {
+    border-color: #e5e7eb;
+}
+
+.theme-light .path-input-addon {
+    color: #374151;
+    background: #f3f4f6;
+    border-color: #d1d5db;
 }
 
 .theme-light .trend-chart line {
