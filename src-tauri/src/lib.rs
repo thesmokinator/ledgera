@@ -274,6 +274,7 @@ fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, Stri
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_app_settings,
             update_app_settings,
@@ -644,31 +645,34 @@ fn append_transaction_routed(
             append_to_existing_file(settings, main_journal, main_journal, input)
         }
         RoutingStrategy::Flat(includes) => {
-            let target_name = target_subjournal_name(input);
-            let target_file = main_journal
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .join(&target_name);
-            if includes.contains(&target_name) || target_file.exists() {
+            let target_include = flat_target_include(&includes, input);
+            let target_file = resolve_relative_to_main(main_journal, &target_include);
+            if target_file.exists() {
                 append_to_existing_file(settings, main_journal, &target_file, input)
             } else {
                 append_to_new_flat_subjournal(
                     settings,
                     main_journal,
                     &target_file,
-                    &target_name,
+                    &target_include,
                     input,
                 )
             }
         }
-        RoutingStrategy::Glob(years) => {
-            let (target_file, year) = glob_target_path(main_journal, input);
+        RoutingStrategy::Glob(includes) => {
+            let (target_file, target_include) = glob_target_path(main_journal, &includes, input);
             if target_file.exists() {
                 append_to_existing_file(settings, main_journal, &target_file, input)
-            } else if years.contains(&year) {
+            } else if glob_include_matches_year(&target_include, &includes) {
                 append_to_new_glob_subjournal(settings, main_journal, &target_file, input)
             } else {
-                append_to_new_glob_year(settings, main_journal, &target_file, &year, input)
+                append_to_new_glob_year(
+                    settings,
+                    main_journal,
+                    &target_file,
+                    &target_include,
+                    input,
+                )
             }
         }
     }
@@ -733,7 +737,7 @@ fn append_to_new_glob_year(
     settings: &AppSettings,
     main_journal: &Path,
     target_file: &Path,
-    year: &str,
+    target_include: &str,
     input: &TransactionInput,
 ) -> Result<(), String> {
     let original_main = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
@@ -741,7 +745,7 @@ fn append_to_new_glob_year(
         .parent()
         .ok_or_else(|| "Unable to resolve target journal directory.".to_string())?;
     let year_dir_created = !year_dir.exists();
-    let updated_main = insert_glob_include_sorted(&original_main, &format!("{}/*.journal", year));
+    let updated_main = insert_glob_include_sorted(&original_main, target_include);
 
     fs::write(main_journal, updated_main).map_err(|error| error.to_string())?;
     fs::create_dir_all(year_dir).map_err(|error| error.to_string())?;
@@ -772,12 +776,12 @@ fn append_transaction_text(content: &str, input: &TransactionInput) -> String {
 }
 
 fn detect_routing_strategy(content: &str) -> RoutingStrategy {
-    let glob_years = content
+    let glob_includes = content
         .lines()
-        .filter_map(parse_glob_include_year)
+        .filter_map(parse_glob_include)
         .collect::<Vec<_>>();
-    if !glob_years.is_empty() {
-        return RoutingStrategy::Glob(glob_years);
+    if !glob_includes.is_empty() {
+        return RoutingStrategy::Glob(glob_includes);
     }
 
     let flat_files = content
@@ -813,32 +817,113 @@ fn parse_flat_include_filename(line: &str) -> Option<String> {
     }
 }
 
-fn parse_glob_include_year(line: &str) -> Option<String> {
+fn parse_glob_include(line: &str) -> Option<String> {
     let include = parse_include_directive(line)?;
-    let (year, rest) = include.split_once('/')?;
-    if year.len() == 4
-        && year.chars().all(|character| character.is_ascii_digit())
-        && rest == "*.journal"
-    {
-        Some(year.to_string())
+    if include.ends_with("/*.journal") && glob_include_year(&include).is_some() {
+        Some(include)
     } else {
         None
     }
+}
+
+fn glob_include_year(include: &str) -> Option<String> {
+    let mut parts = include.split('/').collect::<Vec<_>>();
+    if parts.pop()? != "*.journal" {
+        return None;
+    }
+    parts
+        .into_iter()
+        .rev()
+        .find(|part| part.len() == 4 && part.chars().all(|character| character.is_ascii_digit()))
+        .map(ToString::to_string)
 }
 
 fn target_subjournal_name(input: &TransactionInput) -> String {
     format!("{}.journal", input.date.chars().take(7).collect::<String>())
 }
 
-fn glob_target_path(main_journal: &Path, input: &TransactionInput) -> (PathBuf, String) {
+fn flat_target_include(includes: &[String], input: &TransactionInput) -> String {
+    let target_name = target_subjournal_name(input);
+    if let Some(existing) = includes.iter().find(|include| {
+        Path::new(include)
+            .file_name()
+            .and_then(|name| name.to_str())
+            == Some(target_name.as_str())
+    }) {
+        return existing.clone();
+    }
+
+    let target_year = input.date.chars().take(4).collect::<String>();
+    if let Some(similar_year_include) = includes.iter().find(|include| {
+        Path::new(include)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.starts_with(&target_year))
+            .unwrap_or(false)
+    }) {
+        return Path::new(similar_year_include)
+            .parent()
+            .map(|parent| parent.join(&target_name).to_string_lossy().to_string())
+            .unwrap_or(target_name);
+    }
+
+    target_name
+}
+
+fn resolve_relative_to_main(main_journal: &Path, include: &str) -> PathBuf {
+    let include_path = PathBuf::from(include);
+    if include_path.is_absolute() {
+        include_path
+    } else {
+        main_journal
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(include_path)
+    }
+}
+
+fn glob_target_path(
+    main_journal: &Path,
+    includes: &[String],
+    input: &TransactionInput,
+) -> (PathBuf, String) {
     let year = input.date.chars().take(4).collect::<String>();
     let month = input.date.chars().skip(5).take(2).collect::<String>();
-    let target = main_journal
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .join(&year)
-        .join(format!("{}.journal", month));
-    (target, year)
+    let target_include = glob_target_include(includes, &year);
+    let target_file = resolve_relative_to_main(
+        main_journal,
+        &target_include.replace("*.journal", &format!("{}.journal", month)),
+    );
+    (target_file, target_include)
+}
+
+fn glob_target_include(includes: &[String], year: &str) -> String {
+    if let Some(existing) = includes
+        .iter()
+        .find(|include| glob_include_year(include).as_deref() == Some(year))
+    {
+        return existing.clone();
+    }
+
+    if let Some(first) = includes.first() {
+        let mut parts = first.split('/').collect::<Vec<_>>();
+        let _ = parts.pop();
+        if let Some(index) = parts.iter().rposition(|part| {
+            part.len() == 4 && part.chars().all(|character| character.is_ascii_digit())
+        }) {
+            parts[index] = year;
+            return format!("{}/*.journal", parts.join("/"));
+        }
+    }
+
+    format!("{}/*.journal", year)
+}
+
+fn glob_include_matches_year(target_include: &str, includes: &[String]) -> bool {
+    let target_year = glob_include_year(target_include);
+    includes
+        .iter()
+        .any(|include| glob_include_year(include) == target_year)
 }
 
 fn insert_include_sorted(content: &str, new_include: &str) -> String {
@@ -846,9 +931,7 @@ fn insert_include_sorted(content: &str, new_include: &str) -> String {
 }
 
 fn insert_glob_include_sorted(content: &str, new_include: &str) -> String {
-    insert_sorted_include(content, new_include, |line| {
-        parse_glob_include_year(line).map(|year| format!("{}/*.journal", year))
-    })
+    insert_sorted_include(content, new_include, parse_glob_include)
 }
 
 fn insert_sorted_include<F>(content: &str, new_include: &str, parser: F) -> String
@@ -1478,6 +1561,48 @@ mod tests {
     }
 
     #[test]
+    fn reads_nested_tree_journal_with_directives_and_prices() {
+        let dir = temp_dir("read-tree");
+        let main = dir.join("main.journal");
+        write_file(
+            &main,
+            "include accounts.journal\n\ninclude yearly/2026/recurring.journal\ninclude yearly/2026/2026-05.journal\n\ninclude prices/xeon.journal\n",
+        );
+        write_file(
+            &dir.join("accounts.journal"),
+            "commodity €\n  format €1.000,00\n\naccount assets:bank:fineco\n\n2026-05-16 Opening balances\n    assets:bank:fineco  €5706,51\n    equity:opening-balances\n",
+        );
+        write_file(
+            &dir.join("yearly/2026/recurring.journal"),
+            "; recurring transactions go here\n",
+        );
+        write_file(
+            &dir.join("yearly/2026/2026-05.journal"),
+            "; May 2026\n\n2026-05-20 Groceries\n    expenses:food  €25,00\n    assets:bank:fineco\n",
+        );
+        write_file(
+            &dir.join("prices/xeon.journal"),
+            "P 2026-05-16 XEON €148,70087\n",
+        );
+
+        let summary = read_journal_summary(&main).expect("tree journal should load");
+
+        assert_eq!(summary.transactions.len(), 2);
+        assert!(summary
+            .transactions
+            .iter()
+            .any(|transaction| transaction.description == "Opening balances"
+                && transaction.source_file.ends_with("accounts.journal")));
+        assert!(summary
+            .transactions
+            .iter()
+            .any(|transaction| transaction.description == "Groceries"
+                && transaction
+                    .source_file
+                    .ends_with("yearly/2026/2026-05.journal")));
+    }
+
+    #[test]
     fn appends_to_existing_flat_subjournal_for_transaction_month() {
         let dir = temp_dir("append-flat-existing");
         let main = dir.join("main.journal");
@@ -1496,6 +1621,68 @@ mod tests {
         let may_content = fs::read_to_string(&may).expect("may journal should be readable");
         assert_eq!(main_content.matches("include 2026-05.journal").count(), 1);
         assert!(may_content.contains("2026-05-20 * New split transaction"));
+    }
+
+    #[test]
+    fn appends_to_existing_tree_subjournal_for_transaction_month() {
+        let dir = temp_dir("append-tree-existing");
+        let main = dir.join("main.journal");
+        let may = dir.join("yearly/2026/2026-05.journal");
+        write_file(
+            &main,
+            "include accounts.journal\ninclude yearly/2026/2026-05.journal\ninclude prices/xeon.journal\n",
+        );
+        write_file(
+            &dir.join("accounts.journal"),
+            "account assets:bank:fineco\n",
+        );
+        write_file(
+            &dir.join("prices/xeon.journal"),
+            "P 2026-05-16 XEON €148,70087\n",
+        );
+        write_file(&may, "; May 2026\n");
+        let settings = settings_for(&main);
+
+        create_transaction_for_settings(&settings, &input("2026-05-20", "Tree routed"))
+            .expect("transaction should route to existing nested month file");
+
+        let main_content = fs::read_to_string(&main).expect("main should be readable");
+        let may_content = fs::read_to_string(&may).expect("may journal should be readable");
+        assert!(!main_content.contains("2026-05-20 * Tree routed"));
+        assert!(may_content.contains("2026-05-20 * Tree routed"));
+    }
+
+    #[test]
+    fn creates_missing_flat_tree_subjournal_and_sorted_include() {
+        let dir = temp_dir("append-tree-new");
+        let main = dir.join("main.journal");
+        write_file(
+            &main,
+            "include yearly/2026/2026-04.journal\ninclude yearly/2026/2026-06.journal\n",
+        );
+        write_file(&dir.join("yearly/2026/2026-04.journal"), "");
+        write_file(&dir.join("yearly/2026/2026-06.journal"), "");
+        let settings = settings_for(&main);
+
+        create_transaction_for_settings(&settings, &input("2026-05-03", "Inserted tree month"))
+            .expect("missing nested month journal should be created");
+
+        let main_content = fs::read_to_string(&main).expect("main should be readable");
+        let includes = main_content
+            .lines()
+            .filter(|line| line.starts_with("include"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            includes,
+            vec![
+                "include yearly/2026/2026-04.journal",
+                "include yearly/2026/2026-05.journal",
+                "include yearly/2026/2026-06.journal",
+            ]
+        );
+        assert!(fs::read_to_string(dir.join("yearly/2026/2026-05.journal"))
+            .expect("new nested split file should exist")
+            .contains("2026-05-03 * Inserted tree month"));
     }
 
     #[test]
@@ -1526,6 +1713,24 @@ mod tests {
         assert!(fs::read_to_string(dir.join("2026-05.journal"))
             .expect("new split file should exist")
             .contains("2026-05-03 * Inserted month"));
+    }
+
+    #[test]
+    fn creates_new_nested_glob_year_and_month_file() {
+        let dir = temp_dir("append-nested-glob-new-year");
+        let main = dir.join("main.journal");
+        write_file(&main, "include yearly/2025/*.journal\n");
+        write_file(&dir.join("yearly/2025/12.journal"), "");
+        let settings = settings_for(&main);
+
+        create_transaction_for_settings(&settings, &input("2026-01-15", "New nested glob year"))
+            .expect("new nested glob year should be created");
+
+        let main_content = fs::read_to_string(&main).expect("main should be readable");
+        assert!(main_content.contains("include yearly/2026/*.journal"));
+        assert!(fs::read_to_string(dir.join("yearly/2026/01.journal"))
+            .expect("new nested glob month should exist")
+            .contains("2026-01-15 * New nested glob year"));
     }
 
     #[test]

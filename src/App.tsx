@@ -37,9 +37,10 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import packageJson from "../package.json";
 import "./App.css";
@@ -501,35 +502,26 @@ function PathInput({
   pickerTitle: string;
   statusAddon?: ReactNode;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  async function selectFile() {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      title: pickerTitle,
+    });
 
-  function selectFile(file?: File) {
-    if (!file) {
-      return;
+    if (typeof selected === "string") {
+      onChange?.(selected);
     }
-
-    onChange?.(((file as File & { path?: string }).path || file.name));
   }
 
   return (
-    <>
-      <Space.Compact block className="path-input-group">
-        <Input value={value} onChange={(event) => onChange?.(event.target.value)} placeholder={placeholder} />
-        {statusAddon ? <div className="path-input-addon">{statusAddon}</div> : null}
-        <Tooltip title={pickerTitle}>
-          <Button icon={<UploadOutlined />} onClick={() => inputRef.current?.click()} />
-        </Tooltip>
-      </Space.Compact>
-      <input
-        ref={inputRef}
-        className="hidden-file-input"
-        type="file"
-        tabIndex={-1}
-        aria-hidden="true"
-        style={{ display: "none" }}
-        onChange={(event) => selectFile(event.target.files?.[0])}
-      />
-    </>
+    <Space.Compact block className="path-input-group">
+      <Input value={value} onChange={(event) => onChange?.(event.target.value)} placeholder={placeholder} />
+      {statusAddon ? <div className="path-input-addon">{statusAddon}</div> : null}
+      <Tooltip title={pickerTitle}>
+        <Button icon={<UploadOutlined />} onClick={selectFile} />
+      </Tooltip>
+    </Space.Compact>
   );
 }
 
