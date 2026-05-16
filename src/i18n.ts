@@ -6,6 +6,8 @@ const resources = {
     translation: {
       common: {
         dashboard: "Dashboard",
+        transactions: "Transactions",
+        accounts: "Accounts",
         settings: "Settings",
         refresh: "Refresh",
         save: "Save",
@@ -15,14 +17,17 @@ const resources = {
         configure: "Configure",
         notDetected: "Not detected",
         noneDetected: "None detected",
+        previous: "Previous",
+        next: "Next",
+        currentMonth: "Current month",
       },
       dashboard: {
         monthlyTransactions: "Monthly Transactions",
-        monthlyTransactionsDescription: "Transactions from the start of this month through today",
+        monthlyTransactionsDescription: "Executed transactions in {{month}}",
         scheduledTransactions: "Scheduled Transactions",
-        scheduledTransactionsDescription: "Future-dated transactions through the end of this month",
-        activeAccounts: "Active Accounts",
-        activeAccountsDescription: "Accounts used by the visible monthly transactions",
+        scheduledTransactionsDescription: "Future-dated transactions in {{month}}",
+        activeAccounts: "Accounts",
+        activeAccountsDescription: "All accounts detected in the journal",
         rustBridge: "Rust bridge",
         configureJournal: "Configure a journal path in Settings to start.",
         totalVisitors: "Total Visitors",
@@ -31,6 +36,10 @@ const resources = {
         scheduledTransactionsTab: "Scheduled transactions",
         accountsTab: "Accounts ({{count}})",
         accountsDetected: "{{count}} accounts detected in this journal.",
+      },
+      accounts: {
+        allAccounts: "All accounts",
+        transactionsCount: "Transactions",
       },
       settings: {
         appInfo: "Application & hledger",

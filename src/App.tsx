@@ -1,6 +1,5 @@
 import {
   AutoComplete,
-  Badge,
   Button,
   Card,
   ConfigProvider,
@@ -22,10 +21,13 @@ import {
   theme,
 } from "antd";
 import {
+  BankOutlined,
   DeleteOutlined,
   EditOutlined,
   HomeOutlined,
+  LeftOutlined,
   PlusOutlined,
+  RightOutlined,
   ReloadOutlined,
   SaveOutlined,
   SettingOutlined,
@@ -152,7 +154,8 @@ const defaultSettings: AppSettings = {
 };
 
 const primaryNavigation: NavigationItem[] = [
-  { key: "transactions", label: "common.dashboard", icon: <HomeOutlined /> },
+  { key: "transactions", label: "common.transactions", icon: <HomeOutlined /> },
+  { key: "accounts", label: "common.accounts", icon: <BankOutlined /> },
 ];
 
 const settingsNavigation: NavigationItem[] = [
@@ -220,7 +223,38 @@ function formatCount(value: number): string {
   return new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value);
 }
 
+function isSameJournalMonth(date: string, month: dayjs.Dayjs): boolean {
+  const parsedDate = dayjs(date, journalDateFormat, true);
+  return parsedDate.isValid() && parsedDate.isSame(month, "month");
+}
 
+function isExecutedTransaction(transaction: JournalTransaction): boolean {
+  const parsedDate = dayjs(transaction.date, journalDateFormat, true);
+  return parsedDate.isValid() && !parsedDate.isAfter(dayjs(), "day");
+}
+
+function collectAccounts(transactions: JournalTransaction[]) {
+  const accountsByName = new Map<string, { account: string; transactions: number }>();
+
+  transactions.forEach((transaction) => {
+    const accountsInTransaction = new Set(
+      transaction.postings
+        .map((posting) => posting.account.trim())
+        .filter(Boolean),
+    );
+
+    accountsInTransaction.forEach((account) => {
+      const key = account.toLowerCase();
+      const current = accountsByName.get(key) ?? { account, transactions: 0 };
+      current.transactions += 1;
+      accountsByName.set(key, current);
+    });
+  });
+
+  return Array.from(accountsByName.values()).sort((left, right) =>
+    left.account.localeCompare(right.account),
+  );
+}
 
 
 
@@ -297,6 +331,88 @@ function CourtesyState({
   );
 }
 
+function TransactionsTable({
+  transactions,
+  loading,
+  powerUser,
+  onEdit,
+  onDelete,
+}: {
+  transactions: JournalTransaction[];
+  loading: boolean;
+  powerUser: boolean;
+  onEdit: (transaction: JournalTransaction) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Table<JournalTransaction>
+      rowKey="id"
+      loading={loading}
+      dataSource={transactions}
+      pagination={{ pageSize: 8 }}
+      expandable={
+        powerUser
+          ? {
+            expandedRowRender: (transaction) => (
+              <pre className="transaction-raw">{transaction.raw}</pre>
+            ),
+          }
+          : undefined
+      }
+      columns={[
+        { title: t("transactions.date"), dataIndex: "date", width: 132 },
+        { title: t("transactions.status"), dataIndex: "status", width: 88, render: (status: string) => status || "-" },
+        { title: t("transactions.description"), dataIndex: "description" },
+        {
+          title: t("transactions.account"),
+          width: 260,
+          render: (_, transaction) => transaction.display.account,
+        },
+        {
+          title: t("transactions.amount"),
+          width: 160,
+          align: "right",
+          render: (_, transaction) => (
+            <span className={`transaction-amount transaction-amount-${transaction.display.kind}`}>
+              {transaction.display.amount}
+            </span>
+          ),
+        },
+        ...(powerUser
+          ? [
+            {
+              title: t("transactions.lines"),
+              width: 120,
+              render: (_: unknown, transaction: JournalTransaction) =>
+                `${transaction.startLine}-${transaction.endLine}`,
+            },
+          ]
+          : []),
+        {
+          title: t("transactions.actions"),
+          width: 136,
+          render: (_, transaction) => (
+            <Space>
+              <Button aria-label={t("transactions.editTransactionAction")} icon={<EditOutlined />} onClick={() => onEdit(transaction)} />
+              <Popconfirm
+                title={t("transactions.deleteTransactionAction")}
+                description={t("transactions.deleteTransactionDescription")}
+                okText={t("transactions.delete")}
+                okButtonProps={{ danger: true }}
+                onConfirm={() => onDelete(transaction.id)}
+              >
+                <Button danger aria-label={t("transactions.deleteTransactionAction")} icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </Space>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
 function AppRuntimeCard({
   hledgerStatus,
 }: {
@@ -332,6 +448,7 @@ function AppRuntimeCard({
 /** Renders the Ledgera desktop application. */
 function App() {
   const [activeView, setActiveView] = useState("transactions");
+  const [activeMonth, setActiveMonth] = useState(() => dayjs().startOf("month"));
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [transactionForm] = Form.useForm<TransactionInput>();
@@ -348,7 +465,7 @@ function App() {
 
   const activeSettings = normalizeSettings(settingsQuery.data);
   const isDarkTheme = activeSettings.theme === "system" ? systemPrefersDark : activeSettings.theme === "dark";
-  const activeTitle = activeView === "settings" ? t("common.settings") : t("common.dashboard");
+  const activeTitle = activeView === "settings" ? t("common.settings") : t(`common.${activeView}`);
 
   const hledgerQuery = useQuery({
     queryKey: ["hledger-status"],
@@ -457,10 +574,17 @@ function App() {
   const shouldShowCourtesy = courtesyReasons.length > 0;
 
 
-  const dashboardSummary = transactionsQuery.data?.dashboard;
-  const monthlyTransactions = dashboardSummary?.monthlyTransactions ?? [];
-  const scheduledTransactions = dashboardSummary?.scheduledTransactions ?? [];
-  const accountsCount = dashboardSummary?.activeAccountsCount ?? 0;
+  const transactions = transactionsQuery.data?.transactions ?? [];
+  const visibleMonthTransactions = transactions.filter((transaction) =>
+    isSameJournalMonth(transaction.date, activeMonth),
+  );
+  const monthlyTransactions = visibleMonthTransactions.filter(isExecutedTransaction);
+  const scheduledTransactions = visibleMonthTransactions.filter(
+    (transaction) => !isExecutedTransaction(transaction),
+  );
+  const accounts = collectAccounts(transactions);
+  const accountsCount = accounts.length;
+  const activeMonthLabel = activeMonth.format("MMMM YYYY");
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -615,96 +739,74 @@ function App() {
                 details={journalLoadError || hledgerQuery.data?.message}
                 onConfigure={() => setActiveView("settings")}
               />
+            ) : activeView === "accounts" ? (
+              <Space direction="vertical" size={24} className="content-stack">
+                <Card className="settings-card" title={t("accounts.allAccounts")}>
+                  <Table
+                    rowKey="account"
+                    loading={transactionsQuery.isFetching}
+                    dataSource={accounts}
+                    pagination={{ pageSize: 12 }}
+                    columns={[
+                      { title: t("transactions.account"), dataIndex: "account" },
+                      {
+                        title: t("accounts.transactionsCount"),
+                        dataIndex: "transactions",
+                        width: 180,
+                        align: "right",
+                      },
+                    ]}
+                  />
+                </Card>
+              </Space>
             ) : (
               <Space direction="vertical" size={24} className="content-stack">
                 <div className="metric-grid">
                   <Card className="metric-card">
                     <span>{t("dashboard.monthlyTransactions")}</span>
                     <strong>{formatCount(monthlyTransactions.length)}</strong>
-                    <Badge count="mtd" />
-                    <p>{t("dashboard.monthlyTransactionsDescription")}</p>
+                    <p>{t("dashboard.monthlyTransactionsDescription", { month: activeMonthLabel })}</p>
                   </Card>
                   <Card className="metric-card">
                     <span>{t("dashboard.scheduledTransactions")}</span>
                     <strong>{formatCount(scheduledTransactions.length)}</strong>
-                    <Badge count="month" />
-                    <p>{t("dashboard.scheduledTransactionsDescription")}</p>
+                    <p>{t("dashboard.scheduledTransactionsDescription", { month: activeMonthLabel })}</p>
                   </Card>
                   <Card className="metric-card">
                     <span>{t("dashboard.activeAccounts")}</span>
                     <strong>{formatCount(accountsCount)}</strong>
-                    <Badge count="chart" />
                     <p>{t("dashboard.activeAccountsDescription")}</p>
                   </Card>
                 </div>
+
+                <Card className="settings-card month-toolbar-card">
+                  <Space className="month-toolbar" wrap>
+                    <Button icon={<LeftOutlined />} onClick={() => setActiveMonth((month) => month.subtract(1, "month"))}>
+                      {t("common.previous")}
+                    </Button>
+                    <Typography.Title level={4}>{activeMonthLabel}</Typography.Title>
+                    <Button icon={<RightOutlined />} onClick={() => setActiveMonth((month) => month.add(1, "month"))}>
+                      {t("common.next")}
+                    </Button>
+                    <Button onClick={() => setActiveMonth(dayjs().startOf("month"))}>
+                      {t("common.currentMonth")}
+                    </Button>
+                  </Space>
+                </Card>
 
                 <Tabs
                   className="document-tabs"
                   items={[
                     {
-                      key: "outline",
+                      key: "executed",
                       label: t("dashboard.monthlyTransactionsTab"),
                       children: (
-                        <Table<JournalTransaction>
-                          rowKey="id"
+                        <TransactionsTable
+                          transactions={monthlyTransactions}
                           loading={transactionsQuery.isFetching}
-                          dataSource={monthlyTransactions}
-                          pagination={{ pageSize: 8 }}
-                          expandable={
-                            activeSettings.powerUser
-                              ? {
-                                expandedRowRender: (transaction) => (
-                                  <pre className="transaction-raw">{transaction.raw}</pre>
-                                ),
-                              }
-                              : undefined
-                          }
-                          columns={[
-                            { title: t("transactions.date"), dataIndex: "date", width: 132 },
-                            { title: t("transactions.status"), dataIndex: "status", width: 88, render: (status: string) => status || "-" },
-                            { title: t("transactions.description"), dataIndex: "description" },
-                            {
-                              title: t("transactions.account"),
-                              width: 260,
-                              render: (_, transaction) => transaction.display.account,
-                            },
-                            {
-                              title: t("transactions.amount"),
-                              width: 160,
-                              align: "right",
-                              render: (_, transaction) => {
-                                return <span className={`transaction-amount transaction-amount-${transaction.display.kind}`}>{transaction.display.amount}</span>;
-                              },
-                            },
-                            ...(activeSettings.powerUser
-                              ? [
-                                {
-                                  title: t("transactions.lines"),
-                                  width: 120,
-                                  render: (_: unknown, transaction: JournalTransaction) =>
-                                    `${transaction.startLine}-${transaction.endLine}`,
-                                },
-                              ]
-                              : []),
-                            {
-                              title: t("transactions.actions"),
-                              width: 136,
-                              render: (_, transaction) => (
-                                <Space>
-                                  <Button aria-label={t("transactions.editTransactionAction")} icon={<EditOutlined />} onClick={() => openEditTransaction(transaction)} />
-                                  <Popconfirm
-                                    title={t("transactions.deleteTransactionAction")}
-                                    description={t("transactions.deleteTransactionDescription")}
-                                    okText={t("transactions.delete")}
-                                    okButtonProps={{ danger: true }}
-                                    onConfirm={() => deleteTransactionMutation.mutate(transaction.id)}
-                                  >
-                                    <Button danger aria-label={t("transactions.deleteTransactionAction")} icon={<DeleteOutlined />} />
-                                  </Popconfirm>
-                                </Space>
-                              ),
-                            },
-                          ]}
+                          powerUser={activeSettings.powerUser}
+                          onEdit={openEditTransaction}
+                          onDelete={(id) => deleteTransactionMutation.mutate(id)}
                         />
                       ),
                     },
@@ -712,66 +814,12 @@ function App() {
                       key: "scheduled",
                       label: t("dashboard.scheduledTransactionsTab"),
                       children: (
-                        <Table<JournalTransaction>
-                          rowKey="id"
+                        <TransactionsTable
+                          transactions={scheduledTransactions}
                           loading={transactionsQuery.isFetching}
-                          dataSource={scheduledTransactions}
-                          pagination={{ pageSize: 8 }}
-                          expandable={
-                            activeSettings.powerUser
-                              ? {
-                                expandedRowRender: (transaction) => (
-                                  <pre className="transaction-raw">{transaction.raw}</pre>
-                                ),
-                              }
-                              : undefined
-                          }
-                          columns={[
-                            { title: t("transactions.date"), dataIndex: "date", width: 132 },
-                            { title: t("transactions.status"), dataIndex: "status", width: 88, render: (status: string) => status || "-" },
-                            { title: t("transactions.description"), dataIndex: "description" },
-                            {
-                              title: t("transactions.account"),
-                              width: 260,
-                              render: (_, transaction) => transaction.display.account,
-                            },
-                            {
-                              title: t("transactions.amount"),
-                              width: 160,
-                              align: "right",
-                              render: (_, transaction) => {
-                                return <span className={`transaction-amount transaction-amount-${transaction.display.kind}`}>{transaction.display.amount}</span>;
-                              },
-                            },
-                            ...(activeSettings.powerUser
-                              ? [
-                                {
-                                  title: t("transactions.lines"),
-                                  width: 120,
-                                  render: (_: unknown, transaction: JournalTransaction) =>
-                                    `${transaction.startLine}-${transaction.endLine}`,
-                                },
-                              ]
-                              : []),
-                            {
-                              title: t("transactions.actions"),
-                              width: 136,
-                              render: (_, transaction) => (
-                                <Space>
-                                  <Button aria-label={t("transactions.editTransactionAction")} icon={<EditOutlined />} onClick={() => openEditTransaction(transaction)} />
-                                  <Popconfirm
-                                    title={t("transactions.deleteTransactionAction")}
-                                    description={t("transactions.deleteTransactionDescription")}
-                                    okText={t("transactions.delete")}
-                                    okButtonProps={{ danger: true }}
-                                    onConfirm={() => deleteTransactionMutation.mutate(transaction.id)}
-                                  >
-                                    <Button danger aria-label={t("transactions.deleteTransactionAction")} icon={<DeleteOutlined />} />
-                                  </Popconfirm>
-                                </Space>
-                              ),
-                            },
-                          ]}
+                          powerUser={activeSettings.powerUser}
+                          onEdit={openEditTransaction}
+                          onDelete={(id) => deleteTransactionMutation.mutate(id)}
                         />
                       ),
                     },

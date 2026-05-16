@@ -232,19 +232,6 @@ button {
     letter-spacing: -0.04em;
 }
 
-.metric-card .ant-badge {
-    position: absolute;
-    top: 18px;
-    right: 18px;
-}
-
-.metric-card .ant-badge-count {
-    color: #f5f5f5;
-    background: #252525;
-    border: 1px solid #3a3a3a;
-    box-shadow: none;
-}
-
 .metric-card p {
     margin: 14px -24px -24px;
     padding: 16px 24px;
@@ -462,6 +449,30 @@ button {
     border-color: #2c2c2c;
 }
 
+.month-toolbar {
+    width: 100%;
+}
+
+.month-toolbar h4.ant-typography {
+    min-width: 180px;
+    margin: 0;
+    color: #f5f5f5;
+    text-align: center;
+}
+
+.settings-card .ant-table,
+.settings-card .ant-table-thead > tr > th,
+.settings-card .ant-table-tbody > tr > td,
+.settings-card .ant-table-cell-row-hover {
+    color: #f5f5f5;
+    background: #141414 !important;
+    border-color: #2c2c2c !important;
+}
+
+.settings-card .ant-table-thead > tr > th {
+    color: #a3a3a3;
+}
+
 .app-info-card .ant-descriptions-item-label,
 .app-info-card .ant-descriptions-item-content {
     color: #d4d4d4 !important;
@@ -554,10 +565,9 @@ button {
 
 .posting-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(
-            0,
-            0.9fr
-        ) auto;
+    grid-template-columns:
+        minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(0, 0.9fr)
+        auto;
     column-gap: 8px;
     width: 100%;
 }
@@ -610,6 +620,10 @@ button {
 
 .theme-light .app-header {
     border-bottom-color: #e5e7eb;
+}
+
+.theme-light .month-toolbar h4.ant-typography {
+    color: #111827;
 }
 
 .theme-light .metric-card.ant-card,
@@ -681,7 +695,11 @@ button {
 .theme-light .document-tabs .ant-table,
 .theme-light .document-tabs .ant-table-thead > tr > th,
 .theme-light .document-tabs .ant-table-tbody > tr > td,
-.theme-light .document-tabs .ant-table-cell-row-hover {
+.theme-light .document-tabs .ant-table-cell-row-hover,
+.theme-light .settings-card .ant-table,
+.theme-light .settings-card .ant-table-thead > tr > th,
+.theme-light .settings-card .ant-table-tbody > tr > td,
+.theme-light .settings-card .ant-table-cell-row-hover {
     color: #111827;
     background: #ffffff !important;
     border-color: #e5e7eb !important;
