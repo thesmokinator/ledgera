@@ -40,6 +40,10 @@ const resources = {
       accounts: {
         allAccounts: "All accounts",
         transactionsCount: "Transactions",
+        activityRange: "Activity range",
+        currentMonth: "Current month",
+        lastDays: "Last {{count}} days",
+        accountActivity: "{{count}} transactions for {{account}}",
       },
       settings: {
         appInfo: "Application & hledger",

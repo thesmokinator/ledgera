@@ -81,13 +81,6 @@ button {
     margin: 12px 0;
 }
 
-.sidebar-bottom-nav {
-    position: absolute;
-    right: 16px;
-    bottom: 18px;
-    left: 16px;
-}
-
 .nav-group-title.ant-typography {
     margin: 18px 8px 6px;
     color: #a3a3a3;
@@ -473,6 +466,31 @@ button {
     color: #a3a3a3;
 }
 
+.accounts-range-control .ant-typography,
+.account-transactions-title.ant-typography {
+    color: #d4d4d4;
+}
+
+.accounts-range-control .ant-select {
+    min-width: 160px;
+}
+
+.account-transactions-panel {
+    display: grid;
+    gap: 12px;
+    padding: 8px 0 4px;
+}
+
+.account-transactions-panel .ant-table-wrapper {
+    overflow: hidden;
+    border: 1px solid #2c2c2c;
+    border-radius: 10px;
+}
+
+.account-transactions-panel .ant-table-pagination {
+    margin-right: 12px !important;
+}
+
 .app-info-card .ant-descriptions-item-label,
 .app-info-card .ant-descriptions-item-content {
     color: #d4d4d4 !important;
@@ -753,6 +771,15 @@ button {
     border-color: #e5e7eb;
 }
 
+.theme-light .accounts-range-control .ant-typography,
+.theme-light .account-transactions-title.ant-typography {
+    color: #374151;
+}
+
+.theme-light .account-transactions-panel .ant-table-wrapper {
+    border-color: #e5e7eb;
+}
+
 @media (max-width: 1040px) {
     .metric-grid {
         grid-template-columns: 1fr;
@@ -771,11 +798,6 @@ button {
         min-width: 0 !important;
         min-height: auto;
         padding-bottom: 18px;
-    }
-
-    .sidebar-bottom-nav {
-        position: static;
-        margin-top: 16px;
     }
 
     .app-header {

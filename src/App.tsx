@@ -124,6 +124,14 @@ type NavigationItem = {
   icon: ReactNode;
 };
 
+type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";
+
+type AccountSummary = {
+  account: string;
+  transactions: number;
+  accountTransactions: JournalTransaction[];
+};
+
 
 
 
@@ -156,10 +164,16 @@ const defaultSettings: AppSettings = {
 const primaryNavigation: NavigationItem[] = [
   { key: "transactions", label: "common.transactions", icon: <HomeOutlined /> },
   { key: "accounts", label: "common.accounts", icon: <BankOutlined /> },
+  { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
 ];
 
-const settingsNavigation: NavigationItem[] = [
-  { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
+const accountActivityRangeOptions: AccountActivityRange[] = [
+  "current-month",
+  "30",
+  "60",
+  "90",
+  "180",
+  "365",
 ];
 
 function toAutocompleteOptions(values: string[]) {
@@ -233,27 +247,56 @@ function isExecutedTransaction(transaction: JournalTransaction): boolean {
   return parsedDate.isValid() && !parsedDate.isAfter(dayjs(), "day");
 }
 
-function collectAccounts(transactions: JournalTransaction[]) {
-  const accountsByName = new Map<string, { account: string; transactions: number }>();
+function transactionIncludesAccount(transaction: JournalTransaction, account: string): boolean {
+  return transaction.postings.some(
+    (posting) => posting.account.trim().toLowerCase() === account.toLowerCase(),
+  );
+}
+
+function isInAccountActivityRange(transaction: JournalTransaction, range: AccountActivityRange): boolean {
+  const parsedDate = dayjs(transaction.date, journalDateFormat, true);
+  if (!parsedDate.isValid()) {
+    return false;
+  }
+
+  const today = dayjs().startOf("day");
+  if (range === "current-month") {
+    return parsedDate.isSame(today, "month");
+  }
+
+  const days = Number(range);
+  const rangeStart = today.subtract(days - 1, "day");
+  return !parsedDate.isBefore(rangeStart, "day") && !parsedDate.isAfter(today, "day");
+}
+
+function collectAccounts(
+  transactions: JournalTransaction[],
+  visibleTransactions: JournalTransaction[],
+): AccountSummary[] {
+  const accountNames = new Map<string, string>();
 
   transactions.forEach((transaction) => {
-    const accountsInTransaction = new Set(
-      transaction.postings
-        .map((posting) => posting.account.trim())
-        .filter(Boolean),
-    );
-
-    accountsInTransaction.forEach((account) => {
-      const key = account.toLowerCase();
-      const current = accountsByName.get(key) ?? { account, transactions: 0 };
-      current.transactions += 1;
-      accountsByName.set(key, current);
+    transaction.postings.forEach((posting) => {
+      const account = posting.account.trim();
+      if (account) {
+        accountNames.set(account.toLowerCase(), account);
+      }
     });
   });
 
-  return Array.from(accountsByName.values()).sort((left, right) =>
-    left.account.localeCompare(right.account),
-  );
+  return Array.from(accountNames.values())
+    .map((account) => {
+      const accountTransactions = visibleTransactions.filter((transaction) =>
+        transactionIncludesAccount(transaction, account),
+      );
+
+      return {
+        account,
+        transactions: accountTransactions.length,
+        accountTransactions,
+      };
+    })
+    .sort((left, right) => left.account.localeCompare(right.account));
 }
 
 
@@ -449,6 +492,7 @@ function AppRuntimeCard({
 function App() {
   const [activeView, setActiveView] = useState("transactions");
   const [activeMonth, setActiveMonth] = useState(() => dayjs().startOf("month"));
+  const [accountActivityRange, setAccountActivityRange] = useState<AccountActivityRange>("current-month");
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [transactionForm] = Form.useForm<TransactionInput>();
@@ -582,7 +626,10 @@ function App() {
   const scheduledTransactions = visibleMonthTransactions.filter(
     (transaction) => !isExecutedTransaction(transaction),
   );
-  const accounts = collectAccounts(transactions);
+  const visibleAccountTransactions = transactions.filter((transaction) =>
+    isInAccountActivityRange(transaction, accountActivityRange),
+  );
+  const accounts = collectAccounts(transactions, visibleAccountTransactions);
   const accountsCount = accounts.length;
   const activeMonthLabel = activeMonth.format("MMMM YYYY");
 
@@ -664,14 +711,6 @@ function App() {
             activeKey={activeView}
             onSelect={(key) => setActiveView(key)}
           />
-
-          <div className="sidebar-bottom-nav">
-            <NavigationGroup
-              items={settingsNavigation}
-              activeKey={activeView}
-              onSelect={(key) => setActiveView(key)}
-            />
-          </div>
         </Layout.Sider>
 
         <Layout className="app-main">
@@ -741,12 +780,50 @@ function App() {
               />
             ) : activeView === "accounts" ? (
               <Space direction="vertical" size={24} className="content-stack">
-                <Card className="settings-card" title={t("accounts.allAccounts")}>
-                  <Table
+                <Card
+                  className="settings-card accounts-card"
+                  title={t("accounts.allAccounts")}
+                  extra={(
+                    <Space className="accounts-range-control">
+                      <Typography.Text>{t("accounts.activityRange")}</Typography.Text>
+                      <Select<AccountActivityRange>
+                        value={accountActivityRange}
+                        onChange={setAccountActivityRange}
+                        options={accountActivityRangeOptions.map((range) => ({
+                          value: range,
+                          label: range === "current-month"
+                            ? t("accounts.currentMonth")
+                            : t("accounts.lastDays", { count: Number(range) }),
+                        }))}
+                      />
+                    </Space>
+                  )}
+                >
+                  <Table<AccountSummary>
                     rowKey="account"
                     loading={transactionsQuery.isFetching}
                     dataSource={accounts}
                     pagination={{ pageSize: 12 }}
+                    expandable={{
+                      expandedRowRender: (account) => (
+                        <div className="account-transactions-panel">
+                          <Typography.Text className="account-transactions-title">
+                            {t("accounts.accountActivity", {
+                              account: account.account,
+                              count: account.transactions,
+                            })}
+                          </Typography.Text>
+                          <TransactionsTable
+                            transactions={account.accountTransactions}
+                            loading={transactionsQuery.isFetching}
+                            powerUser={activeSettings.powerUser}
+                            onEdit={openEditTransaction}
+                            onDelete={(id) => deleteTransactionMutation.mutate(id)}
+                          />
+                        </div>
+                      ),
+                      rowExpandable: (account) => account.transactions > 0,
+                    }}
                     columns={[
                       { title: t("transactions.account"), dataIndex: "account" },
                       {
@@ -754,6 +831,7 @@ function App() {
                         dataIndex: "transactions",
                         width: 180,
                         align: "right",
+                        render: (count: number) => formatCount(count),
                       },
                     ]}
                   />
