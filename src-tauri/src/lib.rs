@@ -463,6 +463,7 @@ fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTran
         .iter()
         .flat_map(|file| parse_transactions(&file.content, &file.path))
         .collect();
+    transactions.reverse();
     transactions.sort_by(|a, b| b.date.cmp(&a.date));
     Ok(transactions)
 }
