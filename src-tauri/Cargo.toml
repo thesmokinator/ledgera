@@ -1,8 +1,8 @@
 [package]
 name = "ledgera"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Just another user interface for managing hledger journal transactions"
+authors = ["Michele Broggi"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

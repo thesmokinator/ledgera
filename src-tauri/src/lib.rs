@@ -3,15 +3,172 @@
 //! The Rust layer owns journal access, conservative transaction edits, settings
 //! persistence, and integration with the official hledger CLI.
 
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    env, fs,
+    env, fmt, fs,
     path::{Path, PathBuf},
     process::Command,
 };
 use tauri::{AppHandle, Manager};
+
+/// Structured application error serialized as JSON over the Tauri bridge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppError {
+    code: String,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+}
+
+impl AppError {
+    fn new(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            code: code.to_string(),
+            message: message.into(),
+            details: None,
+        }
+    }
+
+    fn with_details(mut self, details: impl Into<String>) -> Self {
+        self.details = Some(details.into());
+        self
+    }
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+/// Serializes an AppError into a JSON string that the frontend can parse.
+fn to_error_string(code: &str, message: impl Into<String>) -> String {
+    let error = AppError::new(code, message);
+    serde_json::to_string(&error)
+        .unwrap_or_else(|_| format!(r#"{{"code":"{}","message":"Serialization failed"}}"#, code))
+}
+
+fn to_error_string_with_details(
+    code: &str,
+    message: impl Into<String>,
+    details: impl Into<String>,
+) -> String {
+    let error = AppError::new(code, message).with_details(details);
+    serde_json::to_string(&error)
+        .unwrap_or_else(|_| format!(r#"{{"code":"{}","message":"Serialization failed"}}"#, code))
+}
+
+// ── Logging ──────────────────────────────────────────────────────────────
+
+const LOG_RETENTION_DAYS: i64 = 90;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LogEntry {
+    ts: String,
+    level: String,
+    code: String,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+}
+
+fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join("ledgera.log.jsonl"))
+}
+
+fn log_event(app: &AppHandle, level: &str, code: &str, message: &str) {
+    log_event_with_details(app, level, code, message, None);
+}
+
+fn log_event_with_details(
+    app: &AppHandle,
+    level: &str,
+    code: &str,
+    message: &str,
+    details: Option<String>,
+) {
+    let path = match log_path(app) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let entry = LogEntry {
+        ts: Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+        level: level.to_string(),
+        code: code.to_string(),
+        message: message.to_string(),
+        details,
+    };
+    if let Ok(json) = serde_json::to_string(&entry) {
+        let mut line = json;
+        line.push('\n');
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, line.as_bytes()));
+    }
+}
+
+fn cleanup_old_logs(app: &AppHandle) {
+    let path = match log_path(app) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let content = match fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let cutoff = Utc::now() - chrono::Duration::days(LOG_RETENTION_DAYS);
+    let cutoff_str = cutoff.format("%Y-%m-%dT").to_string();
+    let kept: Vec<&str> = content
+        .lines()
+        .filter(|line| line.trim() >= cutoff_str.as_str())
+        .collect();
+    if kept.len() != content.lines().count() {
+        let _ = fs::write(&path, kept.join("\n") + "\n");
+    }
+}
+
+#[tauri::command]
+fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
+    let path = log_path(&app)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&path).map_err(|error| {
+        to_error_string_with_details(
+            "LOG_READ_FAILED",
+            "Unable to read log file.",
+            error.to_string(),
+        )
+    })?;
+    let mut entries: Vec<LogEntry> = content
+        .lines()
+        .filter_map(|line| serde_json::from_str::<LogEntry>(line).ok())
+        .collect();
+    entries.reverse();
+    Ok(entries)
+}
+
+#[tauri::command]
+fn clear_logs(app: AppHandle) -> Result<(), String> {
+    let path = log_path(&app)?;
+    fs::write(&path, "").map_err(|error| {
+        to_error_string_with_details(
+            "LOG_WRITE_FAILED",
+            "Unable to clear log file.",
+            error.to_string(),
+        )
+    })
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +179,8 @@ struct AppSettings {
     theme: String,
     #[serde(default)]
     power_user: bool,
+    #[serde(default)]
+    default_commodity: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,6 +217,13 @@ struct AutocompleteSuggestions {
     descriptions: Vec<String>,
     accounts: Vec<String>,
     commodities: Vec<String>,
+    default_commodity: String,
+    default_cash_account: String,
+    default_expense_account: String,
+    default_income_account: String,
+    default_transfer_account: String,
+    default_investment_account: String,
+    default_investment_commodity: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -112,6 +278,8 @@ struct PostingInput {
     #[serde(default)]
     commodity: String,
     #[serde(default)]
+    unit_price: String,
+    #[serde(default)]
     comment: String,
 }
 
@@ -133,6 +301,16 @@ enum RoutingStrategy {
     Fallback,
 }
 
+#[derive(Debug, Clone, Default)]
+struct JournalProfile {
+    default_cash_account: String,
+    default_expense_account: String,
+    default_income_account: String,
+    default_transfer_account: String,
+    default_investment_account: String,
+    default_investment_commodity: String,
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -140,6 +318,7 @@ impl Default for AppSettings {
             hledger_path: String::new(),
             theme: default_theme(),
             power_user: false,
+            default_commodity: String::new(),
         }
     }
 }
@@ -159,11 +338,29 @@ fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
 fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
     let path = settings_path(&app)?;
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        fs::create_dir_all(parent).map_err(|error| {
+            to_error_string_with_details(
+                "SETTINGS_SAVE_FAILED",
+                "Unable to create settings directory.",
+                error.to_string(),
+            )
+        })?;
     }
 
-    let content = serde_json::to_string_pretty(&settings).map_err(|error| error.to_string())?;
-    fs::write(path, content).map_err(|error| error.to_string())?;
+    let content = serde_json::to_string_pretty(&settings).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_SAVE_FAILED",
+            "Unable to encode settings.",
+            error.to_string(),
+        )
+    })?;
+    fs::write(&path, content).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_SAVE_FAILED",
+            "Unable to write settings file.",
+            error.to_string(),
+        )
+    })?;
     Ok(settings)
 }
 
@@ -209,6 +406,8 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
     let journal_path = require_journal_path(&settings)?;
     let transactions = load_transactions_from_journal(&journal_path)?;
 
+    let profile = build_journal_profile(&transactions, settings.default_commodity.trim());
+
     Ok(AutocompleteSuggestions {
         codes: unique_sorted(
             transactions
@@ -233,6 +432,13 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
                 .collect(),
         ),
         commodities: collect_commodities(&transactions),
+        default_commodity: settings.default_commodity.trim().to_string(),
+        default_cash_account: profile.default_cash_account,
+        default_expense_account: profile.default_expense_account,
+        default_income_account: profile.default_income_account,
+        default_transfer_account: profile.default_transfer_account,
+        default_investment_account: profile.default_investment_account,
+        default_investment_commodity: profile.default_investment_commodity,
     })
 }
 
@@ -248,7 +454,18 @@ fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
 #[tauri::command]
 fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
-    create_transaction_for_settings(&settings, &input)
+    let result = create_transaction_for_settings(&settings, &input);
+    match &result {
+        Ok(_) => log_event(&app, "info", "TRANSACTION_CREATED", &input.description),
+        Err(e) => log_event_with_details(
+            &app,
+            "error",
+            "TRANSACTION_CREATE_FAILED",
+            "Failed to create transaction",
+            Some(e.clone()),
+        ),
+    }
+    result
 }
 
 /// Replaces an existing transaction block by id.
@@ -259,14 +476,36 @@ fn update_transaction(
     input: TransactionInput,
 ) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
-    update_transaction_for_settings(&settings, &id, &input)
+    let result = update_transaction_for_settings(&settings, &id, &input);
+    match &result {
+        Ok(_) => log_event(&app, "info", "TRANSACTION_UPDATED", &input.description),
+        Err(e) => log_event_with_details(
+            &app,
+            "error",
+            "TRANSACTION_UPDATE_FAILED",
+            "Failed to update transaction",
+            Some(e.clone()),
+        ),
+    }
+    result
 }
 
 /// Removes an existing transaction block by id.
 #[tauri::command]
 fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
-    delete_transaction_for_settings(&settings, &id)
+    let result = delete_transaction_for_settings(&settings, &id);
+    match &result {
+        Ok(_) => log_event(&app, "info", "TRANSACTION_DELETED", &id),
+        Err(e) => log_event_with_details(
+            &app,
+            "error",
+            "TRANSACTION_DELETE_FAILED",
+            "Failed to delete transaction",
+            Some(e.clone()),
+        ),
+    }
+    result
 }
 
 /// Starts the Tauri application and registers backend commands.
@@ -275,6 +514,22 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            cleanup_old_logs(&app.handle());
+
+            let win_builder =
+                tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                    .title("Ledgera")
+                    .inner_size(1400.0, 918.0)
+                    .min_inner_size(1080.0, 720.0);
+
+            #[cfg(target_os = "macos")]
+            let win_builder = win_builder.title_bar_style(tauri::TitleBarStyle::Transparent);
+
+            let _window = win_builder.build().unwrap();
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_app_settings,
             update_app_settings,
@@ -283,7 +538,9 @@ pub fn run() {
             list_transactions,
             create_transaction,
             update_transaction,
-            delete_transaction
+            delete_transaction,
+            get_logs,
+            clear_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -305,8 +562,20 @@ fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
         return Ok(AppSettings::default());
     }
 
-    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
-    serde_json::from_str(&content).map_err(|error| error.to_string())
+    let content = fs::read_to_string(&path).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_READ_FAILED",
+            "Unable to read settings file.",
+            error.to_string(),
+        )
+    })?;
+    serde_json::from_str(&content).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_READ_FAILED",
+            "Settings file is corrupted.",
+            error.to_string(),
+        )
+    })
 }
 
 /// Resolves the hledger executable from settings or common macOS/user-shell locations.
@@ -387,14 +656,19 @@ fn login_shell_path_dirs() -> Vec<PathBuf> {
 /// Resolves the configured journal path.
 fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     if settings.journal_path.trim().is_empty() {
-        return Err(
-            "Configure a journal path in Settings before loading transactions.".to_string(),
-        );
+        return Err(to_error_string(
+            "JOURNAL_NOT_CONFIGURED",
+            "Configure a journal path in Settings before loading transactions.",
+        ));
     }
 
     let path = PathBuf::from(settings.journal_path.trim());
     if !path.exists() {
-        return Err(format!("Journal file does not exist: {}", path.display()));
+        return Err(to_error_string_with_details(
+            "JOURNAL_NOT_FOUND",
+            "Journal file does not exist.",
+            format!("Expected at: {}", path.display()),
+        ));
     }
     Ok(path)
 }
@@ -414,10 +688,13 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
 
 fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
     let files = load_journal_files(journal_path)?;
-    Ok(files
+    let mut transactions: Vec<JournalTransaction> = files
         .iter()
         .flat_map(|file| parse_transactions(&file.content, &file.path))
-        .collect())
+        .collect();
+    transactions.reverse();
+    transactions.sort_by(|a, b| b.date.cmp(&a.date));
+    Ok(transactions)
 }
 
 fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {
@@ -438,7 +715,13 @@ fn load_journal_file_recursive(
         return Ok(());
     }
 
-    let content = fs::read_to_string(&canonical_path).map_err(|error| error.to_string())?;
+    let content = fs::read_to_string(&canonical_path).map_err(|error| {
+        to_error_string_with_details(
+            "JOURNAL_READ_FAILED",
+            "Unable to read journal file.",
+            format!("{}: {}", canonical_path.display(), error),
+        )
+    })?;
     let include_paths = find_include_paths(&canonical_path, &content)?;
     files.push(JournalFile {
         path: canonical_path,
@@ -492,9 +775,10 @@ fn resolve_include_paths(journal_path: &Path, include: &str) -> Result<Vec<PathB
         return if absolute_pattern.exists() {
             Ok(vec![absolute_pattern])
         } else {
-            Err(format!(
-                "Included journal file does not exist: {}",
-                absolute_pattern.display()
+            Err(to_error_string_with_details(
+                "JOURNAL_INCLUDE_MISSING",
+                "Included journal file does not exist.",
+                format!("Expected at: {}", absolute_pattern.display()),
             ))
         };
     }
@@ -622,12 +906,30 @@ fn mutate_existing_file<F>(
 where
     F: FnOnce(&str) -> Result<String, String>,
 {
-    let original = fs::read_to_string(source_path).map_err(|error| error.to_string())?;
+    let original = fs::read_to_string(source_path).map_err(|error| {
+        to_error_string_with_details(
+            "JOURNAL_READ_FAILED",
+            "Unable to read source journal file.",
+            format!("{}: {}", source_path.display(), error),
+        )
+    })?;
     let updated = mutate(&original)?;
 
-    fs::write(source_path, &updated).map_err(|error| error.to_string())?;
+    fs::write(source_path, &updated).map_err(|error| {
+        to_error_string_with_details(
+            "JOURNAL_WRITE_FAILED",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
+    })?;
     if let Err(error) = validate_journal(settings, main_journal) {
-        fs::write(source_path, original).map_err(|rollback_error| rollback_error.to_string())?;
+        fs::write(source_path, original).map_err(|rollback_error| {
+            to_error_string_with_details(
+                "JOURNAL_WRITE_FAILED",
+                "Journal file may be corrupted — rollback failed.",
+                rollback_error.to_string(),
+            )
+        })?;
         return Err(error);
     }
 
@@ -978,8 +1280,16 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
 
     match output {
         Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(String::from_utf8_lossy(&output.stderr).trim().to_string()),
-        Err(error) => Err(format!("Unable to run hledger check: {}", error)),
+        Ok(output) => Err(to_error_string_with_details(
+            "HLEDGER_CHECK_FAILED",
+            "hledger check failed. The journal may contain syntax errors.",
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        )),
+        Err(error) => Err(to_error_string_with_details(
+            "HLEDGER_CHECK_FAILED",
+            "Unable to run hledger check.",
+            error.to_string(),
+        )),
     }
 }
 
@@ -1186,7 +1496,13 @@ fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlock, String>
         .into_iter()
         .find(|transaction| transaction.id == id)
         .map(|transaction| TransactionBlock { transaction })
-        .ok_or_else(|| format!("Transaction not found: {}", id))
+        .ok_or_else(|| {
+            to_error_string_with_details(
+                "TRANSACTION_NOT_FOUND",
+                "Transaction not found. It may have been deleted or moved.",
+                format!("Transaction id: {}", id),
+            )
+        })
 }
 
 /// Splits content into normalized lines for range replacement.
@@ -1290,7 +1606,11 @@ fn format_posting_amount(amount: &str, commodity: &str) -> String {
 
 /// Formats a posting, including an optional hledger inline comment.
 fn format_posting(posting: &PostingInput) -> String {
-    let amount = format_posting_amount(&posting.amount, &posting.commodity);
+    let mut amount = format_posting_amount(&posting.amount, &posting.commodity);
+    if !posting.unit_price.trim().is_empty() && !amount.trim().is_empty() {
+        amount.push_str(" @ ");
+        amount.push_str(posting.unit_price.trim());
+    }
     let mut line = if amount.trim().is_empty() {
         format!("    {}", posting.account.trim())
     } else {
@@ -1466,6 +1786,88 @@ fn unique_sorted(mut values: Vec<String>) -> Vec<String> {
 }
 
 /// Extracts commodity-like tokens from posting amounts for display.
+fn build_journal_profile(
+    transactions: &[JournalTransaction],
+    default_commodity: &str,
+) -> JournalProfile {
+    let mut cash_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut expense_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut income_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut transfer_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut investment_accounts = std::collections::HashMap::<String, usize>::new();
+    let mut investment_commodities = std::collections::HashMap::<String, usize>::new();
+
+    for transaction in transactions {
+        let has_income_or_expense = transaction.postings.iter().any(|posting| {
+            is_account_root(
+                &posting.account,
+                &["income", "revenue", "expenses", "expense"],
+            )
+        });
+
+        for posting in &transaction.postings {
+            let account = posting.account.trim();
+            let commodity = posting.commodity.trim();
+            if account.is_empty() {
+                continue;
+            }
+
+            if is_account_root(account, &["expenses", "expense"]) {
+                *expense_accounts.entry(account.to_string()).or_default() += 1;
+            } else if is_account_root(account, &["income", "revenue"]) {
+                *income_accounts.entry(account.to_string()).or_default() += 1;
+            } else if is_account_root(account, &["assets", "asset", "liabilities", "liability"]) {
+                if !has_income_or_expense {
+                    *transfer_accounts.entry(account.to_string()).or_default() += 1;
+                }
+
+                let is_non_monetary = !commodity.is_empty() && commodity != default_commodity;
+                let looks_like_investment = account.to_lowercase().contains("invest")
+                    || account.to_lowercase().contains("broker")
+                    || account.to_lowercase().contains("portfolio")
+                    || is_non_monetary;
+
+                if looks_like_investment && is_non_monetary {
+                    *investment_accounts.entry(account.to_string()).or_default() += 1;
+                    *investment_commodities
+                        .entry(commodity.to_string())
+                        .or_default() += 1;
+                } else {
+                    *cash_accounts.entry(account.to_string()).or_default() += 1;
+                }
+            }
+        }
+    }
+
+    JournalProfile {
+        default_cash_account: most_frequent(cash_accounts),
+        default_expense_account: most_frequent(expense_accounts),
+        default_income_account: most_frequent(income_accounts),
+        default_transfer_account: most_frequent(transfer_accounts),
+        default_investment_account: most_frequent(investment_accounts),
+        default_investment_commodity: most_frequent(investment_commodities),
+    }
+}
+
+fn is_account_root(account: &str, roots: &[&str]) -> bool {
+    let normalized = account.to_lowercase();
+    roots
+        .iter()
+        .any(|root| normalized == *root || normalized.starts_with(&format!("{}:", root)))
+}
+
+fn most_frequent(values: std::collections::HashMap<String, usize>) -> String {
+    values
+        .into_iter()
+        .max_by(|(left_value, left_count), (right_value, right_count)| {
+            left_count
+                .cmp(right_count)
+                .then_with(|| right_value.cmp(left_value))
+        })
+        .map(|(value, _)| value)
+        .unwrap_or_default()
+}
+
 fn collect_commodities(transactions: &[JournalTransaction]) -> Vec<String> {
     let mut commodities = transactions
         .iter()
@@ -1506,6 +1908,7 @@ mod tests {
             hledger_path: "true".to_string(),
             theme: default_theme(),
             power_user: false,
+            default_commodity: String::new(),
         }
     }
 
@@ -1527,12 +1930,14 @@ mod tests {
                     account: "expenses:test".to_string(),
                     amount: "10".to_string(),
                     commodity: "EUR".to_string(),
+                    unit_price: String::new(),
                     comment: String::new(),
                 },
                 PostingInput {
                     account: "assets:cash".to_string(),
                     amount: String::new(),
                     commodity: "EUR".to_string(),
+                    unit_price: String::new(),
                     comment: String::new(),
                 },
             ],
@@ -1783,14 +2188,138 @@ mod tests {
     }
 
     #[test]
+    fn builds_frequency_based_journal_profile() {
+        let transactions = vec![
+            JournalTransaction {
+                id: "test:1".to_string(),
+                source_file: "test".to_string(),
+                date: "2026-05-16".to_string(),
+                status: String::new(),
+                code: String::new(),
+                description: "Groceries".to_string(),
+                postings: vec![
+                    JournalPosting {
+                        account: "expenses:food".to_string(),
+                        amount: "25".to_string(),
+                        commodity: "€".to_string(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                    JournalPosting {
+                        account: "assets:bank:fineco".to_string(),
+                        amount: String::new(),
+                        commodity: String::new(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                ],
+                display: TransactionDisplay {
+                    account: "expenses:food".to_string(),
+                    amount: "-€25".to_string(),
+                    kind: "expense".to_string(),
+                },
+                raw: String::new(),
+                start_line: 1,
+                end_line: 3,
+            },
+            JournalTransaction {
+                id: "test:2".to_string(),
+                source_file: "test".to_string(),
+                date: "2026-05-17".to_string(),
+                status: String::new(),
+                code: String::new(),
+                description: "Buy fund".to_string(),
+                postings: vec![
+                    JournalPosting {
+                        account: "assets:investments:xeon".to_string(),
+                        amount: "10".to_string(),
+                        commodity: "XEON".to_string(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                    JournalPosting {
+                        account: "assets:bank:fineco".to_string(),
+                        amount: "1487".to_string(),
+                        commodity: "€".to_string(),
+                        comment: String::new(),
+                        raw: String::new(),
+                    },
+                ],
+                display: TransactionDisplay {
+                    account: "assets:investments:xeon".to_string(),
+                    amount: "10 XEON".to_string(),
+                    kind: "transfer".to_string(),
+                },
+                raw: String::new(),
+                start_line: 5,
+                end_line: 7,
+            },
+        ];
+
+        let profile = build_journal_profile(&transactions, "€");
+
+        assert_eq!(profile.default_cash_account, "assets:bank:fineco");
+        assert_eq!(profile.default_expense_account, "expenses:food");
+        assert_eq!(
+            profile.default_investment_account,
+            "assets:investments:xeon"
+        );
+        assert_eq!(profile.default_investment_commodity, "XEON");
+    }
+
+    #[test]
     fn configured_hledger_path_overrides_detection() {
         let settings = AppSettings {
             journal_path: String::new(),
             hledger_path: "/custom/bin/hledger".to_string(),
             theme: default_theme(),
             power_user: false,
+            default_commodity: String::new(),
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");
+    }
+
+    #[test]
+    fn formats_posting_with_unit_price() {
+        let posting = PostingInput {
+            account: "assets:investments:etf".to_string(),
+            amount: "10".to_string(),
+            commodity: "VWCE".to_string(),
+            unit_price: "150 EUR".to_string(),
+            comment: String::new(),
+        };
+        let result = format_posting(&posting);
+        assert!(result.contains("@ 150 EUR"));
+        assert!(result.contains("10.00 VWCE"));
+        assert!(result.contains("assets:investments:etf"));
+    }
+
+    #[test]
+    fn formats_posting_without_unit_price_when_empty() {
+        let posting = PostingInput {
+            account: "expenses:food".to_string(),
+            amount: "25".to_string(),
+            commodity: "EUR".to_string(),
+            unit_price: String::new(),
+            comment: String::new(),
+        };
+        let result = format_posting(&posting);
+        assert!(!result.contains('@'));
+        assert!(result.contains("25.00 EUR"));
+    }
+
+    #[test]
+    fn formats_posting_with_unit_price_and_comment() {
+        let posting = PostingInput {
+            account: "assets:investments:etf".to_string(),
+            amount: "5".to_string(),
+            commodity: "BTC".to_string(),
+            unit_price: "45000 USD".to_string(),
+            comment: "limit order".to_string(),
+        };
+        let result = format_posting(&posting);
+        assert!(result.contains("@ 45000 USD"));
+        assert!(result.contains("; limit order"));
     }
 }

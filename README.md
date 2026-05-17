@@ -1,78 +1,63 @@
 # Ledgera
 
-Ledgera is a desktop app for managing hledger journals.
+A desktop app for managing [hledger](https://hledger.org) journals — built with Tauri, React, and Rust.
 
-It lets you:
+![Screenshot](screenshots/001.png)
 
-- browse transactions in a simple UI;
-- switch between monthly transactions and scheduled ones;
-- navigate month by month;
-- explore accounts and their transactions over a time range;
-- edit, create, and delete journal entries;
-- work with split journals;
-- use a custom `hledger` executable path when needed.
+## Features
+
+- **Browse & filter** — monthly transactions, scheduled entries, accounts overview with time-range filters
+- **Edit, create & delete** — full CRUD on journal entries with date, status, code, description, and postings
+- **Investment mode** — enter quantity, commodity, and unit price; the balancing cash posting is calculated automatically using hledger's `@` syntax
+- **Split journal support** — flat, nested, and glob-based include structures are auto-detected
+- **Logs** — structured event log (errors, warnings, mutations), visible for power users, with one-click copy
+- **Structured errors** — backend-driven error codes with localised messages and technical details
 
 ## Requirements
 
 - Node.js and npm
 - Rust toolchain
-- hledger installed locally or configured in the app settings
+- [hledger](https://hledger.org/install.html) installed locally or configured in the app settings
 
-## Run locally
-
-Install dependencies:
+## Getting started
 
 ```bash
 npm install
+npm run tauri:dev        # desktop app (dev mode)
+npm run dev              # frontend only (browser)
+npm run tauri:build      # production build
 ```
 
-Start the desktop app in development mode:
+## Settings
 
-```bash
-npm run tauri:dev
-```
+Open the **Settings** tab to configure:
 
-If you only want the frontend in the browser, run:
-
-```bash
-npm run dev
-```
-
-## Build
-
-Create a production build with:
-
-```bash
-npm run tauri:build
-```
-
-## Configure the app
-
-Open `Settings` and set:
-
-- the journal file path;
-- the `hledger` executable path, if it is not on the standard PATH;
-- the theme preference.
+| Setting | Description |
+|---------|-------------|
+| Journal path | Path to your main `.journal` file |
+| hledger path | Custom executable path (auto-detected by default) |
+| Default commodity | e.g. `EUR`, `€`, `USD` |
+| Theme | System / Dark / Light |
+| Power user | Show raw journal entries, line numbers, and the Logs section |
 
 ## Sample journals
 
-The repository includes sample journals under `examples/`.
+The `examples/` directory contains ready-to-use journals:
 
-Useful samples include:
-
-- `examples/sample.journal` for a simple single-file journal;
-- `examples/split-flat/` for a month-based split journal;
-- `examples/split-glob/` for a year/month glob split journal;
-- `examples/custom-hledger-path/` for a journal paired with a custom CLI setup.
+- `examples/sample.journal` — single-file journal
+- `examples/split-flat/` — month-based split (`include YYYY-MM.journal`)
+- `examples/split-glob/` — year/month glob split (`include YYYY/*.journal`)
+- `examples/custom-hledger-path/` — custom CLI setup
 
 ## Project structure
 
-- `src/` contains the React frontend;
-- `src-tauri/` contains the Rust backend and Tauri commands;
-- `examples/` contains sample journal layouts.
+| Directory | Purpose |
+|-----------|---------|
+| `src/` | React frontend — routes, components, i18n |
+| `src-tauri/` | Rust backend — journal parsing, mutation, logging |
+| `examples/` | Sample hledger journal layouts |
+| `screenshots/` | Screenshots |
 
-## Notes
+## License
 
-Ledgera is designed around plain-text accounting workflows.
-The backend owns the journal parsing and mutation logic, while the frontend
-focuses on navigation, forms, and presentation.
+MIT
