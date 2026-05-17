@@ -460,10 +460,12 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
 
 fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
     let files = load_journal_files(journal_path)?;
-    Ok(files
+    let mut transactions: Vec<JournalTransaction> = files
         .iter()
         .flat_map(|file| parse_transactions(&file.content, &file.path))
-        .collect())
+        .collect();
+    transactions.sort_by(|a, b| b.date.cmp(&a.date));
+    Ok(transactions)
 }
 
 fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {
