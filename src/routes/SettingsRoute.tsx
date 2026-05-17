@@ -23,6 +23,7 @@ import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import packageJson from "../../package.json";
 import { formatCount, formatFileSize } from "../utils/format";
+import { parseError } from "../utils/error";
 import type { AppSettings, HledgerStatus, JournalSummary } from "./types";
 
 const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
@@ -81,6 +82,7 @@ export function SettingsRoute({
   commodityOptions,
   hledgerStatus,
   journalSummary,
+  journalError,
   onValuesChange,
 }: {
   form: FormInstance<AppSettings>;
@@ -88,6 +90,7 @@ export function SettingsRoute({
   commodityOptions: { value: string }[];
   hledgerStatus: HledgerStatus | undefined;
   journalSummary: JournalSummary | undefined;
+  journalError: string | null;
   onValuesChange: (changed: Partial<AppSettings>, values: AppSettings) => void;
 }) {
   const { t } = useTranslation();
@@ -137,7 +140,11 @@ export function SettingsRoute({
             />
           </Form.Item>
 
-          {stats ? (
+          {journalError ? (
+            <Typography.Text type="danger">
+              {parseError(journalError, t)}
+            </Typography.Text>
+          ) : stats ? (
             <div className="stats-grid">
               <div className="stats-item">
                 <span className="stats-label">{t("settings.statsTransactions")}</span>
@@ -180,31 +187,19 @@ export function SettingsRoute({
           className="settings-card"
           title={<CardTitle icon={<CodeOutlined />} label={t("settings.hledger")} />}
           extra={
-            hledgerStatus ? (
-              <Tag color={hledgerStatus.available ? "success" : "error"}>
-                {hledgerStatus.available
-                  ? t("common.available")
-                  : t("common.unavailable")}
-                {hledgerStatus.version ? ` · ${hledgerStatus.version}` : ""}
+            hledgerStatus?.available ? (
+              <Tag color="success">
+                {hledgerStatus.version || ""}
               </Tag>
-            ) : null
+            ) : hledgerStatus ? (
+              <Tag color="error">{t("settings.hledgerNotAvailable")}</Tag>
+            ) : (
+              <Tag>{t("settings.hledgerNotConfigured")}</Tag>
+            )
           }
         >
           <Form.Item
-            label={
-              <Space size={4}>
-                <span>{t("settings.hledgerExecutable")}</span>
-                {hledgerStatus?.source === "detected" ? (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    · {t("settings.detected")}
-                  </Typography.Text>
-                ) : hledgerStatus?.source === "configured" ? (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    · {t("settings.configured")}
-                  </Typography.Text>
-                ) : null}
-              </Space>
-            }
+            label={t("settings.hledgerExecutable")}
             name="hledgerPath"
           >
             <PathInput
@@ -212,27 +207,6 @@ export function SettingsRoute({
                 hledgerStatus?.resolvedPath || t("settings.hledgerExecutablePlaceholder")
               }
               pickerTitle={t("settings.pickHledgerExecutable")}
-              statusAddon={
-                <Tooltip
-                  title={
-                    hledgerStatus?.source === "configured"
-                      ? t("settings.hledgerUsingConfigured")
-                      : hledgerStatus?.resolvedPath
-                        ? t("settings.hledgerUsingDetected", {
-                          path: hledgerStatus.resolvedPath,
-                        })
-                        : t("settings.hledgerExecutableHelp")
-                  }
-                >
-                  <span>
-                    {hledgerStatus?.source === "configured"
-                      ? t("settings.configured")
-                      : hledgerStatus?.resolvedPath
-                        ? t("settings.detected")
-                        : t("settings.fallback")}
-                  </span>
-                </Tooltip>
-              }
             />
           </Form.Item>
         </Card>

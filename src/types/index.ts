@@ -121,4 +121,5 @@ export type NavigationItem = {
   key: string;
   label: string;
   icon: React.ReactNode;
+  disabled?: boolean;
 };
