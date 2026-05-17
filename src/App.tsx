@@ -10,6 +10,7 @@ import {
 } from "antd";
 import {
   BankOutlined,
+  FileTextOutlined,
   HomeOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -28,6 +29,7 @@ import {
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import {
   AccountsRoute,
+  LogsRoute,
   SettingsRoute,
   TransactionsRoute,
 } from "./routes";
@@ -50,7 +52,7 @@ import {
   journalDateFormat,
   todayJournalDate,
 } from "./utils/date";
-import { formatJournalName, toAutocompleteOptions } from "./utils/format";
+import { toAutocompleteOptions } from "./utils/format";
 import {
   collectAccounts,
   transactionTemplatePostings,
@@ -60,6 +62,7 @@ import {
   emptyTransaction,
   toTransactionInput,
 } from "./utils/transaction";
+import { parseError } from "./utils/error";
 import "./App.css";
 
 const primaryNavigation: NavigationItem[] = [
@@ -140,7 +143,7 @@ function App() {
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
-    onError: (error) => messageApi.error(String(error)),
+    onError: (error) => messageApi.error(parseError(error, t)),
   });
 
   const createTransactionMutation = useMutation({
@@ -152,7 +155,7 @@ function App() {
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
-    onError: (error) => messageApi.error(String(error)),
+    onError: (error) => messageApi.error(parseError(error, t)),
   });
 
   const updateTransactionMutation = useMutation({
@@ -168,7 +171,7 @@ function App() {
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
-    onError: (error) => messageApi.error(String(error)),
+    onError: (error) => messageApi.error(parseError(error, t)),
   });
 
   const deleteTransactionMutation = useMutation({
@@ -179,7 +182,7 @@ function App() {
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
-    onError: (error) => messageApi.error(String(error)),
+    onError: (error) => messageApi.error(parseError(error, t)),
   });
 
   const autocompleteSuggestions = autocompleteQuery.data ?? {
@@ -352,6 +355,16 @@ function App() {
   const isSavingTransaction =
     createTransactionMutation.isPending || updateTransactionMutation.isPending;
 
+  const navigationItems = useMemo<NavigationItem[]>(
+    () => [
+      ...primaryNavigation,
+      ...(activeSettings.powerUser
+        ? [{ key: "logs", label: "logs.title" as const, icon: <FileTextOutlined /> }]
+        : []),
+    ],
+    [activeSettings.powerUser],
+  );
+
   return (
     <ConfigProvider
       theme={{
@@ -366,7 +379,7 @@ function App() {
         {contextHolder}
         <Layout.Sider className="app-sidebar" width={288}>
           <NavigationGroup
-            items={primaryNavigation}
+            items={navigationItems}
             activeKey={activeView}
             onSelect={(key) => setActiveView(key)}
           />
@@ -413,6 +426,8 @@ function App() {
                 onEditTransaction={openEditTransaction}
                 onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
               />
+            ) : activeView === "logs" ? (
+              <LogsRoute />
             ) : (
               <TransactionsRoute
                 monthlyTransactions={monthlyTransactions}

@@ -91,6 +91,20 @@ export type TransactionInput = {
 
 export type TransactionType = "expense" | "income" | "transfer" | "investment" | "custom";
 
+export type AppError = {
+  code: string;
+  message: string;
+  details?: string;
+};
+
+export type LogEntry = {
+  ts: string;
+  level: "info" | "warn" | "error";
+  code: string;
+  message: string;
+  details?: string;
+};
+
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";
 
 export type AccountSummary = {

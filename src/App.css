@@ -238,10 +238,6 @@ button {
     user-select: none;
 }
 
-.platform-macos .app-header {
-    padding-left: 82px;
-}
-
 .app-header .ant-typography {
     margin: 0;
     color: #f5f5f5;

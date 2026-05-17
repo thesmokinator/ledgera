@@ -3,15 +3,172 @@
 //! The Rust layer owns journal access, conservative transaction edits, settings
 //! persistence, and integration with the official hledger CLI.
 
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    env, fs,
+    env, fmt, fs,
     path::{Path, PathBuf},
     process::Command,
 };
 use tauri::{AppHandle, Manager};
+
+/// Structured application error serialized as JSON over the Tauri bridge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppError {
+    code: String,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+}
+
+impl AppError {
+    fn new(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            code: code.to_string(),
+            message: message.into(),
+            details: None,
+        }
+    }
+
+    fn with_details(mut self, details: impl Into<String>) -> Self {
+        self.details = Some(details.into());
+        self
+    }
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+/// Serializes an AppError into a JSON string that the frontend can parse.
+fn to_error_string(code: &str, message: impl Into<String>) -> String {
+    let error = AppError::new(code, message);
+    serde_json::to_string(&error)
+        .unwrap_or_else(|_| format!(r#"{{"code":"{}","message":"Serialization failed"}}"#, code))
+}
+
+fn to_error_string_with_details(
+    code: &str,
+    message: impl Into<String>,
+    details: impl Into<String>,
+) -> String {
+    let error = AppError::new(code, message).with_details(details);
+    serde_json::to_string(&error)
+        .unwrap_or_else(|_| format!(r#"{{"code":"{}","message":"Serialization failed"}}"#, code))
+}
+
+// ── Logging ──────────────────────────────────────────────────────────────
+
+const LOG_RETENTION_DAYS: i64 = 90;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LogEntry {
+    ts: String,
+    level: String,
+    code: String,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+}
+
+fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join("ledgera.log.jsonl"))
+}
+
+fn log_event(app: &AppHandle, level: &str, code: &str, message: &str) {
+    log_event_with_details(app, level, code, message, None);
+}
+
+fn log_event_with_details(
+    app: &AppHandle,
+    level: &str,
+    code: &str,
+    message: &str,
+    details: Option<String>,
+) {
+    let path = match log_path(app) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let entry = LogEntry {
+        ts: Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+        level: level.to_string(),
+        code: code.to_string(),
+        message: message.to_string(),
+        details,
+    };
+    if let Ok(json) = serde_json::to_string(&entry) {
+        let mut line = json;
+        line.push('\n');
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, line.as_bytes()));
+    }
+}
+
+fn cleanup_old_logs(app: &AppHandle) {
+    let path = match log_path(app) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let content = match fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let cutoff = Utc::now() - chrono::Duration::days(LOG_RETENTION_DAYS);
+    let cutoff_str = cutoff.format("%Y-%m-%dT").to_string();
+    let kept: Vec<&str> = content
+        .lines()
+        .filter(|line| line.trim() >= cutoff_str.as_str())
+        .collect();
+    if kept.len() != content.lines().count() {
+        let _ = fs::write(&path, kept.join("\n") + "\n");
+    }
+}
+
+#[tauri::command]
+fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
+    let path = log_path(&app)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&path).map_err(|error| {
+        to_error_string_with_details(
+            "LOG_READ_FAILED",
+            "Unable to read log file.",
+            error.to_string(),
+        )
+    })?;
+    let mut entries: Vec<LogEntry> = content
+        .lines()
+        .filter_map(|line| serde_json::from_str::<LogEntry>(line).ok())
+        .collect();
+    entries.reverse();
+    Ok(entries)
+}
+
+#[tauri::command]
+fn clear_logs(app: AppHandle) -> Result<(), String> {
+    let path = log_path(&app)?;
+    fs::write(&path, "").map_err(|error| {
+        to_error_string_with_details(
+            "LOG_WRITE_FAILED",
+            "Unable to clear log file.",
+            error.to_string(),
+        )
+    })
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -181,11 +338,29 @@ fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
 fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
     let path = settings_path(&app)?;
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        fs::create_dir_all(parent).map_err(|error| {
+            to_error_string_with_details(
+                "SETTINGS_SAVE_FAILED",
+                "Unable to create settings directory.",
+                error.to_string(),
+            )
+        })?;
     }
 
-    let content = serde_json::to_string_pretty(&settings).map_err(|error| error.to_string())?;
-    fs::write(path, content).map_err(|error| error.to_string())?;
+    let content = serde_json::to_string_pretty(&settings).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_SAVE_FAILED",
+            "Unable to encode settings.",
+            error.to_string(),
+        )
+    })?;
+    fs::write(&path, content).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_SAVE_FAILED",
+            "Unable to write settings file.",
+            error.to_string(),
+        )
+    })?;
     Ok(settings)
 }
 
@@ -279,7 +454,18 @@ fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
 #[tauri::command]
 fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
-    create_transaction_for_settings(&settings, &input)
+    let result = create_transaction_for_settings(&settings, &input);
+    match &result {
+        Ok(_) => log_event(&app, "info", "TRANSACTION_CREATED", &input.description),
+        Err(e) => log_event_with_details(
+            &app,
+            "error",
+            "TRANSACTION_CREATE_FAILED",
+            "Failed to create transaction",
+            Some(e.clone()),
+        ),
+    }
+    result
 }
 
 /// Replaces an existing transaction block by id.
@@ -290,14 +476,36 @@ fn update_transaction(
     input: TransactionInput,
 ) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
-    update_transaction_for_settings(&settings, &id, &input)
+    let result = update_transaction_for_settings(&settings, &id, &input);
+    match &result {
+        Ok(_) => log_event(&app, "info", "TRANSACTION_UPDATED", &input.description),
+        Err(e) => log_event_with_details(
+            &app,
+            "error",
+            "TRANSACTION_UPDATE_FAILED",
+            "Failed to update transaction",
+            Some(e.clone()),
+        ),
+    }
+    result
 }
 
 /// Removes an existing transaction block by id.
 #[tauri::command]
 fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
-    delete_transaction_for_settings(&settings, &id)
+    let result = delete_transaction_for_settings(&settings, &id);
+    match &result {
+        Ok(_) => log_event(&app, "info", "TRANSACTION_DELETED", &id),
+        Err(e) => log_event_with_details(
+            &app,
+            "error",
+            "TRANSACTION_DELETE_FAILED",
+            "Failed to delete transaction",
+            Some(e.clone()),
+        ),
+    }
+    result
 }
 
 /// Starts the Tauri application and registers backend commands.
@@ -307,6 +515,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            cleanup_old_logs(&app.handle());
+
             let win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                     .title("Ledgera")
@@ -328,7 +538,9 @@ pub fn run() {
             list_transactions,
             create_transaction,
             update_transaction,
-            delete_transaction
+            delete_transaction,
+            get_logs,
+            clear_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -350,8 +562,20 @@ fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
         return Ok(AppSettings::default());
     }
 
-    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
-    serde_json::from_str(&content).map_err(|error| error.to_string())
+    let content = fs::read_to_string(&path).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_READ_FAILED",
+            "Unable to read settings file.",
+            error.to_string(),
+        )
+    })?;
+    serde_json::from_str(&content).map_err(|error| {
+        to_error_string_with_details(
+            "SETTINGS_READ_FAILED",
+            "Settings file is corrupted.",
+            error.to_string(),
+        )
+    })
 }
 
 /// Resolves the hledger executable from settings or common macOS/user-shell locations.
@@ -432,14 +656,19 @@ fn login_shell_path_dirs() -> Vec<PathBuf> {
 /// Resolves the configured journal path.
 fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     if settings.journal_path.trim().is_empty() {
-        return Err(
-            "Configure a journal path in Settings before loading transactions.".to_string(),
-        );
+        return Err(to_error_string(
+            "JOURNAL_NOT_CONFIGURED",
+            "Configure a journal path in Settings before loading transactions.",
+        ));
     }
 
     let path = PathBuf::from(settings.journal_path.trim());
     if !path.exists() {
-        return Err(format!("Journal file does not exist: {}", path.display()));
+        return Err(to_error_string_with_details(
+            "JOURNAL_NOT_FOUND",
+            "Journal file does not exist.",
+            format!("Expected at: {}", path.display()),
+        ));
     }
     Ok(path)
 }
@@ -486,7 +715,13 @@ fn load_journal_file_recursive(
         return Ok(());
     }
 
-    let content = fs::read_to_string(&canonical_path).map_err(|error| error.to_string())?;
+    let content = fs::read_to_string(&canonical_path).map_err(|error| {
+        to_error_string_with_details(
+            "JOURNAL_READ_FAILED",
+            "Unable to read journal file.",
+            format!("{}: {}", canonical_path.display(), error),
+        )
+    })?;
     let include_paths = find_include_paths(&canonical_path, &content)?;
     files.push(JournalFile {
         path: canonical_path,
@@ -540,9 +775,10 @@ fn resolve_include_paths(journal_path: &Path, include: &str) -> Result<Vec<PathB
         return if absolute_pattern.exists() {
             Ok(vec![absolute_pattern])
         } else {
-            Err(format!(
-                "Included journal file does not exist: {}",
-                absolute_pattern.display()
+            Err(to_error_string_with_details(
+                "JOURNAL_INCLUDE_MISSING",
+                "Included journal file does not exist.",
+                format!("Expected at: {}", absolute_pattern.display()),
             ))
         };
     }
@@ -670,12 +906,30 @@ fn mutate_existing_file<F>(
 where
     F: FnOnce(&str) -> Result<String, String>,
 {
-    let original = fs::read_to_string(source_path).map_err(|error| error.to_string())?;
+    let original = fs::read_to_string(source_path).map_err(|error| {
+        to_error_string_with_details(
+            "JOURNAL_READ_FAILED",
+            "Unable to read source journal file.",
+            format!("{}: {}", source_path.display(), error),
+        )
+    })?;
     let updated = mutate(&original)?;
 
-    fs::write(source_path, &updated).map_err(|error| error.to_string())?;
+    fs::write(source_path, &updated).map_err(|error| {
+        to_error_string_with_details(
+            "JOURNAL_WRITE_FAILED",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
+    })?;
     if let Err(error) = validate_journal(settings, main_journal) {
-        fs::write(source_path, original).map_err(|rollback_error| rollback_error.to_string())?;
+        fs::write(source_path, original).map_err(|rollback_error| {
+            to_error_string_with_details(
+                "JOURNAL_WRITE_FAILED",
+                "Journal file may be corrupted — rollback failed.",
+                rollback_error.to_string(),
+            )
+        })?;
         return Err(error);
     }
 
@@ -1026,8 +1280,16 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
 
     match output {
         Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(String::from_utf8_lossy(&output.stderr).trim().to_string()),
-        Err(error) => Err(format!("Unable to run hledger check: {}", error)),
+        Ok(output) => Err(to_error_string_with_details(
+            "HLEDGER_CHECK_FAILED",
+            "hledger check failed. The journal may contain syntax errors.",
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        )),
+        Err(error) => Err(to_error_string_with_details(
+            "HLEDGER_CHECK_FAILED",
+            "Unable to run hledger check.",
+            error.to_string(),
+        )),
     }
 }
 
@@ -1234,7 +1496,13 @@ fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlock, String>
         .into_iter()
         .find(|transaction| transaction.id == id)
         .map(|transaction| TransactionBlock { transaction })
-        .ok_or_else(|| format!("Transaction not found: {}", id))
+        .ok_or_else(|| {
+            to_error_string_with_details(
+                "TRANSACTION_NOT_FOUND",
+                "Transaction not found. It may have been deleted or moved.",
+                format!("Transaction id: {}", id),
+            )
+        })
 }
 
 /// Splits content into normalized lines for range replacement.

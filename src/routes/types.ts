@@ -1,6 +1,8 @@
 export type {
   ThemePreference,
   AppSettings,
+  AppError,
+  LogEntry,
   HledgerStatus,
   JournalPosting,
   TransactionDisplay,

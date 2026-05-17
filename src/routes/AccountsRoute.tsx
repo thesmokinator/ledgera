@@ -32,7 +32,6 @@ export function AccountsRoute({
         title={t("accounts.allAccounts")}
         extra={(
           <Space className="accounts-range-control">
-            <Typography.Text>{t("accounts.activityRange")}</Typography.Text>
             <Select<AccountActivityRange>
               value={accountActivityRange}
               onChange={onActivityRangeChange}
