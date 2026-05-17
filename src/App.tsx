@@ -407,6 +407,7 @@ function App() {
                 initialValues={activeSettings}
                 commodityOptions={commodityOptions}
                 hledgerStatus={hledgerQuery.data}
+                journalSummary={transactionsQuery.data}
                 onValuesChange={updateSettingsOnChange}
               />
             ) : shouldShowCourtesy ? (
