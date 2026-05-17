@@ -18,6 +18,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction, TransactionInput, TransactionType } from "../types";
 import { isValidJournalDate, journalDateFormat } from "../utils/date";
+import styles from "./TransactionModal.module.css";
 
 function PostingRow({
   field,
@@ -35,7 +36,7 @@ function PostingRow({
   const { t } = useTranslation();
 
   return (
-    <div className={`posting-row${isInvestmentMode ? " posting-row--investment" : ""}`}>
+    <div className={`${styles.postingRow}${isInvestmentMode ? ` ${styles.postingRowInvestment}` : ""}`}>
       <Form.Item label={t("transactions.account")} name={[field.name, "account"]}>
         <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
       </Form.Item>
@@ -58,12 +59,12 @@ function PostingRow({
       )}
       <Button
         danger
-        className="posting-delete-button"
+        className={styles.postingDeleteButton}
         aria-label={t("transactions.removePosting")}
         icon={<DeleteOutlined />}
         onClick={onRemove}
       />
-      <Form.Item className="posting-comment-field" name={[field.name, "comment"]}>
+      <Form.Item className={styles.postingCommentField} name={[field.name, "comment"]}>
         <Input placeholder={t("transactions.commentPlaceholder")} />
       </Form.Item>
     </div>
@@ -124,7 +125,7 @@ export function TransactionModal({
       >
         {!editingTransaction ? (
           <Segmented<TransactionType>
-            className="transaction-type-selector"
+            className={styles.transactionTypeSelector}
             block
             value={transactionType}
             onChange={onTransactionTypeChange}
@@ -137,7 +138,7 @@ export function TransactionModal({
             ]}
           />
         ) : null}
-        <Space className="form-row" size="middle">
+        <Space className={styles.formRow} size="middle">
           <Form.Item
             label={t("transactions.date")}
             name="date"
@@ -157,12 +158,12 @@ export function TransactionModal({
               },
             ]}
           >
-            <DatePicker format={journalDateFormat} className="full-width-control" />
+            <DatePicker format={journalDateFormat} className={styles.fullWidthControl} />
           </Form.Item>
           <Form.Item label={t("transactions.status")} name="status">
             <Select
               allowClear
-              className="full-width-control"
+              className={styles.fullWidthControl}
               placeholder={t("transactions.statusPlaceholder")}
               options={[
                 { value: "*", label: t("transactions.statusCleared") },

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
 import type { JournalTransaction } from "./types";
 import { formatCount } from "../utils/format";
+import styles from "./TransactionsRoute.module.css";
 
 export function TransactionsRoute({
   monthlyTransactions,
@@ -52,8 +53,8 @@ export function TransactionsRoute({
         </Card>
       </div>
 
-      <Card className="settings-card month-toolbar-card">
-        <Space className="month-toolbar" wrap>
+      <Card className={`${styles.card} ${styles.monthToolbarCard}`}>
+        <Space className={styles.monthToolbar} wrap>
           <Button icon={<LeftOutlined />} onClick={() => onMonthChange(activeMonth.subtract(1, "month"))}>
             {t("common.previous")}
           </Button>
@@ -68,7 +69,7 @@ export function TransactionsRoute({
       </Card>
 
       <Tabs
-        className="document-tabs"
+        className={styles.documentTabs}
         items={[
           {
             key: "executed",

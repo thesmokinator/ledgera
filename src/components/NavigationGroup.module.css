@@ -1,0 +1,67 @@
+.navGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 8px;
+    color: #f1f1f1;
+    text-align: left;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    font-weight: 475;
+    transition: background 120ms, color 120ms;
+}
+
+.navItem:hover:not(:disabled),
+.navItem.isActive {
+    color: #052e16;
+    background: #d1fae5;
+}
+
+.navItem:disabled {
+    cursor: default;
+    opacity: 0.82;
+}
+
+.navItem.isDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.navItem.isDisabled:hover {
+    color: #f1f1f1;
+    background: transparent;
+}
+
+.navItemLock {
+    margin-left: auto;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+:global(.theme-light) .navItem {
+    color: #374151;
+}
+
+:global(.theme-light) .navItem:hover:not(:disabled),
+:global(.theme-light) .navItem.isActive {
+    color: #064e3b;
+    background: #d1fae5;
+}
+
+:global(.theme-light) .navItem.isDisabled:hover {
+    color: #374151;
+    background: transparent;
+}

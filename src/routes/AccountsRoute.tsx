@@ -3,6 +3,27 @@ import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
 import type { AccountActivityRange, AccountSummary, JournalTransaction } from "./types";
 import { formatCount } from "../utils/format";
+import styles from "./AccountsRoute.module.css";
+
+const groupOrder = ["assets", "liabilities", "equity", "income", "expenses"];
+
+function groupAccounts(accounts: AccountSummary[]): { group: string; items: AccountSummary[] }[] {
+  const map = new Map<string, AccountSummary[]>();
+  for (const a of accounts) {
+    const root = a.account.split(":")[0].toLowerCase();
+    const key = groupOrder.includes(root) ? root : "other";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(a);
+  }
+  const result: { group: string; items: AccountSummary[] }[] = [];
+  for (const g of groupOrder) {
+    const items = map.get(g);
+    if (items) result.push({ group: g, items });
+  }
+  const other = map.get("other");
+  if (other) result.push({ group: "other", items: other });
+  return result;
+}
 
 export function AccountsRoute({
   accounts,
@@ -24,14 +45,15 @@ export function AccountsRoute({
   onDeleteTransaction: (id: string) => void;
 }) {
   const { t } = useTranslation();
+  const grouped = groupAccounts(accounts);
 
   return (
     <Space direction="vertical" size={24} className="content-stack">
       <Card
-        className="settings-card accounts-card"
-        title={t("accounts.allAccounts")}
+        className={styles.card}
+        title={t("accounts.title")}
         extra={(
-          <Space className="accounts-range-control">
+          <Space className={styles.rangeControl}>
             <Select<AccountActivityRange>
               value={accountActivityRange}
               onChange={onActivityRangeChange}
@@ -45,42 +67,53 @@ export function AccountsRoute({
           </Space>
         )}
       >
-        <Table<AccountSummary>
-          rowKey="account"
-          loading={loading}
-          dataSource={accounts}
-          pagination={{ pageSize: 12 }}
-          expandable={{
-            expandedRowRender: (account) => (
-              <div className="account-transactions-panel">
-                <Typography.Text className="account-transactions-title">
-                  {t("accounts.accountActivity", {
-                    account: account.account,
-                    count: account.transactions,
-                  })}
-                </Typography.Text>
-                <TransactionsTable
-                  transactions={account.accountTransactions}
-                  loading={loading}
-                  powerUser={powerUser}
-                  onEdit={onEditTransaction}
-                  onDelete={onDeleteTransaction}
-                />
-              </div>
-            ),
-            rowExpandable: (account) => account.transactions > 0,
-          }}
-          columns={[
-            { title: t("transactions.account"), dataIndex: "account" },
-            {
-              title: t("accounts.transactionsCount"),
-              dataIndex: "transactions",
-              width: 180,
-              align: "right",
-              render: (count: number) => formatCount(count),
-            },
-          ]}
-        />
+        {grouped.map(({ group, items }) => (
+          <div key={group} className={styles.group}>
+            <Typography.Title level={5} className={styles.groupTitle}>
+              {t(`accounts.groups.${group}`)}
+              <Typography.Text type="secondary" className={styles.groupCount}>
+                {formatCount(items.length)}
+              </Typography.Text>
+            </Typography.Title>
+            <Table<AccountSummary>
+              rowKey="account"
+              loading={loading}
+              dataSource={items}
+              pagination={false}
+              showHeader={false}
+              expandable={{
+                expandedRowRender: (account) => (
+                  <div className={styles.transactionsPanel}>
+                    <Typography.Text className={styles.transactionsTitle}>
+                      {t("accounts.accountActivity", {
+                        account: account.account,
+                        count: account.transactions,
+                      })}
+                    </Typography.Text>
+                    <TransactionsTable
+                      transactions={account.accountTransactions}
+                      loading={loading}
+                      powerUser={powerUser}
+                      onEdit={onEditTransaction}
+                      onDelete={onDeleteTransaction}
+                    />
+                  </div>
+                ),
+                rowExpandable: (account) => account.transactions > 0,
+              }}
+              columns={[
+                { title: t("transactions.account"), dataIndex: "account" },
+                {
+                  title: t("accounts.transactionsCount"),
+                  dataIndex: "transactions",
+                  width: 120,
+                  align: "right",
+                  render: (count: number) => formatCount(count),
+                },
+              ]}
+            />
+          </div>
+        ))}
       </Card>
     </Space>
   );

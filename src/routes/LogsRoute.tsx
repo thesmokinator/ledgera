@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import type { LogEntry } from "./types";
+import styles from "./LogsRoute.module.css";
 
 const levelColors: Record<LogEntry["level"], string> = {
   info: "blue",
@@ -69,7 +70,7 @@ export function LogsRoute() {
     <Space direction="vertical" size={24} className="content-stack">
       {modalContextHolder}
       <Card
-        className="settings-card"
+        className={styles.card}
         title={t("logs.title")}
         extra={(
           <Space>
