@@ -121,6 +121,8 @@ struct PostingInput {
     #[serde(default)]
     commodity: String,
     #[serde(default)]
+    unit_price: String,
+    #[serde(default)]
     comment: String,
 }
 
@@ -305,14 +307,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let win_builder = tauri::WebviewWindowBuilder::new(
-                app,
-                "main",
-                tauri::WebviewUrl::default(),
-            )
-            .title("Ledgera")
-            .inner_size(1400.0, 918.0)
-            .min_inner_size(1080.0, 720.0);
+            let win_builder =
+                tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                    .title("Ledgera")
+                    .inner_size(1400.0, 918.0)
+                    .min_inner_size(1080.0, 720.0);
 
             #[cfg(target_os = "macos")]
             let win_builder = win_builder.title_bar_style(tauri::TitleBarStyle::Transparent);
@@ -1338,7 +1337,11 @@ fn format_posting_amount(amount: &str, commodity: &str) -> String {
 
 /// Formats a posting, including an optional hledger inline comment.
 fn format_posting(posting: &PostingInput) -> String {
-    let amount = format_posting_amount(&posting.amount, &posting.commodity);
+    let mut amount = format_posting_amount(&posting.amount, &posting.commodity);
+    if !posting.unit_price.trim().is_empty() && !amount.trim().is_empty() {
+        amount.push_str(" @ ");
+        amount.push_str(posting.unit_price.trim());
+    }
     let mut line = if amount.trim().is_empty() {
         format!("    {}", posting.account.trim())
     } else {
@@ -1658,12 +1661,14 @@ mod tests {
                     account: "expenses:test".to_string(),
                     amount: "10".to_string(),
                     commodity: "EUR".to_string(),
+                    unit_price: String::new(),
                     comment: String::new(),
                 },
                 PostingInput {
                     account: "assets:cash".to_string(),
                     amount: String::new(),
                     commodity: "EUR".to_string(),
+                    unit_price: String::new(),
                     comment: String::new(),
                 },
             ],
@@ -2004,5 +2009,48 @@ mod tests {
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");
+    }
+
+    #[test]
+    fn formats_posting_with_unit_price() {
+        let posting = PostingInput {
+            account: "assets:investments:etf".to_string(),
+            amount: "10".to_string(),
+            commodity: "VWCE".to_string(),
+            unit_price: "150 EUR".to_string(),
+            comment: String::new(),
+        };
+        let result = format_posting(&posting);
+        assert!(result.contains("@ 150 EUR"));
+        assert!(result.contains("10.00 VWCE"));
+        assert!(result.contains("assets:investments:etf"));
+    }
+
+    #[test]
+    fn formats_posting_without_unit_price_when_empty() {
+        let posting = PostingInput {
+            account: "expenses:food".to_string(),
+            amount: "25".to_string(),
+            commodity: "EUR".to_string(),
+            unit_price: String::new(),
+            comment: String::new(),
+        };
+        let result = format_posting(&posting);
+        assert!(!result.contains('@'));
+        assert!(result.contains("25.00 EUR"));
+    }
+
+    #[test]
+    fn formats_posting_with_unit_price_and_comment() {
+        let posting = PostingInput {
+            account: "assets:investments:etf".to_string(),
+            amount: "5".to_string(),
+            commodity: "BTC".to_string(),
+            unit_price: "45000 USD".to_string(),
+            comment: "limit order".to_string(),
+        };
+        let result = format_posting(&posting);
+        assert!(result.contains("@ 45000 USD"));
+        assert!(result.contains("; limit order"));
     }
 }

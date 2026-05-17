@@ -23,28 +23,28 @@ export function transactionTemplatePostings(
   switch (type) {
     case "expense":
       return [
-        { account: suggestions.defaultExpenseAccount || findAccountByRoot(accounts, ["expenses", "expense"]), amount: "", commodity: defaultCommodity, comment: "" },
-        { account: cashAccount, amount: "", commodity: "", comment: "" },
+        { account: suggestions.defaultExpenseAccount || findAccountByRoot(accounts, ["expenses", "expense"]), amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
+        { account: cashAccount, amount: "", commodity: "", unitPrice: "", comment: "" },
       ];
     case "income":
       return [
-        { account: cashAccount, amount: "", commodity: defaultCommodity, comment: "" },
-        { account: suggestions.defaultIncomeAccount || findAccountByRoot(accounts, ["income", "revenue"]), amount: "", commodity: "", comment: "" },
+        { account: cashAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
+        { account: suggestions.defaultIncomeAccount || findAccountByRoot(accounts, ["income", "revenue"]), amount: "", commodity: "", unitPrice: "", comment: "" },
       ];
     case "transfer":
       return [
-        { account: cashAccount, amount: "", commodity: defaultCommodity, comment: "" },
-        { account: transferAccount, amount: "", commodity: defaultCommodity, comment: "" },
+        { account: cashAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
+        { account: transferAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
       ];
     case "investment":
       return [
-        { account: suggestions.defaultInvestmentAccount, amount: "", commodity: investmentCommodity, comment: "" },
-        { account: cashAccount, amount: "", commodity: defaultCommodity, comment: "" },
+        { account: suggestions.defaultInvestmentAccount, amount: "", commodity: investmentCommodity, unitPrice: "", comment: "" },
+        { account: cashAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
       ];
     case "custom":
       return [
-        { account: "", amount: "", commodity: defaultCommodity, comment: "" },
-        { account: "", amount: "", commodity: "", comment: "" },
+        { account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
+        { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
       ];
   }
 }

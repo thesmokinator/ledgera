@@ -89,32 +89,32 @@ describe("findAccountByRoot", () => {
 describe("transactionTemplatePostings", () => {
   it("returns expense postings with expense account and cash account", () => {
     const result = transactionTemplatePostings("expense", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "expenses:food", amount: "", commodity: "EUR", comment: "" });
-    expect(result[1]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "", comment: "" });
+    expect(result[0]).toEqual({ account: "expenses:food", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
+    expect(result[1]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "", unitPrice: "", comment: "" });
   });
 
   it("returns income postings with cash and income account", () => {
     const result = transactionTemplatePostings("income", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", comment: "" });
-    expect(result[1]).toEqual({ account: "income:salary", amount: "", commodity: "", comment: "" });
+    expect(result[0]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
+    expect(result[1]).toEqual({ account: "income:salary", amount: "", commodity: "", unitPrice: "", comment: "" });
   });
 
   it("returns transfer postings with two accounts", () => {
     const result = transactionTemplatePostings("transfer", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", comment: "" });
-    expect(result[1]).toEqual({ account: "assets:cash", amount: "", commodity: "EUR", comment: "" });
+    expect(result[0]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
+    expect(result[1]).toEqual({ account: "assets:cash", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
   });
 
   it("returns investment postings", () => {
     const result = transactionTemplatePostings("investment", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "investments:stocks", amount: "", commodity: "AAPL", comment: "" });
-    expect(result[1]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", comment: "" });
+    expect(result[0]).toEqual({ account: "investments:stocks", amount: "", commodity: "AAPL", unitPrice: "", comment: "" });
+    expect(result[1]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
   });
 
   it("returns empty custom postings", () => {
     const result = transactionTemplatePostings("custom", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "", amount: "", commodity: "EUR", comment: "" });
-    expect(result[1]).toEqual({ account: "", amount: "", commodity: "", comment: "" });
+    expect(result[0]).toEqual({ account: "", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
+    expect(result[1]).toEqual({ account: "", amount: "", commodity: "", unitPrice: "", comment: "" });
   });
 
   it("falls back to account root matching when defaults are empty", () => {

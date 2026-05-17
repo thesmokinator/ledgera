@@ -733,6 +733,12 @@ button {
     width: 100%;
 }
 
+.posting-row--investment {
+    grid-template-columns:
+        minmax(0, 1.3fr) minmax(90px, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.75fr)
+        auto;
+}
+
 .posting-comment-field {
     grid-column: 1 / -1;
     margin-top: -6px;

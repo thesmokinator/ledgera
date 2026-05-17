@@ -30,12 +30,14 @@ describe("emptyTransaction", () => {
       account: "",
       amount: "",
       commodity: "",
+      unitPrice: "",
       comment: "",
     });
     expect(emptyTransaction.postings[1]).toEqual({
       account: "",
       amount: "",
       commodity: "",
+      unitPrice: "",
       comment: "",
     });
   });
@@ -90,12 +92,14 @@ describe("toTransactionInput", () => {
       account: "expenses:food",
       amount: "42.50",
       commodity: "EUR",
+      unitPrice: "",
       comment: "weekly groceries",
     });
     expect(result.postings[1]).toEqual({
       account: "assets:bank",
       amount: "-42.50",
       commodity: "EUR",
+      unitPrice: "",
       comment: "",
     });
   });

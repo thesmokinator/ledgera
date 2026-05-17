@@ -7,8 +7,8 @@ export const emptyTransaction: TransactionInput = {
   code: "",
   description: "",
   postings: [
-    { account: "", amount: "", commodity: "", comment: "" },
-    { account: "", amount: "", commodity: "", comment: "" },
+    { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
+    { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
   ],
 };
 
@@ -24,6 +24,7 @@ export function toTransactionInput(transaction: JournalTransaction): Transaction
           account: posting.account,
           amount: posting.amount,
           commodity: posting.commodity,
+          unitPrice: "",
           comment: posting.comment,
         }))
         : emptyTransaction.postings,

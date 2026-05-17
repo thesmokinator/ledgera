@@ -39,6 +39,7 @@ import type {
   JournalSummary,
   JournalTransaction,
   NavigationItem,
+  PostingInput,
   TransactionInput,
   TransactionType,
 } from "./types";
@@ -269,20 +270,71 @@ function App() {
     setTransactionModalOpen(true);
   }
 
+  function parseAmountValue(amount: string): number {
+    const trimmed = amount.trim().replace(",", ".");
+    const match = trimmed.match(/(-?[\d.]+)/);
+    return match ? parseFloat(match[1]) : 0;
+  }
+
+  function parseUnitPrice(unitPrice: string): { value: number; commodity: string } {
+    const trimmed = unitPrice.trim();
+    const value = parseAmountValue(trimmed);
+    const commodity = trimmed.replace(/[\d.,\s-]/g, "").trim();
+    return { value, commodity };
+  }
+
+  function autoCalculateBalancingAmounts(postings: PostingInput[]): PostingInput[] {
+    const result = postings.map((p) => ({ ...p }));
+    const pricedIndex = result.findIndex(
+      (p) => p.unitPrice.trim() && p.amount.trim()
+    );
+    if (pricedIndex === -1) return result;
+
+    const priced = result[pricedIndex];
+    const quantity = parseAmountValue(priced.amount);
+    const { value: unitPriceValue, commodity: priceCommodity } = parseUnitPrice(
+      priced.unitPrice
+    );
+    if (quantity === 0 || unitPriceValue === 0) return result;
+
+    const total = quantity * unitPriceValue;
+
+    // Find a balancing posting: one with no unitPrice, preferring the same commodity as the price
+    const balanceIndex = result.findIndex(
+      (p, i) =>
+        i !== pricedIndex &&
+        !p.unitPrice.trim() &&
+        (!p.amount.trim() || p.commodity === priceCommodity || p.commodity === defaultCommodity)
+    );
+    if (balanceIndex === -1) return result;
+
+    result[balanceIndex] = {
+      ...result[balanceIndex],
+      amount: (-total).toFixed(2),
+      commodity: priceCommodity || result[balanceIndex].commodity || defaultCommodity,
+    };
+    return result;
+  }
+
   function submitTransaction(values: TransactionInput) {
+    const rawPostings = (values.postings ?? [])
+      .filter((posting) => posting.account.trim().length > 0)
+      .map((posting) => ({
+        account: posting.account,
+        amount: posting.amount ?? "",
+        commodity: posting.amount?.trim() ? (posting.commodity ?? defaultCommodity) : (posting.commodity ?? ""),
+        unitPrice: posting.unitPrice ?? "",
+        comment: posting.comment ?? "",
+      }));
+
+    const balancedPostings = autoCalculateBalancingAmounts(rawPostings);
+
     const normalizedValues: TransactionInput = {
       date: dayjs.isDayjs(values.date) ? values.date.format(journalDateFormat) : values.date,
       status: values.status ?? "",
       code: values.code ?? "",
       description: values.description,
-      postings: (values.postings ?? [])
-        .filter((posting) => posting.account.trim().length > 0)
-        .map((posting) => ({
-          account: posting.account,
-          amount: posting.amount ?? "",
-          commodity: posting.amount?.trim() ? (posting.commodity ?? defaultCommodity) : (posting.commodity ?? ""),
-          comment: posting.comment ?? "",
-        })),
+      postings: balancedPostings,
     };
 
     if (editingTransaction) {

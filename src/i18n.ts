@@ -137,6 +137,8 @@ const resources = {
         account: "Account",
         commodity: "Commodity",
         amount: "Amount",
+        quantity: "Quantity",
+        unitPrice: "Unit price",
         comment: "Comment",
         commentPlaceholder: "Optional posting comment",
         enterAccount: "Enter an account",

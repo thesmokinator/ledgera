@@ -77,6 +77,7 @@ export type PostingInput = {
   account: string;
   amount: string;
   commodity: string;
+  unitPrice: string;
   comment: string;
 };
 

@@ -16,8 +16,59 @@ import {
 import type { FormInstance } from "antd";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
-import type { TransactionInput, TransactionType } from "../types";
+import type { JournalTransaction, TransactionInput, TransactionType } from "../types";
 import { isValidJournalDate, journalDateFormat } from "../utils/date";
+
+function PostingRow({
+  field,
+  accountOptions,
+  commodityOptions,
+  isInvestmentMode,
+  onRemove,
+}: {
+  field: { key: number; name: number };
+  accountOptions: { value: string }[];
+  commodityOptions: { value: string }[];
+  isInvestmentMode: boolean;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className={`posting-row${isInvestmentMode ? " posting-row--investment" : ""}`}>
+      <Form.Item label={t("transactions.account")} name={[field.name, "account"]}>
+        <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
+      </Form.Item>
+      <Form.Item label={t("transactions.commodity")} name={[field.name, "commodity"]}>
+        <AutoComplete options={commodityOptions} placeholder="EUR" filterOption />
+      </Form.Item>
+      {isInvestmentMode ? (
+        <>
+          <Form.Item label={t("transactions.quantity")} name={[field.name, "amount"]}>
+            <Input placeholder="10" />
+          </Form.Item>
+          <Form.Item label={t("transactions.unitPrice")} name={[field.name, "unitPrice"]}>
+            <Input placeholder="150 EUR" />
+          </Form.Item>
+        </>
+      ) : (
+        <Form.Item label={t("transactions.amount")} name={[field.name, "amount"]}>
+          <Input placeholder="25.00" />
+        </Form.Item>
+      )}
+      <Button
+        danger
+        className="posting-delete-button"
+        aria-label={t("transactions.removePosting")}
+        icon={<DeleteOutlined />}
+        onClick={onRemove}
+      />
+      <Form.Item className="posting-comment-field" name={[field.name, "comment"]}>
+        <Input placeholder={t("transactions.commentPlaceholder")} />
+      </Form.Item>
+    </div>
+  );
+}
 
 export function TransactionModal({
   open,
@@ -35,7 +86,7 @@ export function TransactionModal({
   onTransactionTypeChange,
 }: {
   open: boolean;
-  editingTransaction: unknown;
+  editingTransaction: JournalTransaction | null;
   transactionForm: FormInstance<TransactionInput>;
   isSaving: boolean;
   transactionType: TransactionType;
@@ -50,10 +101,17 @@ export function TransactionModal({
 }) {
   const { t } = useTranslation();
 
+  const isInvestmentMode =
+    transactionType === "investment" ||
+    (editingTransaction?.postings ?? []).some(
+      (p) => p.commodity.trim() && p.commodity !== defaultCommodity
+    );
+
   return (
     <Modal
       title={editingTransaction ? t("transactions.editTransaction") : t("transactions.newTransaction")}
       open={open}
+      width={isInvestmentMode ? 780 : 620}
       okText={editingTransaction ? t("common.save") : t("transactions.createTransaction")}
       confirmLoading={isSaving}
       onCancel={onClose}
@@ -123,29 +181,16 @@ export function TransactionModal({
           {(fields, { add, remove }) => (
             <Space direction="vertical" className="content-stack">
               {fields.map((field) => (
-                <div key={field.key} className="posting-row">
-                  <Form.Item label={t("transactions.account")} name={[field.name, "account"]}>
-                    <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
-                  </Form.Item>
-                  <Form.Item label={t("transactions.commodity")} name={[field.name, "commodity"]}>
-                    <AutoComplete options={commodityOptions} placeholder="EUR" filterOption />
-                  </Form.Item>
-                  <Form.Item label={t("transactions.amount")} name={[field.name, "amount"]}>
-                    <Input placeholder="25.00" />
-                  </Form.Item>
-                  <Button
-                    danger
-                    className="posting-delete-button"
-                    aria-label={t("transactions.removePosting")}
-                    icon={<DeleteOutlined />}
-                    onClick={() => remove(field.name)}
-                  />
-                  <Form.Item className="posting-comment-field" name={[field.name, "comment"]}>
-                    <Input placeholder={t("transactions.commentPlaceholder")} />
-                  </Form.Item>
-                </div>
+                <PostingRow
+                  key={field.key}
+                  field={field}
+                  accountOptions={accountOptions}
+                  commodityOptions={commodityOptions}
+                  isInvestmentMode={isInvestmentMode}
+                  onRemove={() => remove(field.name)}
+                />
               ))}
-              <Button icon={<PlusOutlined />} onClick={() => add({ account: "", amount: "", commodity: defaultCommodity, comment: "" })}>
+              <Button icon={<PlusOutlined />} onClick={() => add({ account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" })}>
                 {t("transactions.addPosting")}
               </Button>
             </Space>
