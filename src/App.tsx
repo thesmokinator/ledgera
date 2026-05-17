@@ -137,11 +137,21 @@ function App() {
       callCommand<AppSettings, { settings: AppSettings }>("update_app_settings", {
         settings: normalizeSettings(settings),
       }),
-    onSuccess: async (settings) => {
-      queryClient.setQueryData(["settings"], normalizeSettings(settings));
-      await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+    onSuccess: async (_, variables) => {
+      const next = normalizeSettings(variables);
+      queryClient.setQueryData(["settings"], next);
+
+      const prev = activeSettings;
+      if (prev.journalPath !== next.journalPath) {
+        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+      }
+      if (prev.hledgerPath !== next.hledgerPath) {
+        await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
+      }
+      if (prev.defaultCommodity !== next.defaultCommodity) {
+        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+      }
     },
     onError: (error) => messageApi.error(parseError(error, t)),
   });
