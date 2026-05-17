@@ -65,12 +65,6 @@ import {
 import { parseError } from "./utils/error";
 import "./App.css";
 
-const primaryNavigation: NavigationItem[] = [
-  { key: "transactions", label: "common.transactions", icon: <HomeOutlined /> },
-  { key: "accounts", label: "common.accounts", icon: <BankOutlined /> },
-  { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
-];
-
 const accountActivityRangeOptions: AccountActivityRange[] = [
   "current-month",
   "30",
@@ -137,11 +131,22 @@ function App() {
       callCommand<AppSettings, { settings: AppSettings }>("update_app_settings", {
         settings: normalizeSettings(settings),
       }),
-    onSuccess: async (settings) => {
-      queryClient.setQueryData(["settings"], normalizeSettings(settings));
-      await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+    onSuccess: async (_, variables) => {
+      const next = normalizeSettings(variables);
+      queryClient.setQueryData(["settings"], next);
+
+      const prev = activeSettings;
+      if (prev.journalPath !== next.journalPath) {
+        queryClient.resetQueries({ queryKey: ["transactions"] });
+        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+      }
+      if (prev.hledgerPath !== next.hledgerPath) {
+        await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
+      }
+      if (prev.defaultCommodity !== next.defaultCommodity) {
+        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+      }
     },
     onError: (error) => messageApi.error(parseError(error, t)),
   });
@@ -356,13 +361,18 @@ function App() {
     createTransactionMutation.isPending || updateTransactionMutation.isPending;
 
   const navigationItems = useMemo<NavigationItem[]>(
-    () => [
-      ...primaryNavigation,
-      ...(activeSettings.powerUser
-        ? [{ key: "logs", label: "logs.title" as const, icon: <FileTextOutlined /> }]
-        : []),
-    ],
-    [activeSettings.powerUser],
+    () => {
+      const hasJournal = Boolean(activeSettings.journalPath.trim());
+      return [
+        { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal },
+        { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal },
+        { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
+        ...(activeSettings.powerUser
+          ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined /> }]
+          : []),
+      ];
+    },
+    [activeSettings.powerUser, activeSettings.journalPath],
   );
 
   return (
@@ -407,13 +417,16 @@ function App() {
                 initialValues={activeSettings}
                 commodityOptions={commodityOptions}
                 hledgerStatus={hledgerQuery.data}
+                journalSummary={transactionsQuery.data}
+                journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
                 onValuesChange={updateSettingsOnChange}
               />
+            ) : activeView === "logs" ? (
+              <LogsRoute />
             ) : shouldShowCourtesy ? (
               <CourtesyState
                 reasons={courtesyReasons}
                 details={journalLoadError || hledgerQuery.data?.message}
-                onConfigure={() => setActiveView("settings")}
               />
             ) : activeView === "accounts" ? (
               <AccountsRoute
@@ -426,8 +439,6 @@ function App() {
                 onEditTransaction={openEditTransaction}
                 onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
               />
-            ) : activeView === "logs" ? (
-              <LogsRoute />
             ) : (
               <TransactionsRoute
                 monthlyTransactions={monthlyTransactions}

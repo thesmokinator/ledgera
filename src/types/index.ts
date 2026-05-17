@@ -56,6 +56,8 @@ export type JournalSummary = {
   path: string;
   transactions: JournalTransaction[];
   commodities: string[];
+  fileCount: number;
+  totalSizeBytes: number;
   dashboard: DashboardSummary;
 };
 
@@ -119,4 +121,5 @@ export type NavigationItem = {
   key: string;
   label: string;
   icon: React.ReactNode;
+  disabled?: boolean;
 };

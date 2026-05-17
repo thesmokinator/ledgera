@@ -199,6 +199,8 @@ struct JournalSummary {
     path: String,
     transactions: Vec<JournalTransaction>,
     commodities: Vec<String>,
+    file_count: usize,
+    total_size_bytes: u64,
     dashboard: DashboardSummary,
 }
 
@@ -674,7 +676,16 @@ fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
 }
 
 fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
-    let transactions = load_transactions_from_journal(journal_path)?;
+    let files = load_journal_files(journal_path)?;
+    let file_count = files.len();
+    let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
+    let transactions: Vec<JournalTransaction> = files
+        .iter()
+        .flat_map(|file| parse_transactions(&file.content, &file.path))
+        .collect();
+    let mut transactions = transactions;
+    transactions.reverse();
+    transactions.sort_by(|a, b| b.date.cmp(&a.date));
     let commodities = collect_commodities(&transactions);
     let dashboard = build_dashboard_summary(&transactions);
 
@@ -682,6 +693,8 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
         path: journal_path.to_string_lossy().to_string(),
         transactions,
         commodities,
+        file_count,
+        total_size_bytes,
         dashboard,
     })
 }

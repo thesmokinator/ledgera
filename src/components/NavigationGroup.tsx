@@ -18,11 +18,15 @@ export function NavigationGroup({
         <button
           key={item.key}
           type="button"
-          className={`nav-item ${activeKey === item.key ? "is-active" : ""}`}
-          onClick={() => onSelect(item.key)}
+          className={`nav-item ${activeKey === item.key ? "is-active" : ""} ${item.disabled ? "is-disabled" : ""}`}
+          disabled={item.disabled}
+          onClick={() => {
+            if (!item.disabled) onSelect(item.key);
+          }}
         >
           {item.icon}
           <span>{t(item.label)}</span>
+          {item.disabled ? <span className="nav-item-lock">🔒</span> : null}
         </button>
       ))}
     </div>
