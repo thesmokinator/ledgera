@@ -1,14 +1,26 @@
-import { Button, Card, Space, Table } from "antd";
+import { Button, Card, Space, Table, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { Holding, PriceInfo } from "./types";
+import type { Balance, Holding, PriceInfo } from "./types";
 import styles from "./BalancesRoute.module.css";
+
+function formatAmount(amount: number, commodity: string): string {
+  const abs = Math.abs(amount);
+  const num = Number.isInteger(abs) ? abs.toString() : abs.toFixed(2);
+  return commodity ? `${commodity} ${num}` : num;
+}
 
 export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  const balancesQuery = useQuery({
+    queryKey: ["balances"],
+    queryFn: () => invoke<Balance[]>("get_balances"),
+    retry: false,
+  });
 
   const holdingsQuery = useQuery({
     queryKey: ["holdings"],
@@ -29,8 +41,19 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
 
   const prices = pricesQuery.data ?? {};
 
+  const balances = balancesQuery.data ?? [];
+
+  function renderAmount(amount: number, commodity: string) {
+    return (
+      <span style={{ color: amount < 0 ? "#ef4444" : amount > 0 ? "#22c55e" : undefined, fontWeight: 500 }}>
+        {amount < 0 ? "-" : ""}{formatAmount(amount, commodity)}
+      </span>
+    );
+  }
+
   return (
     <Space direction="vertical" size={24} className="content-stack">
+      {/* ── Account Balances ─────────────────────── */}
       <Card
         className={styles.card}
         title={t("balances.title")}
@@ -46,62 +69,64 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
           ) : null
         }
       >
-        {holdings.length === 0 ? (
-          <p>{t("balances.empty")}</p>
+        {balances.length === 0 ? (
+          <Typography.Text type="secondary">{t("balances.empty")}</Typography.Text>
         ) : (
+          <Table<Balance>
+            dataSource={balances}
+            rowKey="account"
+            loading={balancesQuery.isFetching}
+            pagination={false}
+            showHeader={false}
+            columns={[
+              { dataIndex: "account" },
+              {
+                align: "right",
+                width: 200,
+                render: (_: unknown, record: Balance) => renderAmount(record.amount, record.commodity),
+              },
+            ]}
+          />
+        )}
+      </Card>
+
+      {/* ── Investment Holdings ──────────────────── */}
+      {holdings.length > 0 ? (
+        <Card className={styles.card} title={t("balances.holdings")}>
           <Table<Holding>
             dataSource={holdings}
             rowKey="commodity"
             loading={holdingsQuery.isFetching}
             pagination={false}
             columns={[
+              { title: t("balances.commodity"), dataIndex: "commodity", width: 140, render: (c: string) => <strong>{c}</strong> },
+              { title: t("balances.account"), dataIndex: "account", ellipsis: true },
               {
-                title: t("balances.commodity"),
-                dataIndex: "commodity",
-                width: 140,
-                render: (c: string) => <strong>{c}</strong>,
-              },
-              {
-                title: t("balances.account"),
-                dataIndex: "account",
-                ellipsis: true,
-              },
-              {
-                title: t("balances.quantity"),
-                dataIndex: "quantity",
-                width: 140,
-                align: "right",
-                render: (q: number) =>
-                  Number.isInteger(q) ? q.toString() : q.toFixed(4).replace(/\.?0+$/, ""),
+                title: t("balances.quantity"), dataIndex: "quantity", width: 140, align: "right",
+                render: (q: number) => Number.isInteger(q) ? q.toString() : q.toFixed(4).replace(/\.?0+$/, ""),
               },
               ...(fetchPrices
                 ? [
                   {
-                    title: t("balances.price"),
-                    width: 140,
-                    align: "right" as const,
+                    title: t("balances.price"), width: 140, align: "right" as const,
                     render: (_: unknown, record: Holding) => {
                       const info = prices[record.commodity];
-                      return info ? `${info.currency} ${info.price.toFixed(2)}` : "-";
+                      return info ? `${info.currency} ${info.price.toFixed(2)}` : "—";
                     },
                   },
                   {
-                    title: t("balances.value"),
-                    width: 160,
-                    align: "right" as const,
+                    title: t("balances.value"), width: 160, align: "right" as const,
                     render: (_: unknown, record: Holding) => {
                       const info = prices[record.commodity];
-                      return info
-                        ? `${info.currency} ${(record.quantity * info.price).toFixed(2)}`
-                        : "-";
+                      return info ? `${info.currency} ${(record.quantity * info.price).toFixed(2)}` : "—";
                     },
                   },
                 ]
                 : []),
             ]}
           />
-        )}
-      </Card>
+        </Card>
+      ) : null}
     </Space>
   );
 }

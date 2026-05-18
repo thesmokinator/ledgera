@@ -368,6 +368,117 @@ async fn fetch_prices(
     Ok(prices)
 }
 
+/// Returns account balances from hledger as a hierarchical tree.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Balance {
+    account: String,
+    amount: f64,
+    commodity: String,
+    children: Vec<Balance>,
+}
+
+#[tauri::command]
+async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let executable = hledger_executable(&settings);
+
+    log_event(&app, "info", "BALANCE_START", "Running hledger balance");
+
+    let output = tauri::async_runtime::spawn_blocking(move || {
+        Command::new(&executable)
+            .arg("-f")
+            .arg(&journal_path)
+            .arg("balance")
+            .arg("-O")
+            .arg("json")
+            .output()
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|error| {
+        to_error_string_with_details(
+            "HLEDGER_BALANCE_FAILED",
+            "Unable to run hledger balance.",
+            error.to_string(),
+        )
+    })??;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        log_event_with_details(
+            &app,
+            "error",
+            "BALANCE_FAILED",
+            "hledger balance failed",
+            Some(stderr.clone()),
+        );
+        return Err(to_error_string_with_details(
+            "HLEDGER_BALANCE_FAILED",
+            "hledger balance command failed.",
+            stderr,
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    log_event_with_details(
+        &app,
+        "info",
+        "BALANCE_RAW",
+        "hledger balance output",
+        Some(stdout.clone()),
+    );
+
+    let raw: Vec<serde_json::Value> = serde_json::from_str(&stdout).map_err(|error| {
+        to_error_string_with_details(
+            "HLEDGER_BALANCE_PARSE_FAILED",
+            "Unable to parse hledger balance output.",
+            error.to_string(),
+        )
+    })?;
+
+    // The JSON is [account_rows, totals]. Take only the account rows.
+    let rows = raw.first().and_then(|v| v.as_array()).ok_or_else(|| {
+        to_error_string(
+            "HLEDGER_BALANCE_PARSE_FAILED",
+            "Unexpected hledger balance JSON structure.",
+        )
+    })?;
+
+    let mut result: Vec<Balance> = Vec::new();
+    for row in rows {
+        let arr = match row.as_array() {
+            Some(a) if a.len() >= 4 => a,
+            _ => continue,
+        };
+        let account = arr[0].as_str().unwrap_or("").to_string();
+        let (amount, commodity) = if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
+            let qty = bal["aquantity"]
+                .get("floatingPoint")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
+            (qty, comm)
+        } else {
+            (0.0, String::new())
+        };
+        result.push(Balance {
+            account,
+            amount,
+            commodity,
+            children: Vec::new(),
+        });
+    }
+    log_event(
+        &app,
+        "info",
+        "BALANCE_DONE",
+        &format!("Parsed {} accounts", result.len()),
+    );
+    Ok(result)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
@@ -749,6 +860,7 @@ pub fn run() {
             clear_logs,
             get_holdings,
             fetch_prices,
+            get_balances,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

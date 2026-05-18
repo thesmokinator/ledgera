@@ -120,6 +120,13 @@ export type PriceInfo = {
   currency: string;
 };
 
+export type Balance = {
+  account: string;
+  amount: number;
+  commodity: string;
+  children: Balance[];
+};
+
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";
 
 export type AccountSummary = {

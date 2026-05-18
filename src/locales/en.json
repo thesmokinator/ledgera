@@ -155,6 +155,7 @@
   },
   "balances": {
     "title": "Balances",
+    "holdings": "Holdings",
     "empty": "No investment holdings detected in the journal. Add transactions with non-default commodities to see them here.",
     "count": "{{count}} holdings",
     "commodity": "Commodity",
