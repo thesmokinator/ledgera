@@ -12,6 +12,8 @@ describe("defaultSettings", () => {
       defaultCommodity: "",
       fetchPrices: false,
       commoditySymbols: "",
+      excludeBalances: "",
+      includeInvestments: "",
     });
   });
 });
@@ -68,6 +70,8 @@ describe("normalizeSettings", () => {
       defaultCommodity: "USD",
       fetchPrices: true,
       commoditySymbols: "TEST=TEST.DE",
+      excludeBalances: "",
+      includeInvestments: "",
     };
     expect(normalizeSettings(full)).toEqual(full);
   });

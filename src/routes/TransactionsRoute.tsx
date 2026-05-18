@@ -1,37 +1,45 @@
 import { LeftOutlined, RightOutlined } from "@ant-design/icons";
 import { Button, Card, Space, Tabs, Typography } from "antd";
-import type { Dayjs } from "dayjs";
+import { invoke } from "@tauri-apps/api/core";
+import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
-import type { JournalTransaction } from "./types";
+import type { JournalSummary, JournalTransaction } from "./types";
 import { formatCount } from "../utils/format";
+import { collectAccounts } from "../utils/account";
+import {
+  isExecutedTransaction,
+  isSameJournalMonth,
+} from "../utils/date";
 import styles from "./TransactionsRoute.module.css";
 
 export function TransactionsRoute({
-  monthlyTransactions,
-  scheduledTransactions,
-  accountsCount,
-  activeMonth,
-  activeMonthLabel,
-  loading,
   powerUser,
-  onMonthChange,
   onEditTransaction,
   onDeleteTransaction,
 }: {
-  monthlyTransactions: JournalTransaction[];
-  scheduledTransactions: JournalTransaction[];
-  accountsCount: number;
-  activeMonth: Dayjs;
-  activeMonthLabel: string;
-  loading: boolean;
   powerUser: boolean;
-  onMonthChange: (month: Dayjs) => void;
   onEditTransaction: (transaction: JournalTransaction) => void;
   onDeleteTransaction: (id: string) => void;
 }) {
   const { t } = useTranslation();
+  const [activeMonth, setActiveMonth] = useState(() => dayjs().startOf("month"));
+
+  const transactionsQuery = useQuery({
+    queryKey: ["transactions"],
+    queryFn: () => invoke<JournalSummary>("list_transactions"),
+    retry: false,
+    refetchOnMount: true,
+  });
+
+  const transactions = transactionsQuery.data?.transactions ?? [];
+  const visible = transactions.filter((tx) => isSameJournalMonth(tx.date, activeMonth));
+  const monthlyTransactions = visible.filter(isExecutedTransaction);
+  const scheduledTransactions = visible.filter((tx) => !isExecutedTransaction(tx));
+  const accountsCount = collectAccounts(transactions, visible).length;
+  const activeMonthLabel = activeMonth.format("MMMM YYYY");
 
   return (
     <Space direction="vertical" size={24} className="content-stack">
@@ -55,14 +63,14 @@ export function TransactionsRoute({
 
       <Card className={`${styles.card} ${styles.monthToolbarCard}`}>
         <Space className={styles.monthToolbar} wrap>
-          <Button icon={<LeftOutlined />} onClick={() => onMonthChange(activeMonth.subtract(1, "month"))}>
+          <Button icon={<LeftOutlined />} onClick={() => setActiveMonth(activeMonth.subtract(1, "month"))}>
             {t("common.previous")}
           </Button>
           <Typography.Title level={4}>{activeMonthLabel}</Typography.Title>
-          <Button icon={<RightOutlined />} onClick={() => onMonthChange(activeMonth.add(1, "month"))}>
+          <Button icon={<RightOutlined />} onClick={() => setActiveMonth(activeMonth.add(1, "month"))}>
             {t("common.next")}
           </Button>
-          <Button onClick={() => onMonthChange(dayjs().startOf("month"))}>
+          <Button onClick={() => setActiveMonth(dayjs().startOf("month"))}>
             {t("common.currentMonth")}
           </Button>
         </Space>
@@ -77,7 +85,7 @@ export function TransactionsRoute({
             children: (
               <TransactionsTable
                 transactions={monthlyTransactions}
-                loading={loading}
+                loading={transactionsQuery.isFetching}
                 powerUser={powerUser}
                 onEdit={onEditTransaction}
                 onDelete={onDeleteTransaction}
@@ -90,7 +98,7 @@ export function TransactionsRoute({
             children: (
               <TransactionsTable
                 transactions={scheduledTransactions}
-                loading={loading}
+                loading={transactionsQuery.isFetching}
                 powerUser={powerUser}
                 onEdit={onEditTransaction}
                 onDelete={onDeleteTransaction}

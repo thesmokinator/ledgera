@@ -10,6 +10,8 @@ export type AppSettings = {
   defaultCommodity: string;
   fetchPrices: boolean;
   commoditySymbols: string;
+  excludeBalances: string;
+  includeInvestments: string;
 };
 
 export type HledgerStatus = {
@@ -119,6 +121,7 @@ export type Holding = {
 export type PriceInfo = {
   price: number;
   currency: string;
+  formatted: string;
 };
 
 export type Balance = {

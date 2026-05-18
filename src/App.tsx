@@ -36,7 +36,6 @@ import {
   TransactionsRoute,
 } from "./routes";
 import type {
-  AccountActivityRange,
   AppSettings,
   AutocompleteSuggestions,
   HledgerStatus,
@@ -47,17 +46,11 @@ import type {
   TransactionType,
 } from "./types";
 import {
-  isExecutedTransaction,
-  isInAccountActivityRange,
-  isSameJournalMonth,
   journalDateFormat,
   todayJournalDate,
 } from "./utils/date";
 import { toAutocompleteOptions } from "./utils/format";
-import {
-  collectAccounts,
-  transactionTemplatePostings,
-} from "./utils/account";
+import { transactionTemplatePostings } from "./utils/account";
 import { normalizeSettings } from "./utils/settings";
 import {
   emptyTransaction,
@@ -66,15 +59,6 @@ import {
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
 import "./App.css";
-
-const accountActivityRangeOptions: AccountActivityRange[] = [
-  "current-month",
-  "30",
-  "60",
-  "90",
-  "180",
-  "365",
-];
 
 /** Invokes a typed Tauri command. */
 function callCommand<TResponse, TPayload extends Record<string, unknown> = Record<string, never>>(
@@ -87,8 +71,6 @@ function callCommand<TResponse, TPayload extends Record<string, unknown> = Recor
 /** Renders the Ledgera desktop application. */
 function App() {
   const [activeView, setActiveView] = useState("transactions");
-  const [activeMonth, setActiveMonth] = useState(() => dayjs().startOf("month"));
-  const [accountActivityRange, setAccountActivityRange] = useState<AccountActivityRange>("current-month");
   const [transactionType, setTransactionType] = useState<TransactionType>("expense");
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
@@ -119,6 +101,7 @@ function App() {
     queryFn: () => callCommand<JournalSummary>("list_transactions"),
     enabled: Boolean(settingsQuery.data?.journalPath),
     retry: false,
+    refetchOnMount: true,
   });
 
   const autocompleteQuery = useQuery({
@@ -148,6 +131,12 @@ function App() {
       }
       if (prev.defaultCommodity !== next.defaultCommodity) {
         await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+      }
+      if (prev.excludeBalances !== next.excludeBalances) {
+        await queryClient.invalidateQueries({ queryKey: ["balances"] });
+      }
+      if (prev.includeInvestments !== next.includeInvestments) {
+        await queryClient.invalidateQueries({ queryKey: ["investments"] });
       }
     },
     onError: (error) => messageApi.error(parseError(error, t)),
@@ -231,22 +220,6 @@ function App() {
     hledgerUnavailable ? t("settings.hledgerNotFound") : null,
   ].filter((reason): reason is string => Boolean(reason));
   const shouldShowCourtesy = courtesyReasons.length > 0;
-
-
-  const transactions = transactionsQuery.data?.transactions ?? [];
-  const visibleMonthTransactions = transactions.filter((transaction) =>
-    isSameJournalMonth(transaction.date, activeMonth),
-  );
-  const monthlyTransactions = visibleMonthTransactions.filter(isExecutedTransaction);
-  const scheduledTransactions = visibleMonthTransactions.filter(
-    (transaction) => !isExecutedTransaction(transaction),
-  );
-  const visibleAccountTransactions = transactions.filter((transaction) =>
-    isInAccountActivityRange(transaction, accountActivityRange),
-  );
-  const accounts = collectAccounts(transactions, visibleAccountTransactions);
-  const accountsCount = accounts.length;
-  const activeMonthLabel = activeMonth.format("MMMM YYYY");
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -387,12 +360,7 @@ function App() {
               />
             ) : activeView === "accounts" ? (
               <AccountsRoute
-                accounts={accounts}
-                accountActivityRange={accountActivityRange}
-                accountActivityRangeOptions={accountActivityRangeOptions}
-                loading={transactionsQuery.isFetching}
                 powerUser={activeSettings.powerUser}
-                onActivityRangeChange={setAccountActivityRange}
                 onEditTransaction={openEditTransaction}
                 onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
               />
@@ -407,14 +375,7 @@ function App() {
               />
             ) : (
               <TransactionsRoute
-                monthlyTransactions={monthlyTransactions}
-                scheduledTransactions={scheduledTransactions}
-                accountsCount={accountsCount}
-                activeMonth={activeMonth}
-                activeMonthLabel={activeMonthLabel}
-                loading={transactionsQuery.isFetching}
                 powerUser={activeSettings.powerUser}
-                onMonthChange={setActiveMonth}
                 onEditTransaction={openEditTransaction}
                 onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
               />

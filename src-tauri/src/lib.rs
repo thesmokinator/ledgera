@@ -188,6 +188,7 @@ struct Holding {
 struct PriceInfo {
     price: f64,
     currency: String,
+    formatted: String,
 }
 
 #[tauri::command]
@@ -229,18 +230,151 @@ fn get_holdings(app: AppHandle) -> Result<Vec<Holding>, String> {
         }
     }
 
-    let mut result: Vec<Holding> = quantities
-        .into_iter()
-        .filter(|(_, qty)| qty.abs() > 0.0001)
-        .map(|(commodity_lower, quantity)| Holding {
-            account: accounts.remove(&commodity_lower).unwrap_or_default(),
-            commodity: original_commodity
-                .remove(&commodity_lower)
-                .unwrap_or(commodity_lower),
-            quantity,
-        })
+    let include_set: std::collections::HashSet<String> = settings
+        .include_investments
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
         .collect();
+
+    let mut result: Vec<Holding> = Vec::new();
+    for (commodity_lower, quantity) in quantities {
+        if quantity.abs() <= 0.0001 {
+            continue;
+        }
+        if !include_set.is_empty() {
+            let acct = accounts.get(&commodity_lower);
+            if acct.map_or(true, |a| !include_set.contains(a.as_str())) {
+                continue;
+            }
+        }
+        let account = accounts.remove(&commodity_lower).unwrap_or_default();
+        let commodity = original_commodity
+            .remove(&commodity_lower)
+            .unwrap_or(commodity_lower);
+        result.push(Holding {
+            account,
+            commodity,
+            quantity,
+        });
+    }
     result.sort_by(|a, b| a.commodity.cmp(&b.commodity));
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let executable = hledger_executable(&settings);
+
+    let include_accounts: Vec<&str> = settings
+        .include_investments
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    if include_accounts.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut cmd = Command::new(&executable);
+    cmd.arg("-f").arg(&journal_path).arg("balance");
+    for acct in &include_accounts {
+        cmd.arg(acct);
+    }
+    cmd.arg("-O").arg("json");
+
+    let output =
+        tauri::async_runtime::spawn_blocking(move || cmd.output().map_err(|e| e.to_string()))
+            .await
+            .map_err(|error| {
+                to_error_string_with_details(
+                    "HLEDGER_BALANCE_FAILED",
+                    "Unable to run hledger balance for investments.",
+                    error.to_string(),
+                )
+            })??;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    parse_balance_output(&app, &stdout, &settings, false)
+}
+
+fn parse_balance_output(
+    _app: &AppHandle,
+    stdout: &str,
+    settings: &AppSettings,
+    apply_exclude: bool,
+) -> Result<Vec<Balance>, String> {
+    let raw: Vec<serde_json::Value> = serde_json::from_str(stdout).map_err(|error| {
+        to_error_string_with_details(
+            "HLEDGER_BALANCE_PARSE_FAILED",
+            "Unable to parse hledger balance output.",
+            error.to_string(),
+        )
+    })?;
+
+    let rows = raw.first().and_then(|v| v.as_array()).ok_or_else(|| {
+        to_error_string(
+            "HLEDGER_BALANCE_PARSE_FAILED",
+            "Unexpected hledger balance JSON structure.",
+        )
+    })?;
+
+    let exclude_set: std::collections::HashSet<&str> = settings
+        .exclude_balances
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    // Always log what we're filtering
+    eprintln!(
+        "BALANCE_FILTER exclude: '{}' ({}), include: '{}' ({})",
+        settings.exclude_balances,
+        exclude_set.len(),
+        settings.include_investments,
+        settings
+            .include_investments
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .count()
+    );
+
+    let mut result: Vec<Balance> = Vec::new();
+    for row in rows {
+        let arr = match row.as_array() {
+            Some(a) if a.len() >= 4 => a,
+            _ => continue,
+        };
+        let account = arr[0].as_str().unwrap_or("").to_string();
+        if apply_exclude && exclude_set.contains(account.as_str()) {
+            continue;
+        }
+        let (amount, commodity, formatted) =
+            if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
+                let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
+                if AMOUNT_STYLE.get().is_none() {
+                    let style = AmountStyle::from_hledger_json(bal);
+                    let _ = AMOUNT_STYLE.set(style);
+                }
+                let qty = bal["aquantity"]
+                    .get("floatingPoint")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let fmt = format_hledger_amount(qty, bal);
+                (qty, comm, fmt)
+            } else {
+                (0.0, String::new(), String::new())
+            };
+        result.push(Balance {
+            account,
+            amount,
+            commodity,
+            formatted,
+        });
+    }
     Ok(result)
 }
 
@@ -320,11 +454,17 @@ async fn fetch_prices(
                             meta["regularMarketPrice"].as_f64(),
                             meta["currency"].as_str(),
                         ) {
+                            let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+                                static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+                                DEFAULT.get_or_init(AmountStyle::default)
+                            });
+                            let formatted = style.format(price);
                             prices.insert(
                                 symbol.clone(),
                                 PriceInfo {
                                     price,
                                     currency: currency.to_string(),
+                                    formatted,
                                 },
                             );
                             log_event(
@@ -472,6 +612,16 @@ fn format_hledger_amount(amount: f64, bal: &serde_json::Value) -> String {
     AmountStyle::from_hledger_json(bal).format(amount)
 }
 
+/// Formats a number using the journal's display style.
+#[tauri::command]
+fn format_number(value: f64) -> String {
+    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT.get_or_init(AmountStyle::default)
+    });
+    style.format(value)
+}
+
 #[tauri::command]
 async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     let settings = read_settings(&app)?;
@@ -524,60 +674,7 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
         Some(stdout.clone()),
     );
 
-    let raw: Vec<serde_json::Value> = serde_json::from_str(&stdout).map_err(|error| {
-        to_error_string_with_details(
-            "HLEDGER_BALANCE_PARSE_FAILED",
-            "Unable to parse hledger balance output.",
-            error.to_string(),
-        )
-    })?;
-
-    // The JSON is [account_rows, totals]. Take only the account rows.
-    let rows = raw.first().and_then(|v| v.as_array()).ok_or_else(|| {
-        to_error_string(
-            "HLEDGER_BALANCE_PARSE_FAILED",
-            "Unexpected hledger balance JSON structure.",
-        )
-    })?;
-
-    let mut result: Vec<Balance> = Vec::new();
-    for row in rows {
-        let arr = match row.as_array() {
-            Some(a) if a.len() >= 4 => a,
-            _ => continue,
-        };
-        let account = arr[0].as_str().unwrap_or("").to_string();
-        let (amount, commodity, formatted) =
-            if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
-                // Also update global style from hledger's astyle
-                if AMOUNT_STYLE.get().is_none() {
-                    let style = AmountStyle::from_hledger_json(bal);
-                    let _ = AMOUNT_STYLE.set(style);
-                }
-                let qty = bal["aquantity"]
-                    .get("floatingPoint")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
-                let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
-                let fmt = format_hledger_amount(qty, bal);
-                (qty, comm, fmt)
-            } else {
-                (0.0, String::new(), String::new())
-            };
-        result.push(Balance {
-            account,
-            amount,
-            commodity,
-            formatted,
-        });
-    }
-    log_event(
-        &app,
-        "info",
-        "BALANCE_DONE",
-        &format!("Parsed {} accounts", result.len()),
-    );
-    Ok(result)
+    parse_balance_output(&app, &stdout, &settings, true)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -595,6 +692,10 @@ struct AppSettings {
     fetch_prices: bool,
     #[serde(default)]
     commodity_symbols: String,
+    #[serde(default)]
+    exclude_balances: String,
+    #[serde(default)]
+    include_investments: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -739,6 +840,8 @@ impl Default for AppSettings {
             default_commodity: String::new(),
             fetch_prices: false,
             commodity_symbols: String::new(),
+            exclude_balances: String::new(),
+            include_investments: String::new(),
         }
     }
 }
@@ -757,6 +860,12 @@ fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
 #[tauri::command]
 fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
     let path = settings_path(&app)?;
+    log_event(
+        &app,
+        "info",
+        "SETTINGS_SAVE",
+        &format!("Saving exclude_balances: '{}'", settings.exclude_balances),
+    );
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             to_error_string_with_details(
@@ -962,8 +1071,10 @@ pub fn run() {
             get_logs,
             clear_logs,
             get_holdings,
+            get_investments,
             fetch_prices,
             get_balances,
+            format_number,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2467,6 +2578,8 @@ mod tests {
             default_commodity: String::new(),
             fetch_prices: false,
             commodity_symbols: String::new(),
+            exclude_balances: String::new(),
+            include_investments: String::new(),
         }
     }
 
@@ -2837,6 +2950,8 @@ mod tests {
             default_commodity: String::new(),
             fetch_prices: false,
             commodity_symbols: String::new(),
+            exclude_balances: String::new(),
+            include_investments: String::new(),
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");

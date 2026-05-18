@@ -1,31 +1,41 @@
 import { Card, Select, Space, Table, Typography } from "antd";
+import { invoke } from "@tauri-apps/api/core";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
-import type { AccountActivityRange, AccountSummary, JournalTransaction } from "./types";
+import type { AccountActivityRange, AccountSummary, JournalSummary, JournalTransaction } from "./types";
 import { formatCount } from "../utils/format";
-import { groupAccounts } from "../utils/account";
+import { groupAccounts, collectAccounts } from "../utils/account";
+import { isInAccountActivityRange } from "../utils/date";
 import styles from "./AccountsRoute.module.css";
 
+const accountActivityRangeOptions: AccountActivityRange[] = [
+  "current-month", "30", "60", "90", "180", "365",
+];
+
 export function AccountsRoute({
-  accounts,
-  accountActivityRange,
-  accountActivityRangeOptions,
-  loading,
   powerUser,
-  onActivityRangeChange,
   onEditTransaction,
   onDeleteTransaction,
 }: {
-  accounts: AccountSummary[];
-  accountActivityRange: AccountActivityRange;
-  accountActivityRangeOptions: AccountActivityRange[];
-  loading: boolean;
   powerUser: boolean;
-  onActivityRangeChange: (range: AccountActivityRange) => void;
   onEditTransaction: (transaction: JournalTransaction) => void;
   onDeleteTransaction: (id: string) => void;
 }) {
   const { t } = useTranslation();
+  const [activityRange, setActivityRange] = useState<AccountActivityRange>("current-month");
+
+  const transactionsQuery = useQuery({
+    queryKey: ["transactions"],
+    queryFn: () => invoke<JournalSummary>("list_transactions"),
+    retry: false,
+    refetchOnMount: true,
+  });
+
+  const transactions = transactionsQuery.data?.transactions ?? [];
+  const visible = transactions.filter((tx) => isInAccountActivityRange(tx, activityRange));
+  const accounts = collectAccounts(transactions, visible);
   const grouped = groupAccounts(accounts);
 
   return (
@@ -35,9 +45,10 @@ export function AccountsRoute({
         title={t("accounts.title")}
         extra={(
           <Space className={styles.rangeControl}>
+            <Typography.Text>{t("accounts.activityRange")}</Typography.Text>
             <Select<AccountActivityRange>
-              value={accountActivityRange}
-              onChange={onActivityRangeChange}
+              value={activityRange}
+              onChange={setActivityRange}
               options={accountActivityRangeOptions.map((range) => ({
                 value: range,
                 label: range === "current-month"
@@ -58,7 +69,7 @@ export function AccountsRoute({
             </Typography.Title>
             <Table<AccountSummary>
               rowKey="account"
-              loading={loading}
+              loading={transactionsQuery.isFetching}
               dataSource={items}
               pagination={false}
               showHeader={false}
@@ -74,7 +85,7 @@ export function AccountsRoute({
                     </Typography.Text>
                     <TransactionsTable
                       transactions={account.accountTransactions}
-                      loading={loading}
+                      loading={transactionsQuery.isFetching}
                       powerUser={powerUser}
                       onEdit={onEditTransaction}
                       onDelete={onDeleteTransaction}

@@ -8,6 +8,8 @@ export const defaultSettings: AppSettings = {
   defaultCommodity: "",
   fetchPrices: false,
   commoditySymbols: "",
+  excludeBalances: "",
+  includeInvestments: "",
 };
 
 export function normalizeSettings(settings?: Partial<AppSettings>): AppSettings {

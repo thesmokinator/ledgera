@@ -272,6 +272,28 @@ export function SettingsRoute({
               ) : null
             }
           </Form.Item>
+          <Form.Item
+            label={t("settings.excludeBalances")}
+            name="excludeBalances"
+            help={t("settings.excludeBalancesHelp")}
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder="assets:investments:xeon"
+              style={{ fontFamily: "monospace", fontSize: 13 }}
+            />
+          </Form.Item>
+          <Form.Item
+            label={t("settings.includeInvestments")}
+            name="includeInvestments"
+            help={t("settings.includeInvestmentsHelp")}
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder="assets:investments:xeon"
+              style={{ fontFamily: "monospace", fontSize: 13 }}
+            />
+          </Form.Item>
         </Card>
 
         {/* ── Footer ───────────────────────────────── */}
