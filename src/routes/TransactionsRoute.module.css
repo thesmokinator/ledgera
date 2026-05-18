@@ -30,8 +30,91 @@
     border-radius: 14px;
 }
 
+.documentTabs :global(.ant-tabs-nav) {
+    margin: 0 !important;
+    padding: 0 18px;
+    border-bottom: 1px solid #2c2c2c;
+}
+
+.documentTabs :global(.ant-tabs-nav::before) {
+    border-bottom: 0 !important;
+}
+
+.documentTabs :global(.ant-tabs-tab) {
+    margin: 0 24px 0 0 !important;
+    padding: 16px 0 13px !important;
+}
+
+.documentTabs :global(.ant-tabs-tab-btn) {
+    color: #8b8b8b;
+    font-weight: 500;
+}
+
+.documentTabs :global(.ant-tabs-tab-active) :global(.ant-tabs-tab-btn) {
+    color: #f5f5f5 !important;
+}
+
+.documentTabs :global(.ant-tabs-ink-bar) {
+    height: 2px;
+    background: #f5f5f5;
+}
+
+.documentTabs :global(.ant-tabs-content-holder) {
+    padding: 18px;
+    background: transparent;
+}
+
+.documentTabs :global(.ant-table),
+.documentTabs :global(.ant-table-thead) > tr > :global(th),
+.documentTabs :global(.ant-table-tbody) > tr > :global(td),
+.documentTabs :global(.ant-table-cell-row-hover) {
+    color: #f5f5f5;
+    background: #141414 !important;
+    border-color: #2c2c2c !important;
+}
+
+.documentTabs :global(.ant-table-thead) > tr > :global(th) {
+    color: #a3a3a3;
+}
+
 :global(.theme-light) .documentTabs {
     color: #111827;
     background: #ffffff;
     border-color: #e5e7eb;
+}
+
+:global(.theme-light) .documentTabs :global(.ant-tabs-nav) {
+    border-bottom-color: #e5e7eb;
+}
+
+:global(.theme-light) .documentTabs :global(.ant-tabs-tab-btn) {
+    color: #6b7280;
+}
+
+:global(.theme-light)
+    .documentTabs
+    :global(.ant-tabs-tab-active)
+    :global(.ant-tabs-tab-btn) {
+    color: #111827 !important;
+}
+
+:global(.theme-light) .documentTabs :global(.ant-tabs-ink-bar) {
+    background: #111827;
+}
+
+:global(.theme-light) .documentTabs :global(.ant-table),
+:global(.theme-light)
+    .documentTabs
+    :global(.ant-table-thead)
+    > tr
+    > :global(th),
+:global(.theme-light)
+    .documentTabs
+    :global(.ant-table-tbody)
+    > tr
+    > :global(td),
+:global(.theme-light) .documentTabs :global(.ant-table-cell-row-hover) {
+    color: #111827;
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
 }

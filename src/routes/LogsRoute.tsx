@@ -139,7 +139,7 @@ export function LogsRoute() {
                     </Typography.Text>
                   </Tooltip>
                 ) : (
-                  "—"
+                  "-"
                 ),
             },
             {

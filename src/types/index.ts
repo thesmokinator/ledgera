@@ -8,6 +8,8 @@ export type AppSettings = {
   theme: ThemePreference;
   powerUser: boolean;
   defaultCommodity: string;
+  fetchPrices: boolean;
+  commoditySymbols: string;
 };
 
 export type HledgerStatus = {
@@ -105,6 +107,17 @@ export type LogEntry = {
   code: string;
   message: string;
   details?: string;
+};
+
+export type Holding = {
+  commodity: string;
+  quantity: number;
+  account: string;
+};
+
+export type PriceInfo = {
+  price: number;
+  currency: string;
 };
 
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";

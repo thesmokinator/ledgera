@@ -12,6 +12,7 @@ import {
   BankOutlined,
   FileTextOutlined,
   HomeOutlined,
+  PieChartOutlined,
   PlusOutlined,
   ReloadOutlined,
   SettingOutlined,
@@ -29,6 +30,7 @@ import {
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import {
   AccountsRoute,
+  BalancesRoute,
   LogsRoute,
   SettingsRoute,
   TransactionsRoute,
@@ -366,6 +368,7 @@ function App() {
       return [
         { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal },
         { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal },
+        { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal },
         { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
         ...(activeSettings.powerUser
           ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined /> }]
@@ -438,6 +441,15 @@ function App() {
                 onActivityRangeChange={setAccountActivityRange}
                 onEditTransaction={openEditTransaction}
                 onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
+              />
+            ) : activeView === "balances" ? (
+              <BalancesRoute fetchPrices={activeSettings.fetchPrices} />
+            ) : activeView === "logs" ? (
+              <LogsRoute />
+            ) : shouldShowCourtesy ? (
+              <CourtesyState
+                reasons={courtesyReasons}
+                details={journalLoadError || hledgerQuery.data?.message}
               />
             ) : (
               <TransactionsRoute

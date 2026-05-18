@@ -103,12 +103,8 @@ button {
     user-select: none;
 }
 
-.platform-macos .app-header {
-    padding-left: 96px;
-}
-
-.platform-macos .app-sidebar {
-    padding-top: 56px;
+.titlebar-drag .ant-typography {
+    margin: 0 !important;
 }
 
 /* ── Utility ──────────────────────────────────────────────────────── */

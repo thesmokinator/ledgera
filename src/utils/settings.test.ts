@@ -10,6 +10,7 @@ describe("defaultSettings", () => {
       theme: "system",
       powerUser: false,
       defaultCommodity: "",
+      fetchPrices: false,
     });
   });
 });
@@ -64,6 +65,7 @@ describe("normalizeSettings", () => {
       theme: "dark",
       powerUser: true,
       defaultCommodity: "USD",
+      fetchPrices: true,
     };
     expect(normalizeSettings(full)).toEqual(full);
   });

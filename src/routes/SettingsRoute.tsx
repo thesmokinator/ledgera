@@ -244,6 +244,34 @@ export function SettingsRoute({
               <Switch />
             </Form.Item>
           </div>
+          <div className={styles.developerSettings}>
+            <div>
+              <Typography.Text strong>{t("settings.fetchPrices")}</Typography.Text>
+              <Typography.Paragraph type="secondary">
+                {t("settings.fetchPricesHelp")}
+              </Typography.Paragraph>
+            </div>
+            <Form.Item name="fetchPrices" valuePropName="checked" noStyle>
+              <Switch />
+            </Form.Item>
+          </div>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.fetchPrices !== cur.fetchPrices}>
+            {({ getFieldValue }) =>
+              getFieldValue("fetchPrices") ? (
+                <Form.Item
+                  label={t("settings.commoditySymbols")}
+                  name="commoditySymbols"
+                  help={t("settings.commoditySymbolsHelp")}
+                >
+                  <Input.TextArea
+                    rows={3}
+                    placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
+                    style={{ fontFamily: "monospace", fontSize: 13 }}
+                  />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
         </Card>
 
         {/* ── Footer ───────────────────────────────── */}

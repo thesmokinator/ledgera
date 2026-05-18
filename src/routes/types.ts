@@ -3,6 +3,8 @@ export type {
   AppSettings,
   AppError,
   LogEntry,
+  Holding,
+  PriceInfo,
   HledgerStatus,
   JournalPosting,
   TransactionDisplay,

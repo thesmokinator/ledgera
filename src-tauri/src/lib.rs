@@ -170,6 +170,204 @@ fn clear_logs(app: AppHandle) -> Result<(), String> {
     })
 }
 
+// ── Holdings & Prices ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Holding {
+    commodity: String,
+    quantity: f64,
+    account: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PriceInfo {
+    price: f64,
+    currency: String,
+}
+
+#[tauri::command]
+fn get_holdings(app: AppHandle) -> Result<Vec<Holding>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let files = load_journal_files(&journal_path)?;
+    let transactions: Vec<JournalTransaction> = files
+        .iter()
+        .flat_map(|file| parse_transactions(&file.content, &file.path))
+        .collect();
+
+    let default_commodity = settings.default_commodity.trim().to_lowercase();
+    let mut quantities: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut accounts: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut original_commodity: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for tx in &transactions {
+        for posting in &tx.postings {
+            let commodity_raw = posting.commodity.trim();
+            // Strip @ price notation (e.g. "XEON @ €148.70" → "XEON")
+            let commodity_clean = if let Some(at_pos) = commodity_raw.find(" @ ") {
+                commodity_raw[..at_pos].trim()
+            } else {
+                commodity_raw
+            };
+            let commodity_lower = commodity_clean.to_lowercase();
+            if commodity_lower.is_empty() || commodity_lower == default_commodity {
+                continue;
+            }
+            let amount = posting.amount.trim().replace(',', ".");
+            if let Ok(qty) = amount.parse::<f64>() {
+                *quantities.entry(commodity_lower.clone()).or_default() += qty;
+                accounts
+                    .entry(commodity_lower.clone())
+                    .or_insert_with(|| posting.account.trim().to_string());
+                original_commodity
+                    .entry(commodity_lower.clone())
+                    .or_insert_with(|| commodity_clean.to_string());
+            }
+        }
+    }
+
+    let mut result: Vec<Holding> = quantities
+        .into_iter()
+        .filter(|(_, qty)| qty.abs() > 0.0001)
+        .map(|(commodity_lower, quantity)| Holding {
+            account: accounts.remove(&commodity_lower).unwrap_or_default(),
+            commodity: original_commodity
+                .remove(&commodity_lower)
+                .unwrap_or(commodity_lower),
+            quantity,
+        })
+        .collect();
+    result.sort_by(|a, b| a.commodity.cmp(&b.commodity));
+    Ok(result)
+}
+
+/// Fetches current prices from Yahoo Finance for a list of symbols.
+#[tauri::command]
+async fn fetch_prices(
+    app: AppHandle,
+    symbols: Vec<String>,
+) -> Result<std::collections::HashMap<String, PriceInfo>, String> {
+    let settings = read_settings(&app)?;
+    log_event(
+        &app,
+        "info",
+        "PRICE_FETCH_START",
+        &format!("Fetching prices for {} symbols", symbols.len()),
+    );
+
+    if !settings.fetch_prices {
+        return Err(to_error_string(
+            "PRICES_DISABLED",
+            "Market price fetching is disabled in Settings.",
+        ));
+    }
+
+    let mut prices = std::collections::HashMap::new();
+
+    // Parse commodity symbols mapping (format: "VWCE=VWCE.DE\nXEON=XEON.DE")
+    let mapping: std::collections::HashMap<String, String> = settings
+        .commodity_symbols
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            let (k, v) = line.split_once('=')?;
+            Some((k.trim().to_string(), v.trim().to_string()))
+        })
+        .collect();
+
+    for symbol in &symbols {
+        let yahoo_symbol = mapping.get(symbol).unwrap_or(symbol);
+        log_event(
+            &app,
+            "info",
+            "PRICE_FETCH_TRY",
+            &format!("Trying {} → {}", symbol, yahoo_symbol),
+        );
+
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}",
+            yahoo_symbol
+        );
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            )
+            .header("Accept", "application/json")
+            .send()
+            .await;
+        match response {
+            Ok(response) => {
+                log_event(
+                    &app,
+                    "info",
+                    "PRICE_FETCH_RESPONSE",
+                    &format!("Got response for {}", yahoo_symbol),
+                );
+                let body_text = response.text().await.unwrap_or_default();
+                match serde_json::from_str::<serde_json::Value>(&body_text) {
+                    Ok(json) => {
+                        let meta = &json["chart"]["result"][0]["meta"];
+                        if let (Some(price), Some(currency)) = (
+                            meta["regularMarketPrice"].as_f64(),
+                            meta["currency"].as_str(),
+                        ) {
+                            prices.insert(
+                                symbol.clone(),
+                                PriceInfo {
+                                    price,
+                                    currency: currency.to_string(),
+                                },
+                            );
+                            log_event(
+                                &app,
+                                "info",
+                                "PRICE_FETCHED",
+                                &format!("{} = {} {}", symbol, price, currency),
+                            );
+                        } else {
+                            log_event_with_details(
+                                &app,
+                                "warn",
+                                "PRICE_PARSE_FAILED",
+                                &format!("Could not parse price/currency for {}", symbol),
+                                Some(body_text),
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        log_event_with_details(
+                            &app,
+                            "warn",
+                            "PRICE_JSON_FAILED",
+                            &format!("Response not valid JSON for {}", symbol),
+                            Some(format!("Parse error: {}\nBody: {}", e, body_text)),
+                        );
+                    }
+                }
+            }
+            Err(error) => {
+                log_event_with_details(
+                    &app,
+                    "error",
+                    "PRICE_FETCH_FAILED",
+                    &format!("HTTP request failed for {}", symbol),
+                    Some(error.to_string()),
+                );
+            }
+        }
+    }
+    Ok(prices)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
@@ -181,6 +379,10 @@ struct AppSettings {
     power_user: bool,
     #[serde(default)]
     default_commodity: String,
+    #[serde(default)]
+    fetch_prices: bool,
+    #[serde(default)]
+    commodity_symbols: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -321,6 +523,8 @@ impl Default for AppSettings {
             theme: default_theme(),
             power_user: false,
             default_commodity: String::new(),
+            fetch_prices: false,
+            commodity_symbols: String::new(),
         }
     }
 }
@@ -543,6 +747,8 @@ pub fn run() {
             delete_transaction,
             get_logs,
             clear_logs,
+            get_holdings,
+            fetch_prices,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1922,6 +2128,8 @@ mod tests {
             theme: default_theme(),
             power_user: false,
             default_commodity: String::new(),
+            fetch_prices: false,
+            commodity_symbols: String::new(),
         }
     }
 
@@ -2288,6 +2496,8 @@ mod tests {
             theme: default_theme(),
             power_user: false,
             default_commodity: String::new(),
+            fetch_prices: false,
+            commodity_symbols: String::new(),
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");

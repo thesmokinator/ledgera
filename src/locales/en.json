@@ -2,6 +2,7 @@
   "common": {
     "transactions": "Transactions",
     "accounts": "Accounts",
+    "balances": "Balances",
     "logs": "Logs",
     "settings": "Settings",
     "refresh": "Refresh",
@@ -44,6 +45,10 @@
     "journal": "Journal",
     "hledger": "hledger",
     "developerOptions": "Developer options",
+    "fetchPrices": "Fetch market prices",
+    "fetchPricesHelp": "Retrieve current prices from Yahoo Finance for investment commodities.",
+    "commoditySymbols": "Commodity symbols",
+    "commoditySymbolsHelp": "Map journal commodities to Yahoo Finance symbols. One per line: JOURNAL=YAHOO",
     "journalPath": "Journal path",
     "journalPathRequired": "Enter the path to an existing journal file",
     "journalPathPlaceholder": "/Users/name/accounting/main.journal",
@@ -147,5 +152,16 @@
     "message": "Message",
     "details": "Details",
     "copy": "Copy log entry"
+  },
+  "balances": {
+    "title": "Balances",
+    "empty": "No investment holdings detected in the journal. Add transactions with non-default commodities to see them here.",
+    "count": "{{count}} holdings",
+    "commodity": "Commodity",
+    "account": "Account",
+    "quantity": "Quantity",
+    "price": "Price",
+    "value": "Market value",
+    "refreshPrices": "Refresh prices"
   }
 }
