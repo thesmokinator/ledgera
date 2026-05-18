@@ -126,7 +126,6 @@ export type Balance = {
   amount: number;
   commodity: string;
   formatted: string;
-  children: Balance[];
 };
 
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";

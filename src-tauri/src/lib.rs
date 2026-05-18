@@ -465,7 +465,6 @@ struct Balance {
     amount: f64,
     commodity: String,
     formatted: String,
-    children: Vec<Balance>,
 }
 
 /// Formats a number according to hledger display style (decimal mark, digit groups).
@@ -565,7 +564,6 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
             amount,
             commodity,
             formatted,
-            children: Vec::new(),
         });
     }
     log_event(

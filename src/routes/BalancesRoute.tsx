@@ -70,7 +70,8 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
             dataSource={balances}
             rowKey="account"
             loading={balancesQuery.isFetching}
-            pagination={false}
+            pagination={{ pageSize: 50 }}
+            scroll={{ x: 400 }}
             showHeader={false}
             columns={[
               { dataIndex: "account" },
