@@ -549,6 +549,11 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
         let account = arr[0].as_str().unwrap_or("").to_string();
         let (amount, commodity, formatted) =
             if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
+                // Also update global style from hledger's astyle
+                if AMOUNT_STYLE.get().is_none() {
+                    let style = AmountStyle::from_hledger_json(bal);
+                    let _ = AMOUNT_STYLE.set(style);
+                }
                 let qty = bal["aquantity"]
                     .get("floatingPoint")
                     .and_then(|v| v.as_f64())
@@ -1110,7 +1115,7 @@ fn parse_amount_style(files: &[JournalFile], _default_commodity: &str) -> Amount
                 }
                 in_commodity = false;
             }
-            if in_commodity && !trimmed.starts_with(' ') && !trimmed.is_empty() {
+            if in_commodity && !line.starts_with(' ') && !trimmed.is_empty() {
                 in_commodity = false;
             }
         }
@@ -2097,7 +2102,13 @@ fn normalize_quantity(value: &str) -> String {
 
     let normalized = trimmed.replace(',', ".");
     match normalized.parse::<f64>() {
-        Ok(value) => format!("{:.2}", value),
+        Ok(val) => {
+            let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+                static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+                DEFAULT.get_or_init(AmountStyle::default)
+            });
+            style.format(val)
+        }
         Err(_) => trimmed.to_string(),
     }
 }
