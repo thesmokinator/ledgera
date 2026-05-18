@@ -9,31 +9,27 @@ function flowIcon(kind: string) {
   return <ArrowRightOutlined className={`${styles.flowIcon} ${styles[`flowIcon${kind.charAt(0).toUpperCase() + kind.slice(1)}`]}`} />;
 }
 
-function accountFlow(transaction: JournalTransaction) {
-  const accounts = transaction.postings
-    .map((p) => p.account.trim())
-    .filter(Boolean);
-  const unique = [...new Set(accounts)];
-  if (unique.length === 0) return "—";
-  if (unique.length === 1) return unique[0];
+function AccountList({ accounts }: { accounts: string[] }) {
+  return (
+    <span className={styles.accountFlowSide}>
+      {accounts.map((account) => (
+        <span key={account}>{account}</span>
+      ))}
+    </span>
+  );
+}
 
-  const kind = transaction.display.kind;
-  // For income, money flows from income account to asset
-  // For expense, money flows from asset to expense
-  if (kind === "income") {
-    return (
-      <span className={styles.accountFlow}>
-        {unique[0]}
-        {flowIcon("income")}
-        {unique[unique.length - 1]}
-      </span>
-    );
-  }
+export function accountFlow(transaction: JournalTransaction) {
+  const { from, to } = transaction.display.flow;
+  if (from.length === 0 && to.length === 0) return transaction.display.account || "-";
+  if (from.length === 0) return <AccountList accounts={to} />;
+  if (to.length === 0) return <AccountList accounts={from} />;
+
   return (
     <span className={styles.accountFlow}>
-      {unique[unique.length - 1]}
-      {flowIcon(kind)}
-      {unique[0]}
+      <AccountList accounts={from} />
+      {flowIcon(transaction.display.kind)}
+      <AccountList accounts={to} />
     </span>
   );
 }

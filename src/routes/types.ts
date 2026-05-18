@@ -8,6 +8,7 @@ export type {
   Balance,
   HledgerStatus,
   JournalPosting,
+  TransactionFlow,
   TransactionDisplay,
   JournalTransaction,
   DashboardSummary,

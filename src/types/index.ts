@@ -30,11 +30,17 @@ export type JournalPosting = {
   raw: string;
 };
 
+export type TransactionFlow = {
+  from: string[];
+  to: string[];
+};
+
 export type TransactionDisplay = {
   account: string;
   amount: string;
   formatted: string;
   kind: string;
+  flow: TransactionFlow;
 };
 
 export type JournalTransaction = {

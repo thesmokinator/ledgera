@@ -164,7 +164,7 @@ export function SettingsRoute({
                 <span className={styles.statsValue}>
                   {stats.dateMin && stats.dateMax
                     ? `${stats.dateMin} → ${stats.dateMax}`
-                    : "—"}
+                    : "-"}
                 </span>
               </div>
               <div className={styles.statsItem}>
@@ -217,83 +217,88 @@ export function SettingsRoute({
           className={styles.card}
           title={<CardTitle icon={<SettingOutlined />} label={t("settings.preferences")} />}
         >
-          <Form.Item label={t("settings.defaultCommodity")} name="defaultCommodity">
-            <AutoComplete
-              options={commodityOptions}
-              placeholder={t("settings.defaultCommodityPlaceholder")}
-              filterOption
-            />
-          </Form.Item>
-          <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: "system", label: t("settings.themeSystem") },
-                { value: "dark", label: t("settings.themeDark") },
-                { value: "light", label: t("settings.themeLight") },
-              ]}
-            />
-          </Form.Item>
-          <div className={styles.developerSettings}>
-            <div>
-              <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
-              <Typography.Paragraph type="secondary">
-                {t("settings.advancedModeHelp")}
-              </Typography.Paragraph>
+          <div className={styles.preferencesStack}>
+            <Form.Item label={t("settings.defaultCommodity")} name="defaultCommodity">
+              <AutoComplete
+                options={commodityOptions}
+                placeholder={t("settings.defaultCommodityPlaceholder")}
+                filterOption
+              />
+            </Form.Item>
+            <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
+              <Select
+                options={[
+                  { value: "system", label: t("settings.themeSystem") },
+                  { value: "dark", label: t("settings.themeDark") },
+                  { value: "light", label: t("settings.themeLight") },
+                ]}
+              />
+            </Form.Item>
+            <div className={styles.developerSettings}>
+              <div>
+                <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.advancedModeHelp")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name="powerUser" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
             </div>
-            <Form.Item name="powerUser" valuePropName="checked" noStyle>
-              <Switch />
+            <div className={styles.developerSettings}>
+              <div>
+                <Typography.Text strong>{t("settings.fetchPrices")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.fetchPricesHelp")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name="fetchPrices" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
+            <Form.Item noStyle shouldUpdate={(prev, cur) => prev.fetchPrices !== cur.fetchPrices}>
+              {({ getFieldValue }) =>
+                getFieldValue("fetchPrices") ? (
+                  <Form.Item
+                    className={styles.textAreaSetting}
+                    label={t("settings.commoditySymbols")}
+                    name="commoditySymbols"
+                    help={t("settings.commoditySymbolsHelp")}
+                  >
+                    <Input.TextArea
+                      rows={3}
+                      placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
+                      style={{ fontFamily: "monospace", fontSize: 13 }}
+                    />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+            <Form.Item
+              className={styles.textAreaSetting}
+              label={t("settings.excludeBalances")}
+              name="excludeBalances"
+              help={t("settings.excludeBalancesHelp")}
+            >
+              <Input.TextArea
+                rows={3}
+                placeholder="assets:investments:xeon"
+                style={{ fontFamily: "monospace", fontSize: 13 }}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.textAreaSetting}
+              label={t("settings.includeInvestments")}
+              name="includeInvestments"
+              help={t("settings.includeInvestmentsHelp")}
+            >
+              <Input.TextArea
+                rows={3}
+                placeholder="assets:investments:xeon"
+                style={{ fontFamily: "monospace", fontSize: 13 }}
+              />
             </Form.Item>
           </div>
-          <div className={styles.developerSettings}>
-            <div>
-              <Typography.Text strong>{t("settings.fetchPrices")}</Typography.Text>
-              <Typography.Paragraph type="secondary">
-                {t("settings.fetchPricesHelp")}
-              </Typography.Paragraph>
-            </div>
-            <Form.Item name="fetchPrices" valuePropName="checked" noStyle>
-              <Switch />
-            </Form.Item>
-          </div>
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.fetchPrices !== cur.fetchPrices}>
-            {({ getFieldValue }) =>
-              getFieldValue("fetchPrices") ? (
-                <Form.Item
-                  label={t("settings.commoditySymbols")}
-                  name="commoditySymbols"
-                  help={t("settings.commoditySymbolsHelp")}
-                >
-                  <Input.TextArea
-                    rows={3}
-                    placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
-                    style={{ fontFamily: "monospace", fontSize: 13 }}
-                  />
-                </Form.Item>
-              ) : null
-            }
-          </Form.Item>
-          <Form.Item
-            label={t("settings.excludeBalances")}
-            name="excludeBalances"
-            help={t("settings.excludeBalancesHelp")}
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder="assets:investments:xeon"
-              style={{ fontFamily: "monospace", fontSize: 13 }}
-            />
-          </Form.Item>
-          <Form.Item
-            label={t("settings.includeInvestments")}
-            name="includeInvestments"
-            help={t("settings.includeInvestmentsHelp")}
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder="assets:investments:xeon"
-              style={{ fontFamily: "monospace", fontSize: 13 }}
-            />
-          </Form.Item>
         </Card>
 
         {/* ── Footer ───────────────────────────────── */}

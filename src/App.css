@@ -177,8 +177,18 @@ button {
     border-right-color: #e5e7eb;
 }
 
+.theme-light .app-main,
+.theme-light .app-header,
+.theme-light .app-content {
+    background: #f9fafb !important;
+}
+
 .theme-light .app-header {
     border-bottom-color: #e5e7eb;
+}
+
+.theme-light .titlebar-drag .ant-typography {
+    color: #111827;
 }
 
 .theme-light .metric-card.ant-card {

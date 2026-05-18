@@ -52,7 +52,7 @@
     "excludeBalances": "Exclude from balances",
     "excludeBalancesHelp": "Hide these accounts from the Balances view. One account per line.",
     "includeInvestments": "Include in investments",
-    "includeInvestmentsHelp": "Only show these accounts in the Investments view. Leave empty to show all. One account per line.",
+    "includeInvestmentsHelp": "Only show these accounts in the Investments view. Leave empty to hide the Investments view. One account per line.",
     "journalPath": "Journal path",
     "journalPathRequired": "Enter the path to an existing journal file",
     "journalPathPlaceholder": "/Users/name/accounting/main.journal",
@@ -160,7 +160,7 @@
   "balances": {
     "title": "Balances",
     "investments": "Investments",
-    "empty": "No investments detected. Configure accounts in Settings → Include in investments.",
+    "empty": "No investments detected.",
     "commodity": "Commodity",
     "account": "Account",
     "quantity": "Quantity",

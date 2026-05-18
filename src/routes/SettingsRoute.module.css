@@ -35,13 +35,32 @@
     white-space: nowrap;
 }
 
+.preferencesStack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.preferencesStack :global(.ant-form-item) {
+    margin-bottom: 0;
+}
+
 .developerSettings {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    padding-top: 16px;
+    min-height: 56px;
+    padding-top: 20px;
     border-top: 1px solid #2c2c2c;
+}
+
+.developerSettings :global(.ant-typography) {
+    margin-bottom: 0;
+}
+
+.textAreaSetting :global(.ant-form-item-extra) {
+    min-height: 0;
 }
 
 :global(.theme-light) .developerSettings {

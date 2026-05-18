@@ -329,19 +329,6 @@ fn parse_balance_output(
         .filter(|l| !l.is_empty())
         .collect();
 
-    // Always log what we're filtering
-    eprintln!(
-        "BALANCE_FILTER exclude: '{}' ({}), include: '{}' ({})",
-        settings.exclude_balances,
-        exclude_set.len(),
-        settings.include_investments,
-        settings
-            .include_investments
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .count()
-    );
-
     let mut result: Vec<Balance> = Vec::new();
     for row in rows {
         let arr = match row.as_array() {
@@ -767,6 +754,14 @@ struct TransactionDisplay {
     amount: String,
     formatted: String,
     kind: String,
+    flow: TransactionFlow,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TransactionFlow {
+    from: Vec<String>,
+    to: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -933,7 +928,9 @@ fn check_hledger(app: AppHandle) -> Result<HledgerStatus, String> {
 fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestions, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
-    let transactions = load_transactions_from_journal(&journal_path)?;
+    let files = load_journal_files(&journal_path)?;
+    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let commodities = collect_declared_commodities(&files);
 
     let profile = build_journal_profile(&transactions, settings.default_commodity.trim());
 
@@ -960,7 +957,7 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
                 .filter(|value| !value.is_empty())
                 .collect(),
         ),
-        commodities: collect_commodities(&transactions),
+        commodities,
         default_commodity: settings.default_commodity.trim().to_string(),
         default_cash_account: profile.default_cash_account,
         default_expense_account: profile.default_expense_account,
@@ -1309,7 +1306,7 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
     let _ = AMOUNT_STYLE.set(amount_style.clone());
 
     let transactions = load_transactions_from_journal_via_files(&files)?;
-    let commodities = collect_commodities(&transactions);
+    let commodities = collect_declared_commodities(&files);
     let dashboard = build_dashboard_summary(&transactions);
 
     Ok(JournalSummary {
@@ -1569,7 +1566,7 @@ where
         fs::write(source_path, original).map_err(|rollback_error| {
             to_error_string_with_details(
                 "JOURNAL_WRITE_FAILED",
-                "Journal file may be corrupted — rollback failed.",
+                "Journal file may be corrupted - rollback failed.",
                 rollback_error.to_string(),
             )
         })?;
@@ -2284,21 +2281,31 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .first()
         .map(|posting| format_posting_amount(&posting.amount, &posting.commodity))
         .unwrap_or_default();
+    let inferred_values = infer_posting_values(postings);
+    let flow = summarize_transaction_flow(postings, &inferred_values);
 
     if let Some(posting) = postings
         .iter()
         .find(|posting| posting.account.to_lowercase().starts_with("expenses"))
     {
-        let amount = if posting.amount.trim().is_empty() {
-            balancing_amount
-        } else {
-            format_posting_amount(&posting.amount, &posting.commodity)
-        };
+        let display_amount = summarize_kind_amount(postings, &inferred_values, "expense")
+            .unwrap_or_else(|| {
+                let amount = if posting.amount.trim().is_empty() {
+                    balancing_amount
+                } else {
+                    format_posting_amount(&posting.amount, &posting.commodity)
+                };
+                DisplayAmount {
+                    amount: format_display_amount(&amount, "expense"),
+                    formatted: format_amount_styled(&amount),
+                }
+            });
         return TransactionDisplay {
             account: posting.account.clone(),
-            amount: format_display_amount(&amount, "expense"),
-            formatted: format_amount_styled(&amount),
+            amount: display_amount.amount,
+            formatted: display_amount.formatted,
             kind: "expense".to_string(),
+            flow,
         };
     }
 
@@ -2306,29 +2313,24 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .iter()
         .find(|posting| posting.account.to_lowercase().starts_with("income"))
     {
-        let amount = if posting.amount.trim().is_empty() {
-            balancing_amount.clone()
-        } else {
-            format_posting_amount(&posting.amount, &posting.commodity)
-        };
+        let display_amount = summarize_kind_amount(postings, &inferred_values, "income")
+            .unwrap_or_else(|| {
+                let amount = if posting.amount.trim().is_empty() {
+                    balancing_amount.clone()
+                } else {
+                    format_posting_amount(&posting.amount, &posting.commodity)
+                };
+                DisplayAmount {
+                    amount: format_display_amount(&amount, "income"),
+                    formatted: format_amount_styled(&amount),
+                }
+            });
         return TransactionDisplay {
             account: posting.account.clone(),
-            amount: format_display_amount(&amount, "income"),
-            formatted: format_amount_styled(&amount),
+            amount: display_amount.amount,
+            formatted: display_amount.formatted,
             kind: "income".to_string(),
-        };
-    }
-
-    if let Some(posting) = postings_with_amounts.iter().find(|posting| {
-        posting.account.to_lowercase().starts_with("assets")
-            && parse_amount_value(&posting.amount) > 0.0
-    }) {
-        let amount = format_posting_amount(&posting.amount, &posting.commodity);
-        return TransactionDisplay {
-            account: posting.account.clone(),
-            amount: format_display_amount(&amount, "income"),
-            formatted: format_amount_styled(&amount),
-            kind: "income".to_string(),
+            flow,
         };
     }
 
@@ -2339,14 +2341,14 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
     {
         let amount = format_posting_amount(&posting.amount, &posting.commodity);
         let formatted = if amount.is_empty() {
-            "—".to_string()
+            "-".to_string()
         } else {
             format_amount_styled(&amount)
         };
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: if amount.is_empty() {
-                "—".to_string()
+                "-".to_string()
             } else {
                 amount
             },
@@ -2356,14 +2358,143 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
             } else {
                 "transfer".to_string()
             },
+            flow,
         };
     }
 
     TransactionDisplay {
-        account: "—".to_string(),
-        amount: "—".to_string(),
-        formatted: "—".to_string(),
+        account: "-".to_string(),
+        amount: "-".to_string(),
+        formatted: "-".to_string(),
         kind: "unknown".to_string(),
+        flow,
+    }
+}
+
+#[derive(Debug)]
+struct DisplayAmount {
+    amount: String,
+    formatted: String,
+}
+
+fn infer_posting_values(postings: &[JournalPosting]) -> Vec<Option<f64>> {
+    let mut values = postings
+        .iter()
+        .map(|posting| {
+            if posting.amount.trim().is_empty() {
+                None
+            } else {
+                Some(parse_amount_value(&posting.amount))
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let missing_indexes = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| if value.is_none() { Some(index) } else { None })
+        .collect::<Vec<_>>();
+
+    if missing_indexes.len() == 1 {
+        let explicit_total = values.iter().flatten().sum::<f64>();
+        values[missing_indexes[0]] = Some(-explicit_total);
+    }
+
+    values
+}
+
+fn summarize_kind_amount(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+    kind: &str,
+) -> Option<DisplayAmount> {
+    let selected_indexes = postings
+        .iter()
+        .enumerate()
+        .filter_map(|(index, posting)| {
+            let account = posting.account.to_lowercase();
+            let is_selected = match kind {
+                "expense" => account.starts_with("expenses"),
+                "income" => account.starts_with("income"),
+                _ => false,
+            };
+            if is_selected {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let total = selected_indexes
+        .iter()
+        .filter_map(|index| values.get(*index).and_then(|value| *value))
+        .map(f64::abs)
+        .sum::<f64>();
+
+    if total == 0.0 {
+        return None;
+    }
+
+    let fallback_commodity = postings
+        .iter()
+        .find(|posting| !posting.commodity.trim().is_empty())
+        .map(|posting| posting.commodity.trim())
+        .unwrap_or_default();
+    let commodity = selected_indexes
+        .iter()
+        .filter_map(|index| postings.get(*index))
+        .find(|posting| !posting.commodity.trim().is_empty())
+        .map(|posting| posting.commodity.trim())
+        .unwrap_or(fallback_commodity);
+    let amount = format_posting_amount(&format_amount_quantity(total), commodity);
+
+    Some(DisplayAmount {
+        amount: format_display_amount(&amount, kind),
+        formatted: format_amount_value_styled(total),
+    })
+}
+
+fn summarize_transaction_flow(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+) -> TransactionFlow {
+    let mut from = Vec::new();
+    let mut to = Vec::new();
+
+    for (posting, value) in postings.iter().zip(values.iter()) {
+        let account = posting.account.trim();
+        if account.is_empty() {
+            continue;
+        }
+
+        match value {
+            Some(value) if *value < 0.0 => push_unique(&mut from, account),
+            Some(value) if *value > 0.0 => push_unique(&mut to, account),
+            _ => {}
+        }
+    }
+
+    if from.is_empty() && to.is_empty() {
+        let accounts = postings
+            .iter()
+            .map(|posting| posting.account.trim())
+            .filter(|account| !account.is_empty())
+            .collect::<Vec<_>>();
+        if accounts.len() > 1 {
+            push_unique(&mut from, accounts[accounts.len() - 1]);
+            push_unique(&mut to, accounts[0]);
+        } else if let Some(account) = accounts.first() {
+            push_unique(&mut to, account);
+        }
+    }
+
+    TransactionFlow { from, to }
+}
+
+fn push_unique(accounts: &mut Vec<String>, account: &str) {
+    if !accounts.iter().any(|existing| existing == account) {
+        accounts.push(account.to_string());
     }
 }
 
@@ -2376,16 +2507,28 @@ fn parse_amount_value(amount: &str) -> f64 {
         .unwrap_or_default()
 }
 
-/// Formats a numeric string using the journal's display style.
-fn format_amount_styled(raw: &str) -> String {
-    // Use parse_posting_amount to extract just the quantity
-    let (quantity, _commodity) = parse_posting_amount(raw);
-    let value = parse_amount_value(&quantity);
+fn format_amount_quantity(value: f64) -> String {
+    let rounded = format!("{:.2}", value);
+    rounded
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
+}
+
+fn format_amount_value_styled(value: f64) -> String {
     let style_ref = AMOUNT_STYLE.get().unwrap_or_else(|| {
         static DEFAULT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
         DEFAULT_STYLE.get_or_init(AmountStyle::default)
     });
     style_ref.format(value)
+}
+
+/// Formats a numeric string using the journal's display style.
+fn format_amount_styled(raw: &str) -> String {
+    // Use parse_posting_amount to extract just the quantity
+    let (quantity, _commodity) = parse_posting_amount(raw);
+    let value = parse_amount_value(&quantity);
+    format_amount_value_styled(value)
 }
 
 /// Formats the display amount sign according to the inferred transaction kind.
@@ -2535,23 +2678,35 @@ fn most_frequent(values: std::collections::HashMap<String, usize>) -> String {
         .unwrap_or_default()
 }
 
-fn collect_commodities(transactions: &[JournalTransaction]) -> Vec<String> {
-    let mut commodities = transactions
+fn collect_declared_commodities(files: &[JournalFile]) -> Vec<String> {
+    let mut commodities = files
         .iter()
-        .flat_map(|transaction| transaction.postings.iter())
-        .filter_map(|posting| {
-            if posting.commodity.trim().is_empty() {
-                None
-            } else {
-                Some(posting.commodity.as_str())
-            }
-        })
-        .map(ToString::to_string)
+        .flat_map(|file| file.content.lines())
+        .filter_map(parse_commodity_directive)
         .collect::<Vec<_>>();
 
     commodities.sort();
     commodities.dedup();
     commodities
+}
+
+fn parse_commodity_directive(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.starts_with('#') {
+        return None;
+    }
+
+    let (directive, rest) = split_first_token(trimmed);
+    if directive != "commodity" {
+        return None;
+    }
+
+    let commodity = split_inline_comment(rest.trim()).0.trim().trim_matches('"');
+    if commodity.is_empty() {
+        None
+    } else {
+        Some(commodity.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -2569,9 +2724,9 @@ mod tests {
         dir
     }
 
-    fn settings_for(journal_path: &Path) -> AppSettings {
+    fn settings_for(path: &Path) -> AppSettings {
         AppSettings {
-            journal_path: journal_path.to_string_lossy().to_string(),
+            journal_path: path.to_string_lossy().to_string(),
             hledger_path: "true".to_string(),
             theme: default_theme(),
             power_user: false,
@@ -2583,11 +2738,86 @@ mod tests {
         }
     }
 
+    fn posting(account: &str, amount: &str, commodity: &str) -> JournalPosting {
+        JournalPosting {
+            account: account.to_string(),
+            amount: amount.to_string(),
+            commodity: commodity.to_string(),
+            comment: String::new(),
+            raw: String::new(),
+        }
+    }
+
     fn write_file(path: &Path, content: &str) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).expect("parent dir should be created");
         }
-        fs::write(path, content).expect("sample file should be written");
+        fs::write(path, content).expect("file should be written");
+    }
+
+    #[test]
+    fn collects_only_declared_commodities() {
+        let files = vec![JournalFile {
+            path: PathBuf::from("main.journal"),
+            content: "commodity €\n  format €1.000,00\ncommodity XEON\n\n2026-05-16 Opening balances\n    assets:investments:xeon  209 XEON @ €148,70087\n    equity:opening-balances\n"
+                .to_string(),
+        }];
+
+        assert_eq!(collect_declared_commodities(&files), vec!["XEON", "€"]);
+    }
+
+    #[test]
+    fn summarizes_income_flow_from_income_to_asset_with_implicit_posting() {
+        let display = summarize_transaction(&[
+            posting("assets:bank:postepay", "5.20", "€"),
+            posting("income:other", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "income");
+        assert_eq!(display.flow.from, vec!["income:other"]);
+        assert_eq!(display.flow.to, vec!["assets:bank:postepay"]);
+    }
+
+    #[test]
+    fn summarizes_expense_flow_from_asset_to_expense_with_implicit_posting() {
+        let display = summarize_transaction(&[
+            posting("expenses:food", "20", "€"),
+            posting("assets:bank", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "expense");
+        assert_eq!(display.flow.from, vec!["assets:bank"]);
+        assert_eq!(display.flow.to, vec!["expenses:food"]);
+    }
+
+    #[test]
+    fn summarizes_transfer_flow_from_negative_to_positive_posting() {
+        let display = summarize_transaction(&[
+            posting("assets:wallet", "-50", "€"),
+            posting("assets:bank", "50", "€"),
+        ]);
+
+        assert_eq!(display.kind, "transfer");
+        assert_eq!(display.flow.from, vec!["assets:wallet"]);
+        assert_eq!(display.flow.to, vec!["assets:bank"]);
+    }
+
+    #[test]
+    fn summarizes_split_expense_flow_and_total_amount() {
+        let display = summarize_transaction(&[
+            posting("expenses:shopping", "26.58", "€"),
+            posting("expenses:shopping:gifts", "19.99", "€"),
+            posting("assets:bank:fineco", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "expense");
+        assert_eq!(display.amount, "-€46.57");
+        assert_eq!(display.formatted, "46.57");
+        assert_eq!(display.flow.from, vec!["assets:bank:fineco"]);
+        assert_eq!(
+            display.flow.to,
+            vec!["expenses:shopping", "expenses:shopping:gifts"]
+        );
     }
 
     fn input(date: &str, description: &str) -> TransactionInput {
@@ -2889,6 +3119,10 @@ mod tests {
                     amount: "-€25".to_string(),
                     formatted: "-25,00".to_string(),
                     kind: "expense".to_string(),
+                    flow: TransactionFlow {
+                        from: vec!["assets:bank:fineco".to_string()],
+                        to: vec!["expenses:food".to_string()],
+                    },
                 },
                 raw: String::new(),
                 start_line: 1,
@@ -2922,6 +3156,13 @@ mod tests {
                     amount: "10 XEON".to_string(),
                     formatted: "10 XEON".to_string(),
                     kind: "transfer".to_string(),
+                    flow: TransactionFlow {
+                        from: Vec::new(),
+                        to: vec![
+                            "assets:investments:xeon".to_string(),
+                            "assets:bank:fineco".to_string(),
+                        ],
+                    },
                 },
                 raw: String::new(),
                 start_line: 5,
