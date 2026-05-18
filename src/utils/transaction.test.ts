@@ -2,6 +2,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   emptyTransaction,
   toTransactionInput,
+  parseAmountValue,
+  parseUnitPrice,
+  autoCalculateBalancingAmounts,
 } from "./transaction";
 import type { JournalTransaction } from "../types";
 
@@ -117,5 +120,72 @@ describe("toTransactionInput", () => {
     const result = toTransactionInput(tx);
     expect(result.postings[0].account).toBe("expenses:food");
     expect(result.postings[1].account).toBe("assets:bank");
+  });
+});
+
+describe("parseAmountValue", () => {
+  it("parses a plain number", () => {
+    expect(parseAmountValue("42.50")).toBe(42.50);
+  });
+
+  it("parses number with comma as decimal", () => {
+    expect(parseAmountValue("42,50")).toBe(42.50);
+  });
+
+  it("extracts number from string with commodity", () => {
+    expect(parseAmountValue("42.50 EUR")).toBe(42.50);
+  });
+
+  it("handles negative numbers", () => {
+    expect(parseAmountValue("-1500")).toBe(-1500);
+  });
+
+  it("returns 0 for empty string", () => {
+    expect(parseAmountValue("")).toBe(0);
+  });
+
+  it("returns 0 for non-numeric string", () => {
+    expect(parseAmountValue("abc")).toBe(0);
+  });
+});
+
+describe("parseUnitPrice", () => {
+  it("parses price value and commodity", () => {
+    const result = parseUnitPrice("150 EUR");
+    expect(result.value).toBe(150);
+    expect(result.commodity).toBe("EUR");
+  });
+
+  it("parses price with decimal", () => {
+    const result = parseUnitPrice("148.70 EUR");
+    expect(result.value).toBe(148.70);
+    expect(result.commodity).toBe("EUR");
+  });
+
+  it("returns empty commodity if only number", () => {
+    const result = parseUnitPrice("150");
+    expect(result.value).toBe(150);
+    expect(result.commodity).toBe("");
+  });
+});
+
+describe("autoCalculateBalancingAmounts", () => {
+  it("calculates balancing amount from unit price", () => {
+    const postings = [
+      { account: "a", amount: "10", commodity: "VWCE", unitPrice: "150 EUR", comment: "" },
+      { account: "b", amount: "", commodity: "EUR", unitPrice: "", comment: "" },
+    ];
+    const result = autoCalculateBalancingAmounts(postings, "EUR");
+    expect(result[1].amount).toBe("-1500.00");
+    expect(result[1].commodity).toBe("EUR");
+  });
+
+  it("does nothing if no posting has unitPrice", () => {
+    const postings = [
+      { account: "a", amount: "10", commodity: "VWCE", unitPrice: "", comment: "" },
+      { account: "b", amount: "", commodity: "EUR", unitPrice: "", comment: "" },
+    ];
+    const result = autoCalculateBalancingAmounts(postings, "EUR");
+    expect(result).toEqual(postings);
   });
 });
