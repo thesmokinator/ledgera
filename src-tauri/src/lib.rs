@@ -195,10 +195,7 @@ fn get_holdings(app: AppHandle) -> Result<Vec<Holding>, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
     let files = load_journal_files(&journal_path)?;
-    let transactions: Vec<JournalTransaction> = files
-        .iter()
-        .flat_map(|file| parse_transactions(&file.content, &file.path))
-        .collect();
+    let transactions = load_transactions_from_journal_via_files(&files)?;
 
     let default_commodity = settings.default_commodity.trim().to_lowercase();
     let mut quantities: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
@@ -393,6 +390,34 @@ impl Default for AmountStyle {
 }
 
 impl AmountStyle {
+    fn from_hledger_json(bal: &serde_json::Value) -> Self {
+        let style = &bal["astyle"];
+        let decimal_mark = style["asdecimalmark"].as_str().unwrap_or(".").to_string();
+        let digit_groups: Vec<usize> = style["asdigitgroups"]
+            .as_array()
+            .and_then(|arr| arr.get(1))
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_u64().map(|n| n as usize))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let digit_separator = style["asdigitgroups"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let precision = style["asprecision"].as_u64().unwrap_or(2) as usize;
+        Self {
+            decimal_mark,
+            digit_separator,
+            digit_groups,
+            precision,
+        }
+    }
+
     fn format(&self, amount: f64) -> String {
         let abs = amount.abs();
         let sign = if amount < 0.0 { "-" } else { "" };
@@ -445,61 +470,7 @@ struct Balance {
 
 /// Formats a number according to hledger display style (decimal mark, digit groups).
 fn format_hledger_amount(amount: f64, bal: &serde_json::Value) -> String {
-    let style = &bal["astyle"];
-    let decimal_mark = style["asdecimalmark"].as_str().unwrap_or(".");
-    let digit_groups: Vec<usize> = style["asdigitgroups"]
-        .as_array()
-        .and_then(|arr| arr.get(1))
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_u64().map(|n| n as usize))
-                .collect()
-        })
-        .unwrap_or_default();
-    let separator = style["asdigitgroups"]
-        .as_array()
-        .and_then(|arr| arr.first())
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let precision = style["asprecision"].as_u64().unwrap_or(2) as usize;
-
-    let abs = amount.abs();
-    let sign = if amount < 0.0 { "-" } else { "" };
-    let formatted_num = format!("{:.*}", precision, abs);
-    let parts: Vec<&str> = formatted_num.split('.').collect();
-    let int_part = parts[0];
-    let frac_part = parts.get(1).unwrap_or(&"");
-
-    // Apply digit grouping (e.g. 1,234,567 or 1.234.567)
-    let grouped_int = if digit_groups.is_empty() || separator.is_empty() {
-        int_part.to_string()
-    } else {
-        let mut result = String::new();
-        let mut remaining = int_part.len();
-        let mut group_iter = digit_groups.iter().cycle();
-        let mut first = true;
-        while remaining > 0 {
-            if !first {
-                result.insert_str(0, separator);
-            }
-            first = false;
-            let group_size = group_iter.next().unwrap_or(&3);
-            let take = (*group_size).min(remaining);
-            let start = remaining - take;
-            result.insert_str(0, &int_part[start..remaining]);
-            remaining = start;
-        }
-        result
-    };
-
-    let decimal_part = if frac_part.is_empty() {
-        String::new()
-    } else {
-        format!("{}{}", decimal_mark, frac_part)
-    };
-
-    format!("{}{}{}", sign, grouped_int, decimal_part)
+    AmountStyle::from_hledger_json(bal).format(amount)
 }
 
 #[tauri::command]
@@ -1223,13 +1194,7 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
     let amount_style = parse_amount_style(&files, "€");
     let _ = AMOUNT_STYLE.set(amount_style.clone());
 
-    let transactions: Vec<JournalTransaction> = files
-        .iter()
-        .flat_map(|file| parse_transactions(&file.content, &file.path))
-        .collect();
-    let mut transactions = transactions;
-    transactions.reverse();
-    transactions.sort_by(|a, b| b.date.cmp(&a.date));
+    let transactions = load_transactions_from_journal_via_files(&files)?;
     let commodities = collect_commodities(&transactions);
     let dashboard = build_dashboard_summary(&transactions);
 
@@ -1246,6 +1211,12 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
 
 fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
     let files = load_journal_files(journal_path)?;
+    load_transactions_from_journal_via_files(&files)
+}
+
+fn load_transactions_from_journal_via_files(
+    files: &[JournalFile],
+) -> Result<Vec<JournalTransaction>, String> {
     let mut transactions: Vec<JournalTransaction> = files
         .iter()
         .flat_map(|file| parse_transactions(&file.content, &file.path))

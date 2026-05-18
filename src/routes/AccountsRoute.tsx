@@ -3,27 +3,8 @@ import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
 import type { AccountActivityRange, AccountSummary, JournalTransaction } from "./types";
 import { formatCount } from "../utils/format";
+import { groupAccounts } from "../utils/account";
 import styles from "./AccountsRoute.module.css";
-
-const groupOrder = ["assets", "liabilities", "equity", "income", "expenses"];
-
-function groupAccounts(accounts: AccountSummary[]): { group: string; items: AccountSummary[] }[] {
-  const map = new Map<string, AccountSummary[]>();
-  for (const a of accounts) {
-    const root = a.account.split(":")[0].toLowerCase();
-    const key = groupOrder.includes(root) ? root : "other";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(a);
-  }
-  const result: { group: string; items: AccountSummary[] }[] = [];
-  for (const g of groupOrder) {
-    const items = map.get(g);
-    if (items) result.push({ group: g, items });
-  }
-  const other = map.get("other");
-  if (other) result.push({ group: "other", items: other });
-  return result;
-}
 
 export function AccountsRoute({
   accounts,
