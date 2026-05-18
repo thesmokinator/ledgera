@@ -110,7 +110,7 @@ export function TransactionsTable({
             align: "right",
             render: (_, transaction) => (
               <span className={`${styles.amount} ${styles[`amount${transaction.display.kind.charAt(0).toUpperCase() + transaction.display.kind.slice(1)}`]}`}>
-                {transaction.display.amount}
+                {transaction.display.formatted || transaction.display.amount}
               </span>
             ),
           },

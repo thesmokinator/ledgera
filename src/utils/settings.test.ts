@@ -11,6 +11,7 @@ describe("defaultSettings", () => {
       powerUser: false,
       defaultCommodity: "",
       fetchPrices: false,
+      commoditySymbols: "",
     });
   });
 });
@@ -66,6 +67,7 @@ describe("normalizeSettings", () => {
       powerUser: true,
       defaultCommodity: "USD",
       fetchPrices: true,
+      commoditySymbols: "TEST=TEST.DE",
     };
     expect(normalizeSettings(full)).toEqual(full);
   });

@@ -10,8 +10,11 @@ use std::{
     env, fmt, fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::OnceLock,
 };
 use tauri::{AppHandle, Manager};
+
+static AMOUNT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
 
 /// Structured application error serialized as JSON over the Tauri bridge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -368,6 +371,67 @@ async fn fetch_prices(
     Ok(prices)
 }
 
+/// Display style for amounts (decimal mark, digit grouping, precision).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AmountStyle {
+    decimal_mark: String,
+    digit_separator: String,
+    digit_groups: Vec<usize>,
+    precision: usize,
+}
+
+impl Default for AmountStyle {
+    fn default() -> Self {
+        Self {
+            decimal_mark: ".".to_string(),
+            digit_separator: ",".to_string(),
+            digit_groups: vec![3],
+            precision: 2,
+        }
+    }
+}
+
+impl AmountStyle {
+    fn format(&self, amount: f64) -> String {
+        let abs = amount.abs();
+        let sign = if amount < 0.0 { "-" } else { "" };
+        let formatted_num = format!("{:.*}", self.precision, abs);
+        let parts: Vec<&str> = formatted_num.split('.').collect();
+        let int_part = parts[0];
+        let frac_part = parts.get(1).unwrap_or(&"");
+
+        let grouped_int = if self.digit_groups.is_empty() || self.digit_separator.is_empty() {
+            int_part.to_string()
+        } else {
+            let mut result = String::new();
+            let mut remaining = int_part.len();
+            let mut group_iter = self.digit_groups.iter().cycle();
+            let mut first = true;
+            while remaining > 0 {
+                if !first {
+                    result.insert_str(0, &self.digit_separator);
+                }
+                first = false;
+                let group_size = group_iter.next().unwrap_or(&3);
+                let take = (*group_size).min(remaining);
+                let start = remaining - take;
+                result.insert_str(0, &int_part[start..remaining]);
+                remaining = start;
+            }
+            result
+        };
+
+        let decimal_part = if frac_part.is_empty() {
+            String::new()
+        } else {
+            format!("{}{}", self.decimal_mark, frac_part)
+        };
+
+        format!("{}{}{}", sign, grouped_int, decimal_part)
+    }
+}
+
 /// Returns account balances from hledger as a hierarchical tree.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -375,7 +439,67 @@ struct Balance {
     account: String,
     amount: f64,
     commodity: String,
+    formatted: String,
     children: Vec<Balance>,
+}
+
+/// Formats a number according to hledger display style (decimal mark, digit groups).
+fn format_hledger_amount(amount: f64, bal: &serde_json::Value) -> String {
+    let style = &bal["astyle"];
+    let decimal_mark = style["asdecimalmark"].as_str().unwrap_or(".");
+    let digit_groups: Vec<usize> = style["asdigitgroups"]
+        .as_array()
+        .and_then(|arr| arr.get(1))
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_u64().map(|n| n as usize))
+                .collect()
+        })
+        .unwrap_or_default();
+    let separator = style["asdigitgroups"]
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let precision = style["asprecision"].as_u64().unwrap_or(2) as usize;
+
+    let abs = amount.abs();
+    let sign = if amount < 0.0 { "-" } else { "" };
+    let formatted_num = format!("{:.*}", precision, abs);
+    let parts: Vec<&str> = formatted_num.split('.').collect();
+    let int_part = parts[0];
+    let frac_part = parts.get(1).unwrap_or(&"");
+
+    // Apply digit grouping (e.g. 1,234,567 or 1.234.567)
+    let grouped_int = if digit_groups.is_empty() || separator.is_empty() {
+        int_part.to_string()
+    } else {
+        let mut result = String::new();
+        let mut remaining = int_part.len();
+        let mut group_iter = digit_groups.iter().cycle();
+        let mut first = true;
+        while remaining > 0 {
+            if !first {
+                result.insert_str(0, separator);
+            }
+            first = false;
+            let group_size = group_iter.next().unwrap_or(&3);
+            let take = (*group_size).min(remaining);
+            let start = remaining - take;
+            result.insert_str(0, &int_part[start..remaining]);
+            remaining = start;
+        }
+        result
+    };
+
+    let decimal_part = if frac_part.is_empty() {
+        String::new()
+    } else {
+        format!("{}{}", decimal_mark, frac_part)
+    };
+
+    format!("{}{}{}", sign, grouped_int, decimal_part)
 }
 
 #[tauri::command]
@@ -453,20 +577,23 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
             _ => continue,
         };
         let account = arr[0].as_str().unwrap_or("").to_string();
-        let (amount, commodity) = if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
-            let qty = bal["aquantity"]
-                .get("floatingPoint")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
-            let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
-            (qty, comm)
-        } else {
-            (0.0, String::new())
-        };
+        let (amount, commodity, formatted) =
+            if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
+                let qty = bal["aquantity"]
+                    .get("floatingPoint")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
+                let fmt = format_hledger_amount(qty, bal);
+                (qty, comm, fmt)
+            } else {
+                (0.0, String::new(), String::new())
+            };
         result.push(Balance {
             account,
             amount,
             commodity,
+            formatted,
             children: Vec::new(),
         });
     }
@@ -514,6 +641,7 @@ struct JournalSummary {
     commodities: Vec<String>,
     file_count: usize,
     total_size_bytes: u64,
+    amount_style: AmountStyle,
     dashboard: DashboardSummary,
 }
 
@@ -562,6 +690,7 @@ struct JournalTransaction {
 struct TransactionDisplay {
     account: String,
     amount: String,
+    formatted: String,
     kind: String,
 }
 
@@ -993,10 +1122,107 @@ fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// Parses the display style from commodity/format directives in journal files.
+fn parse_amount_style(files: &[JournalFile], _default_commodity: &str) -> AmountStyle {
+    for file in files {
+        let mut in_commodity = false;
+        for line in file.content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("commodity ") {
+                in_commodity = true;
+                continue;
+            }
+            if in_commodity && trimmed.starts_with("format ") {
+                let fmt = trimmed.strip_prefix("format ").unwrap_or("").trim();
+                // format looks like: €1.000,00 or $1,234.56
+                // Extract decimal mark (last non-digit char before the cents)
+                if let Some(style) = parse_format_directive(fmt) {
+                    return style;
+                }
+                in_commodity = false;
+            }
+            if in_commodity && !trimmed.starts_with(' ') && !trimmed.is_empty() {
+                in_commodity = false;
+            }
+        }
+    }
+    AmountStyle::default()
+}
+
+fn parse_format_directive(fmt: &str) -> Option<AmountStyle> {
+    // fmt looks like: "€1.000,00" or "$1,234.56" or "1,234.56"
+    // Strip currency prefix (anything non-digit, non-separator at start)
+    let num_part = fmt.trim_start_matches(|c: char| !c.is_ascii_digit() && c != '-');
+    if num_part.is_empty() {
+        return None;
+    }
+
+    // Find decimal mark: last non-digit character followed by digits at end
+    let chars: Vec<char> = num_part.chars().collect();
+    let len = chars.len();
+
+    // Count trailing digits (decimal places)
+    let mut trailing_digits = 0;
+    for i in (0..len).rev() {
+        if chars[i].is_ascii_digit() {
+            trailing_digits += 1;
+        } else {
+            break;
+        }
+    }
+
+    if trailing_digits == 0 || trailing_digits == len {
+        // No decimal part
+        let separator = chars
+            .iter()
+            .rev()
+            .skip(trailing_digits)
+            .find(|c| !c.is_ascii_digit())
+            .map(|c| c.to_string())
+            .unwrap_or_default();
+        return Some(AmountStyle {
+            decimal_mark: ".".to_string(),
+            digit_separator: separator.clone(),
+            digit_groups: if separator.is_empty() {
+                vec![]
+            } else {
+                vec![3]
+            },
+            precision: 0,
+        });
+    }
+
+    let decimal_mark = chars[len - trailing_digits - 1].to_string();
+    let int_part: String = chars[..len - trailing_digits - 1].iter().collect();
+
+    // Find digit group separator from the integer part
+    let separator = int_part
+        .chars()
+        .rev()
+        .find(|c| !c.is_ascii_digit())
+        .map(|c| c.to_string())
+        .unwrap_or_default();
+
+    Some(AmountStyle {
+        decimal_mark,
+        digit_separator: separator.clone(),
+        digit_groups: if separator.is_empty() {
+            vec![]
+        } else {
+            vec![3]
+        },
+        precision: trailing_digits,
+    })
+}
+
 fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
     let files = load_journal_files(journal_path)?;
     let file_count = files.len();
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
+
+    let amount_style = parse_amount_style(&files, "€");
+    let _ = AMOUNT_STYLE.set(amount_style.clone());
+
     let transactions: Vec<JournalTransaction> = files
         .iter()
         .flat_map(|file| parse_transactions(&file.content, &file.path))
@@ -1013,6 +1239,7 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
         commodities,
         file_count,
         total_size_bytes,
+        amount_style,
         dashboard,
     })
 }
@@ -1979,6 +2206,7 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: format_display_amount(&amount, "expense"),
+            formatted: format_amount_styled(&amount),
             kind: "expense".to_string(),
         };
     }
@@ -1988,13 +2216,14 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .find(|posting| posting.account.to_lowercase().starts_with("income"))
     {
         let amount = if posting.amount.trim().is_empty() {
-            balancing_amount
+            balancing_amount.clone()
         } else {
             format_posting_amount(&posting.amount, &posting.commodity)
         };
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: format_display_amount(&amount, "income"),
+            formatted: format_amount_styled(&amount),
             kind: "income".to_string(),
         };
     }
@@ -2007,6 +2236,7 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: format_display_amount(&amount, "income"),
+            formatted: format_amount_styled(&amount),
             kind: "income".to_string(),
         };
     }
@@ -2017,6 +2247,11 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .or_else(|| postings.first())
     {
         let amount = format_posting_amount(&posting.amount, &posting.commodity);
+        let formatted = if amount.is_empty() {
+            "—".to_string()
+        } else {
+            format_amount_styled(&amount)
+        };
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: if amount.is_empty() {
@@ -2024,6 +2259,7 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
             } else {
                 amount
             },
+            formatted,
             kind: if posting.amount.trim().is_empty() {
                 "unknown".to_string()
             } else {
@@ -2035,6 +2271,7 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
     TransactionDisplay {
         account: "—".to_string(),
         amount: "—".to_string(),
+        formatted: "—".to_string(),
         kind: "unknown".to_string(),
     }
 }
@@ -2048,12 +2285,18 @@ fn parse_amount_value(amount: &str) -> f64 {
         .unwrap_or_default()
 }
 
+/// Formats a numeric string using the journal's display style.
+fn format_amount_styled(raw: &str) -> String {
+    let value = parse_amount_value(raw);
+    let style_ref = AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT_STYLE.get_or_init(AmountStyle::default)
+    });
+    style_ref.format(value)
+}
+
 /// Formats the display amount sign according to the inferred transaction kind.
 fn format_display_amount(amount: &str, kind: &str) -> String {
-    if amount.trim().is_empty() {
-        return "—".to_string();
-    }
-
     let normalized = amount.replace('-', "");
     match kind {
         "income" => format!("+{}", normalized),
@@ -2549,6 +2792,7 @@ mod tests {
                 display: TransactionDisplay {
                     account: "expenses:food".to_string(),
                     amount: "-€25".to_string(),
+                    formatted: "-25,00".to_string(),
                     kind: "expense".to_string(),
                 },
                 raw: String::new(),
@@ -2581,6 +2825,7 @@ mod tests {
                 display: TransactionDisplay {
                     account: "assets:investments:xeon".to_string(),
                     amount: "10 XEON".to_string(),
+                    formatted: "10 XEON".to_string(),
                     kind: "transfer".to_string(),
                 },
                 raw: String::new(),
@@ -2613,6 +2858,44 @@ mod tests {
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");
+    }
+
+    #[test]
+    fn formats_amount_with_italian_locale() {
+        let bal = serde_json::json!({
+            "astyle": {
+                "asdecimalmark": ",",
+                "asdigitgroups": [".", [3]],
+                "asprecision": 2
+            }
+        });
+        assert_eq!(format_hledger_amount(33452.31, &bal), "33.452,31");
+        assert_eq!(format_hledger_amount(-1858.0, &bal), "-1.858,00");
+        assert_eq!(format_hledger_amount(2303.51, &bal), "2.303,51");
+    }
+
+    #[test]
+    fn formats_amount_with_english_locale() {
+        let bal = serde_json::json!({
+            "astyle": {
+                "asdecimalmark": ".",
+                "asdigitgroups": [",", [3]],
+                "asprecision": 2
+            }
+        });
+        assert_eq!(format_hledger_amount(1234567.89, &bal), "1,234,567.89");
+    }
+
+    #[test]
+    fn formats_amount_without_digit_groups() {
+        let bal = serde_json::json!({
+            "astyle": {
+                "asdecimalmark": ".",
+                "asdigitgroups": null,
+                "asprecision": 0
+            }
+        });
+        assert_eq!(format_hledger_amount(209.0, &bal), "209");
     }
 
     #[test]

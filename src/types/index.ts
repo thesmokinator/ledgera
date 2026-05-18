@@ -31,6 +31,7 @@ export type JournalPosting = {
 export type TransactionDisplay = {
   account: string;
   amount: string;
+  formatted: string;
   kind: string;
 };
 
@@ -124,6 +125,7 @@ export type Balance = {
   account: string;
   amount: number;
   commodity: string;
+  formatted: string;
   children: Balance[];
 };
 

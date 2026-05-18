@@ -6,12 +6,6 @@ import { useTranslation } from "react-i18next";
 import type { Balance, Holding, PriceInfo } from "./types";
 import styles from "./BalancesRoute.module.css";
 
-function formatAmount(amount: number, commodity: string): string {
-  const abs = Math.abs(amount);
-  const num = Number.isInteger(abs) ? abs.toString() : abs.toFixed(2);
-  return commodity ? `${commodity} ${num}` : num;
-}
-
 export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -43,10 +37,10 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
 
   const balances = balancesQuery.data ?? [];
 
-  function renderAmount(amount: number, commodity: string) {
+  function renderAmount(amount: number, formatted: string) {
     return (
       <span style={{ color: amount < 0 ? "#ef4444" : amount > 0 ? "#22c55e" : undefined, fontWeight: 500 }}>
-        {amount < 0 ? "-" : ""}{formatAmount(amount, commodity)}
+        {formatted}
       </span>
     );
   }
@@ -83,7 +77,7 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
               {
                 align: "right",
                 width: 200,
-                render: (_: unknown, record: Balance) => renderAmount(record.amount, record.commodity),
+                render: (_: unknown, record: Balance) => renderAmount(record.amount, record.formatted),
               },
             ]}
           />
