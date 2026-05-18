@@ -93,6 +93,7 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
             rowKey="commodity"
             loading={holdingsQuery.isFetching}
             pagination={false}
+            scroll={{ x: 600 }}
             columns={[
               { title: t("balances.commodity"), dataIndex: "commodity", width: 140, render: (c: string) => <strong>{c}</strong> },
               { title: t("balances.account"), dataIndex: "account", ellipsis: true },

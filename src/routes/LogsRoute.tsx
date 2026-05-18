@@ -96,6 +96,7 @@ export function LogsRoute() {
           rowKey={(entry) => `${entry.ts}-${entry.code}`}
           loading={logsQuery.isFetching}
           pagination={{ pageSize: 12 }}
+          scroll={{ x: 900 }}
           columns={[
             {
               title: t("logs.timestamp"),

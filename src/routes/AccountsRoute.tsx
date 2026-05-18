@@ -62,6 +62,7 @@ export function AccountsRoute({
               dataSource={items}
               pagination={false}
               showHeader={false}
+              scroll={{ x: 400 }}
               expandable={{
                 expandedRowRender: (account) => (
                   <div className={styles.transactionsPanel}>

@@ -73,7 +73,8 @@ export function TransactionsTable({
         rowKey="id"
         loading={loading}
         dataSource={transactions}
-        pagination={{ pageSize: 8 }}
+        pagination={{ pageSize: 12 }}
+        scroll={{ x: 900 }}
         expandable={
           powerUser
             ? {
