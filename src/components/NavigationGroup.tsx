@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { NavigationItem } from "../types";
+import styles from "./NavigationGroup.module.css";
 
 export function NavigationGroup({
   items,
@@ -13,12 +14,12 @@ export function NavigationGroup({
   const { t } = useTranslation();
 
   return (
-    <div className="nav-group">
+    <div className={styles.navGroup}>
       {items.map((item) => (
         <button
           key={item.key}
           type="button"
-          className={`nav-item ${activeKey === item.key ? "is-active" : ""} ${item.disabled ? "is-disabled" : ""}`}
+          className={`${styles.navItem} ${activeKey === item.key ? styles.isActive : ""} ${item.disabled ? styles.isDisabled : ""}`}
           disabled={item.disabled}
           onClick={() => {
             if (!item.disabled) onSelect(item.key);
@@ -26,7 +27,7 @@ export function NavigationGroup({
         >
           {item.icon}
           <span>{t(item.label)}</span>
-          {item.disabled ? <span className="nav-item-lock">🔒</span> : null}
+          {item.disabled ? <span className={styles.navItemLock}>🔒</span> : null}
         </button>
       ))}
     </div>

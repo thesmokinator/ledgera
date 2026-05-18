@@ -1,4 +1,5 @@
 export { AccountsRoute } from "./AccountsRoute";
+export { BalancesRoute } from "./BalancesRoute";
 export { LogsRoute } from "./LogsRoute";
 export { SettingsRoute } from "./SettingsRoute";
 export { TransactionsRoute } from "./TransactionsRoute";

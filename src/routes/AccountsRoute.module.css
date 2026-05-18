@@ -1,0 +1,73 @@
+.card {
+    overflow: hidden;
+    color: #f5f5f5;
+    background: linear-gradient(180deg, #191919 0%, #141414 100%);
+    border: 1px solid #2c2c2c;
+    border-radius: 14px;
+}
+
+:global(.theme-light) .card {
+    color: #111827;
+    background: #ffffff;
+    border-color: #e5e7eb;
+}
+
+.rangeControl {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.group {
+    margin-bottom: 24px;
+}
+
+.group:last-child {
+    margin-bottom: 0;
+}
+
+.groupTitle {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 10px !important;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2c2c2c;
+}
+
+:global(.theme-light) .groupTitle {
+    border-bottom-color: #e5e7eb;
+}
+
+.groupCount {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.transactionsPanel {
+    display: grid;
+    gap: 12px;
+    padding: 8px 0 4px;
+}
+
+.transactionsTitle {
+    color: #d4d4d4;
+}
+
+:global(.theme-light) .transactionsTitle {
+    color: #374151;
+}
+
+.transactionsPanel :global(.ant-table-wrapper) {
+    overflow: hidden;
+    border: 1px solid #2c2c2c;
+    border-radius: 10px;
+}
+
+:global(.theme-light) .transactionsPanel :global(.ant-table-wrapper) {
+    border-color: #e5e7eb;
+}
+
+.transactionsPanel :global(.ant-table-pagination) {
+    margin-right: 12px !important;
+}

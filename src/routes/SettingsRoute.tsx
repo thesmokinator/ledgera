@@ -25,12 +25,13 @@ import packageJson from "../../package.json";
 import { formatCount, formatFileSize } from "../utils/format";
 import { parseError } from "../utils/error";
 import type { AppSettings, HledgerStatus, JournalSummary } from "./types";
+import styles from "./SettingsRoute.module.css";
 
 const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
 
 function CardTitle({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <Space className="settings-section-title">
+    <Space className={styles.sectionTitle}>
       {icon}
       <span>{label}</span>
     </Space>
@@ -62,13 +63,13 @@ function PathInput({
   }
 
   return (
-    <Space.Compact block className="path-input-group">
+    <Space.Compact block className={styles.pathInputGroup}>
       <Input
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
         placeholder={placeholder}
       />
-      {statusAddon ? <div className="path-input-addon">{statusAddon}</div> : null}
+      {statusAddon ? <div className={styles.pathInputAddon}>{statusAddon}</div> : null}
       <Tooltip title={pickerTitle}>
         <Button icon={<UploadOutlined />} onClick={selectFile} />
       </Tooltip>
@@ -123,10 +124,10 @@ export function SettingsRoute({
       initialValues={initialValues}
       onValuesChange={onValuesChange}
     >
-      <Space direction="vertical" size={24} className="content-stack settings-stack">
+      <Space direction="vertical" size={24} className="content-stack">
         {/* ── Journal ──────────────────────────────── */}
         <Card
-          className="settings-card"
+          className={styles.card}
           title={<CardTitle icon={<FolderOutlined />} label={t("settings.journal")} />}
         >
           <Form.Item
@@ -145,34 +146,34 @@ export function SettingsRoute({
               {parseError(journalError, t)}
             </Typography.Text>
           ) : stats ? (
-            <div className="stats-grid">
-              <div className="stats-item">
-                <span className="stats-label">{t("settings.statsTransactions")}</span>
-                <span className="stats-value">{formatCount(stats.transactions)}</span>
+            <div className={styles.statsGrid}>
+              <div className={styles.statsItem}>
+                <span className={styles.statsLabel}>{t("settings.statsTransactions")}</span>
+                <span className={styles.statsValue}>{formatCount(stats.transactions)}</span>
               </div>
-              <div className="stats-item">
-                <span className="stats-label">{t("settings.statsAccounts")}</span>
-                <span className="stats-value">{formatCount(stats.accounts)}</span>
+              <div className={styles.statsItem}>
+                <span className={styles.statsLabel}>{t("settings.statsAccounts")}</span>
+                <span className={styles.statsValue}>{formatCount(stats.accounts)}</span>
               </div>
-              <div className="stats-item">
-                <span className="stats-label">{t("settings.statsCommodities")}</span>
-                <span className="stats-value">{formatCount(stats.commodities)}</span>
+              <div className={styles.statsItem}>
+                <span className={styles.statsLabel}>{t("settings.statsCommodities")}</span>
+                <span className={styles.statsValue}>{formatCount(stats.commodities)}</span>
               </div>
-              <div className="stats-item">
-                <span className="stats-label">{t("settings.statsDateRange")}</span>
-                <span className="stats-value">
+              <div className={styles.statsItem}>
+                <span className={styles.statsLabel}>{t("settings.statsDateRange")}</span>
+                <span className={styles.statsValue}>
                   {stats.dateMin && stats.dateMax
                     ? `${stats.dateMin} → ${stats.dateMax}`
-                    : "—"}
+                    : "-"}
                 </span>
               </div>
-              <div className="stats-item">
-                <span className="stats-label">{t("settings.statsFiles")}</span>
-                <span className="stats-value">{formatCount(stats.fileCount)}</span>
+              <div className={styles.statsItem}>
+                <span className={styles.statsLabel}>{t("settings.statsFiles")}</span>
+                <span className={styles.statsValue}>{formatCount(stats.fileCount)}</span>
               </div>
-              <div className="stats-item">
-                <span className="stats-label">{t("settings.statsFileSize")}</span>
-                <span className="stats-value">{formatFileSize(stats.fileSize)}</span>
+              <div className={styles.statsItem}>
+                <span className={styles.statsLabel}>{t("settings.statsFileSize")}</span>
+                <span className={styles.statsValue}>{formatFileSize(stats.fileSize)}</span>
               </div>
             </div>
           ) : (
@@ -184,7 +185,7 @@ export function SettingsRoute({
 
         {/* ── hledger ─────────────────────────────── */}
         <Card
-          className="settings-card"
+          className={styles.card}
           title={<CardTitle icon={<CodeOutlined />} label={t("settings.hledger")} />}
           extra={
             hledgerStatus?.available ? (
@@ -213,40 +214,95 @@ export function SettingsRoute({
 
         {/* ── Preferences ──────────────────────────── */}
         <Card
-          className="settings-card"
+          className={styles.card}
           title={<CardTitle icon={<SettingOutlined />} label={t("settings.preferences")} />}
         >
-          <Form.Item label={t("settings.defaultCommodity")} name="defaultCommodity">
-            <AutoComplete
-              options={commodityOptions}
-              placeholder={t("settings.defaultCommodityPlaceholder")}
-              filterOption
-            />
-          </Form.Item>
-          <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: "system", label: t("settings.themeSystem") },
-                { value: "dark", label: t("settings.themeDark") },
-                { value: "light", label: t("settings.themeLight") },
-              ]}
-            />
-          </Form.Item>
-          <div className="developer-settings">
-            <div>
-              <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
-              <Typography.Paragraph type="secondary">
-                {t("settings.advancedModeHelp")}
-              </Typography.Paragraph>
+          <div className={styles.preferencesStack}>
+            <Form.Item label={t("settings.defaultCommodity")} name="defaultCommodity">
+              <AutoComplete
+                options={commodityOptions}
+                placeholder={t("settings.defaultCommodityPlaceholder")}
+                filterOption
+              />
+            </Form.Item>
+            <Form.Item label={t("settings.theme")} name="theme" rules={[{ required: true }]}>
+              <Select
+                options={[
+                  { value: "system", label: t("settings.themeSystem") },
+                  { value: "dark", label: t("settings.themeDark") },
+                  { value: "light", label: t("settings.themeLight") },
+                ]}
+              />
+            </Form.Item>
+            <div className={styles.developerSettings}>
+              <div>
+                <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.advancedModeHelp")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name="powerUser" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
             </div>
-            <Form.Item name="powerUser" valuePropName="checked" noStyle>
-              <Switch />
+            <div className={styles.developerSettings}>
+              <div>
+                <Typography.Text strong>{t("settings.fetchPrices")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.fetchPricesHelp")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name="fetchPrices" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
+            <Form.Item noStyle shouldUpdate={(prev, cur) => prev.fetchPrices !== cur.fetchPrices}>
+              {({ getFieldValue }) =>
+                getFieldValue("fetchPrices") ? (
+                  <Form.Item
+                    className={styles.textAreaSetting}
+                    label={t("settings.commoditySymbols")}
+                    name="commoditySymbols"
+                    help={t("settings.commoditySymbolsHelp")}
+                  >
+                    <Input.TextArea
+                      rows={3}
+                      placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
+                      style={{ fontFamily: "monospace", fontSize: 13 }}
+                    />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+            <Form.Item
+              className={styles.textAreaSetting}
+              label={t("settings.excludeBalances")}
+              name="excludeBalances"
+              help={t("settings.excludeBalancesHelp")}
+            >
+              <Input.TextArea
+                rows={3}
+                placeholder="assets:investments:xeon"
+                style={{ fontFamily: "monospace", fontSize: 13 }}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.textAreaSetting}
+              label={t("settings.includeInvestments")}
+              name="includeInvestments"
+              help={t("settings.includeInvestmentsHelp")}
+            >
+              <Input.TextArea
+                rows={3}
+                placeholder="assets:investments:xeon"
+                style={{ fontFamily: "monospace", fontSize: 13 }}
+              />
             </Form.Item>
           </div>
         </Card>
 
         {/* ── Footer ───────────────────────────────── */}
-        <div className="settings-footer">
+        <div className={styles.footer}>
           <Typography.Text type="secondary">
             {t("settings.version", { version: packageJson.version })}
           </Typography.Text>

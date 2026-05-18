@@ -10,8 +10,11 @@ use std::{
     env, fmt, fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::OnceLock,
 };
 use tauri::{AppHandle, Manager};
+
+static AMOUNT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
 
 /// Structured application error serialized as JSON over the Tauri bridge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -170,6 +173,497 @@ fn clear_logs(app: AppHandle) -> Result<(), String> {
     })
 }
 
+// ── Holdings & Prices ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Holding {
+    commodity: String,
+    quantity: f64,
+    account: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PriceInfo {
+    price: f64,
+    currency: String,
+    formatted: String,
+}
+
+#[tauri::command]
+fn get_holdings(app: AppHandle) -> Result<Vec<Holding>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let files = load_journal_files(&journal_path)?;
+    let transactions = load_transactions_from_journal_via_files(&files)?;
+
+    let default_commodity = settings.default_commodity.trim().to_lowercase();
+    let mut quantities: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut accounts: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut original_commodity: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for tx in &transactions {
+        for posting in &tx.postings {
+            let commodity_raw = posting.commodity.trim();
+            // Strip @ price notation (e.g. "XEON @ €148.70" → "XEON")
+            let commodity_clean = if let Some(at_pos) = commodity_raw.find(" @ ") {
+                commodity_raw[..at_pos].trim()
+            } else {
+                commodity_raw
+            };
+            let commodity_lower = commodity_clean.to_lowercase();
+            if commodity_lower.is_empty() || commodity_lower == default_commodity {
+                continue;
+            }
+            let amount = posting.amount.trim().replace(',', ".");
+            if let Ok(qty) = amount.parse::<f64>() {
+                *quantities.entry(commodity_lower.clone()).or_default() += qty;
+                accounts
+                    .entry(commodity_lower.clone())
+                    .or_insert_with(|| posting.account.trim().to_string());
+                original_commodity
+                    .entry(commodity_lower.clone())
+                    .or_insert_with(|| commodity_clean.to_string());
+            }
+        }
+    }
+
+    let include_set: std::collections::HashSet<String> = settings
+        .include_investments
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    let mut result: Vec<Holding> = Vec::new();
+    for (commodity_lower, quantity) in quantities {
+        if quantity.abs() <= 0.0001 {
+            continue;
+        }
+        if !include_set.is_empty() {
+            let acct = accounts.get(&commodity_lower);
+            if acct.map_or(true, |a| !include_set.contains(a.as_str())) {
+                continue;
+            }
+        }
+        let account = accounts.remove(&commodity_lower).unwrap_or_default();
+        let commodity = original_commodity
+            .remove(&commodity_lower)
+            .unwrap_or(commodity_lower);
+        result.push(Holding {
+            account,
+            commodity,
+            quantity,
+        });
+    }
+    result.sort_by(|a, b| a.commodity.cmp(&b.commodity));
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let executable = hledger_executable(&settings);
+
+    let include_accounts: Vec<&str> = settings
+        .include_investments
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    if include_accounts.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut cmd = Command::new(&executable);
+    cmd.arg("-f").arg(&journal_path).arg("balance");
+    for acct in &include_accounts {
+        cmd.arg(acct);
+    }
+    cmd.arg("-O").arg("json");
+
+    let output =
+        tauri::async_runtime::spawn_blocking(move || cmd.output().map_err(|e| e.to_string()))
+            .await
+            .map_err(|error| {
+                to_error_string_with_details(
+                    "HLEDGER_BALANCE_FAILED",
+                    "Unable to run hledger balance for investments.",
+                    error.to_string(),
+                )
+            })??;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    parse_balance_output(&app, &stdout, &settings, false)
+}
+
+fn parse_balance_output(
+    _app: &AppHandle,
+    stdout: &str,
+    settings: &AppSettings,
+    apply_exclude: bool,
+) -> Result<Vec<Balance>, String> {
+    let raw: Vec<serde_json::Value> = serde_json::from_str(stdout).map_err(|error| {
+        to_error_string_with_details(
+            "HLEDGER_BALANCE_PARSE_FAILED",
+            "Unable to parse hledger balance output.",
+            error.to_string(),
+        )
+    })?;
+
+    let rows = raw.first().and_then(|v| v.as_array()).ok_or_else(|| {
+        to_error_string(
+            "HLEDGER_BALANCE_PARSE_FAILED",
+            "Unexpected hledger balance JSON structure.",
+        )
+    })?;
+
+    let exclude_set: std::collections::HashSet<&str> = settings
+        .exclude_balances
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    let mut result: Vec<Balance> = Vec::new();
+    for row in rows {
+        let arr = match row.as_array() {
+            Some(a) if a.len() >= 4 => a,
+            _ => continue,
+        };
+        let account = arr[0].as_str().unwrap_or("").to_string();
+        if apply_exclude && exclude_set.contains(account.as_str()) {
+            continue;
+        }
+        let (amount, commodity, formatted) =
+            if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
+                let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
+                if AMOUNT_STYLE.get().is_none() {
+                    let style = AmountStyle::from_hledger_json(bal);
+                    let _ = AMOUNT_STYLE.set(style);
+                }
+                let qty = bal["aquantity"]
+                    .get("floatingPoint")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let fmt = format_hledger_amount(qty, bal);
+                (qty, comm, fmt)
+            } else {
+                (0.0, String::new(), String::new())
+            };
+        result.push(Balance {
+            account,
+            amount,
+            commodity,
+            formatted,
+        });
+    }
+    Ok(result)
+}
+
+/// Fetches current prices from Yahoo Finance for a list of symbols.
+#[tauri::command]
+async fn fetch_prices(
+    app: AppHandle,
+    symbols: Vec<String>,
+) -> Result<std::collections::HashMap<String, PriceInfo>, String> {
+    let settings = read_settings(&app)?;
+    log_event(
+        &app,
+        "info",
+        "PRICE_FETCH_START",
+        &format!("Fetching prices for {} symbols", symbols.len()),
+    );
+
+    if !settings.fetch_prices {
+        return Err(to_error_string(
+            "PRICES_DISABLED",
+            "Market price fetching is disabled in Settings.",
+        ));
+    }
+
+    let mut prices = std::collections::HashMap::new();
+
+    // Parse commodity symbols mapping (format: "VWCE=VWCE.DE\nXEON=XEON.DE")
+    let mapping: std::collections::HashMap<String, String> = settings
+        .commodity_symbols
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            let (k, v) = line.split_once('=')?;
+            Some((k.trim().to_string(), v.trim().to_string()))
+        })
+        .collect();
+
+    for symbol in &symbols {
+        let yahoo_symbol = mapping.get(symbol).unwrap_or(symbol);
+        log_event(
+            &app,
+            "info",
+            "PRICE_FETCH_TRY",
+            &format!("Trying {} → {}", symbol, yahoo_symbol),
+        );
+
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}",
+            yahoo_symbol
+        );
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            )
+            .header("Accept", "application/json")
+            .send()
+            .await;
+        match response {
+            Ok(response) => {
+                log_event(
+                    &app,
+                    "info",
+                    "PRICE_FETCH_RESPONSE",
+                    &format!("Got response for {}", yahoo_symbol),
+                );
+                let body_text = response.text().await.unwrap_or_default();
+                match serde_json::from_str::<serde_json::Value>(&body_text) {
+                    Ok(json) => {
+                        let meta = &json["chart"]["result"][0]["meta"];
+                        if let (Some(price), Some(currency)) = (
+                            meta["regularMarketPrice"].as_f64(),
+                            meta["currency"].as_str(),
+                        ) {
+                            let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+                                static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+                                DEFAULT.get_or_init(AmountStyle::default)
+                            });
+                            let formatted = style.format(price);
+                            prices.insert(
+                                symbol.clone(),
+                                PriceInfo {
+                                    price,
+                                    currency: currency.to_string(),
+                                    formatted,
+                                },
+                            );
+                            log_event(
+                                &app,
+                                "info",
+                                "PRICE_FETCHED",
+                                &format!("{} = {} {}", symbol, price, currency),
+                            );
+                        } else {
+                            log_event_with_details(
+                                &app,
+                                "warn",
+                                "PRICE_PARSE_FAILED",
+                                &format!("Could not parse price/currency for {}", symbol),
+                                Some(body_text),
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        log_event_with_details(
+                            &app,
+                            "warn",
+                            "PRICE_JSON_FAILED",
+                            &format!("Response not valid JSON for {}", symbol),
+                            Some(format!("Parse error: {}\nBody: {}", e, body_text)),
+                        );
+                    }
+                }
+            }
+            Err(error) => {
+                log_event_with_details(
+                    &app,
+                    "error",
+                    "PRICE_FETCH_FAILED",
+                    &format!("HTTP request failed for {}", symbol),
+                    Some(error.to_string()),
+                );
+            }
+        }
+    }
+    Ok(prices)
+}
+
+/// Display style for amounts (decimal mark, digit grouping, precision).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AmountStyle {
+    decimal_mark: String,
+    digit_separator: String,
+    digit_groups: Vec<usize>,
+    precision: usize,
+}
+
+impl Default for AmountStyle {
+    fn default() -> Self {
+        Self {
+            decimal_mark: ".".to_string(),
+            digit_separator: ",".to_string(),
+            digit_groups: vec![3],
+            precision: 2,
+        }
+    }
+}
+
+impl AmountStyle {
+    fn from_hledger_json(bal: &serde_json::Value) -> Self {
+        let style = &bal["astyle"];
+        let decimal_mark = style["asdecimalmark"].as_str().unwrap_or(".").to_string();
+        let digit_groups: Vec<usize> = style["asdigitgroups"]
+            .as_array()
+            .and_then(|arr| arr.get(1))
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_u64().map(|n| n as usize))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let digit_separator = style["asdigitgroups"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let precision = style["asprecision"].as_u64().unwrap_or(2) as usize;
+        Self {
+            decimal_mark,
+            digit_separator,
+            digit_groups,
+            precision,
+        }
+    }
+
+    fn format(&self, amount: f64) -> String {
+        let abs = amount.abs();
+        let sign = if amount < 0.0 { "-" } else { "" };
+        let formatted_num = format!("{:.*}", self.precision, abs);
+        let parts: Vec<&str> = formatted_num.split('.').collect();
+        let int_part = parts[0];
+        let frac_part = parts.get(1).unwrap_or(&"");
+
+        let grouped_int = if self.digit_groups.is_empty() || self.digit_separator.is_empty() {
+            int_part.to_string()
+        } else {
+            let mut result = String::new();
+            let mut remaining = int_part.len();
+            let mut group_iter = self.digit_groups.iter().cycle();
+            let mut first = true;
+            while remaining > 0 {
+                if !first {
+                    result.insert_str(0, &self.digit_separator);
+                }
+                first = false;
+                let group_size = group_iter.next().unwrap_or(&3);
+                let take = (*group_size).min(remaining);
+                let start = remaining - take;
+                result.insert_str(0, &int_part[start..remaining]);
+                remaining = start;
+            }
+            result
+        };
+
+        let decimal_part = if frac_part.is_empty() {
+            String::new()
+        } else {
+            format!("{}{}", self.decimal_mark, frac_part)
+        };
+
+        format!("{}{}{}", sign, grouped_int, decimal_part)
+    }
+}
+
+/// Returns account balances from hledger as a hierarchical tree.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Balance {
+    account: String,
+    amount: f64,
+    commodity: String,
+    formatted: String,
+}
+
+/// Formats a number according to hledger display style (decimal mark, digit groups).
+fn format_hledger_amount(amount: f64, bal: &serde_json::Value) -> String {
+    AmountStyle::from_hledger_json(bal).format(amount)
+}
+
+/// Formats a number using the journal's display style.
+#[tauri::command]
+fn format_number(value: f64) -> String {
+    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT.get_or_init(AmountStyle::default)
+    });
+    style.format(value)
+}
+
+#[tauri::command]
+async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let executable = hledger_executable(&settings);
+
+    log_event(&app, "info", "BALANCE_START", "Running hledger balance");
+
+    let output = tauri::async_runtime::spawn_blocking(move || {
+        Command::new(&executable)
+            .arg("-f")
+            .arg(&journal_path)
+            .arg("balance")
+            .arg("-O")
+            .arg("json")
+            .output()
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|error| {
+        to_error_string_with_details(
+            "HLEDGER_BALANCE_FAILED",
+            "Unable to run hledger balance.",
+            error.to_string(),
+        )
+    })??;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        log_event_with_details(
+            &app,
+            "error",
+            "BALANCE_FAILED",
+            "hledger balance failed",
+            Some(stderr.clone()),
+        );
+        return Err(to_error_string_with_details(
+            "HLEDGER_BALANCE_FAILED",
+            "hledger balance command failed.",
+            stderr,
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    log_event_with_details(
+        &app,
+        "info",
+        "BALANCE_RAW",
+        "hledger balance output",
+        Some(stdout.clone()),
+    );
+
+    parse_balance_output(&app, &stdout, &settings, true)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
@@ -181,6 +675,14 @@ struct AppSettings {
     power_user: bool,
     #[serde(default)]
     default_commodity: String,
+    #[serde(default)]
+    fetch_prices: bool,
+    #[serde(default)]
+    commodity_symbols: String,
+    #[serde(default)]
+    exclude_balances: String,
+    #[serde(default)]
+    include_investments: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -201,6 +703,7 @@ struct JournalSummary {
     commodities: Vec<String>,
     file_count: usize,
     total_size_bytes: u64,
+    amount_style: AmountStyle,
     dashboard: DashboardSummary,
 }
 
@@ -249,7 +752,16 @@ struct JournalTransaction {
 struct TransactionDisplay {
     account: String,
     amount: String,
+    formatted: String,
     kind: String,
+    flow: TransactionFlow,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TransactionFlow {
+    from: Vec<String>,
+    to: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -321,6 +833,10 @@ impl Default for AppSettings {
             theme: default_theme(),
             power_user: false,
             default_commodity: String::new(),
+            fetch_prices: false,
+            commodity_symbols: String::new(),
+            exclude_balances: String::new(),
+            include_investments: String::new(),
         }
     }
 }
@@ -339,6 +855,12 @@ fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
 #[tauri::command]
 fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
     let path = settings_path(&app)?;
+    log_event(
+        &app,
+        "info",
+        "SETTINGS_SAVE",
+        &format!("Saving exclude_balances: '{}'", settings.exclude_balances),
+    );
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             to_error_string_with_details(
@@ -406,7 +928,9 @@ fn check_hledger(app: AppHandle) -> Result<HledgerStatus, String> {
 fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestions, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
-    let transactions = load_transactions_from_journal(&journal_path)?;
+    let files = load_journal_files(&journal_path)?;
+    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let commodities = collect_declared_commodities(&files);
 
     let profile = build_journal_profile(&transactions, settings.default_commodity.trim());
 
@@ -433,7 +957,7 @@ fn get_autocomplete_suggestions(app: AppHandle) -> Result<AutocompleteSuggestion
                 .filter(|value| !value.is_empty())
                 .collect(),
         ),
-        commodities: collect_commodities(&transactions),
+        commodities,
         default_commodity: settings.default_commodity.trim().to_string(),
         default_cash_account: profile.default_cash_account,
         default_expense_account: profile.default_expense_account,
@@ -543,6 +1067,11 @@ pub fn run() {
             delete_transaction,
             get_logs,
             clear_logs,
+            get_holdings,
+            get_investments,
+            fetch_prices,
+            get_balances,
+            format_number,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -675,18 +1204,109 @@ fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// Parses the display style from commodity/format directives in journal files.
+fn parse_amount_style(files: &[JournalFile], _default_commodity: &str) -> AmountStyle {
+    for file in files {
+        let mut in_commodity = false;
+        for line in file.content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("commodity ") {
+                in_commodity = true;
+                continue;
+            }
+            if in_commodity && trimmed.starts_with("format ") {
+                let fmt = trimmed.strip_prefix("format ").unwrap_or("").trim();
+                // format looks like: €1.000,00 or $1,234.56
+                // Extract decimal mark (last non-digit char before the cents)
+                if let Some(style) = parse_format_directive(fmt) {
+                    return style;
+                }
+                in_commodity = false;
+            }
+            if in_commodity && !line.starts_with(' ') && !trimmed.is_empty() {
+                in_commodity = false;
+            }
+        }
+    }
+    AmountStyle::default()
+}
+
+fn parse_format_directive(fmt: &str) -> Option<AmountStyle> {
+    // fmt looks like: "€1.000,00" or "$1,234.56" or "1,234.56"
+    // Strip currency prefix (anything non-digit, non-separator at start)
+    let num_part = fmt.trim_start_matches(|c: char| !c.is_ascii_digit() && c != '-');
+    if num_part.is_empty() {
+        return None;
+    }
+
+    // Find decimal mark: last non-digit character followed by digits at end
+    let chars: Vec<char> = num_part.chars().collect();
+    let len = chars.len();
+
+    // Count trailing digits (decimal places)
+    let mut trailing_digits = 0;
+    for i in (0..len).rev() {
+        if chars[i].is_ascii_digit() {
+            trailing_digits += 1;
+        } else {
+            break;
+        }
+    }
+
+    if trailing_digits == 0 || trailing_digits == len {
+        // No decimal part
+        let separator = chars
+            .iter()
+            .rev()
+            .skip(trailing_digits)
+            .find(|c| !c.is_ascii_digit())
+            .map(|c| c.to_string())
+            .unwrap_or_default();
+        return Some(AmountStyle {
+            decimal_mark: ".".to_string(),
+            digit_separator: separator.clone(),
+            digit_groups: if separator.is_empty() {
+                vec![]
+            } else {
+                vec![3]
+            },
+            precision: 0,
+        });
+    }
+
+    let decimal_mark = chars[len - trailing_digits - 1].to_string();
+    let int_part: String = chars[..len - trailing_digits - 1].iter().collect();
+
+    // Find digit group separator from the integer part
+    let separator = int_part
+        .chars()
+        .rev()
+        .find(|c| !c.is_ascii_digit())
+        .map(|c| c.to_string())
+        .unwrap_or_default();
+
+    Some(AmountStyle {
+        decimal_mark,
+        digit_separator: separator.clone(),
+        digit_groups: if separator.is_empty() {
+            vec![]
+        } else {
+            vec![3]
+        },
+        precision: trailing_digits,
+    })
+}
+
 fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
     let files = load_journal_files(journal_path)?;
     let file_count = files.len();
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
-    let transactions: Vec<JournalTransaction> = files
-        .iter()
-        .flat_map(|file| parse_transactions(&file.content, &file.path))
-        .collect();
-    let mut transactions = transactions;
-    transactions.reverse();
-    transactions.sort_by(|a, b| b.date.cmp(&a.date));
-    let commodities = collect_commodities(&transactions);
+
+    let amount_style = parse_amount_style(&files, "€");
+    let _ = AMOUNT_STYLE.set(amount_style.clone());
+
+    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let commodities = collect_declared_commodities(&files);
     let dashboard = build_dashboard_summary(&transactions);
 
     Ok(JournalSummary {
@@ -695,12 +1315,19 @@ fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
         commodities,
         file_count,
         total_size_bytes,
+        amount_style,
         dashboard,
     })
 }
 
 fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
     let files = load_journal_files(journal_path)?;
+    load_transactions_from_journal_via_files(&files)
+}
+
+fn load_transactions_from_journal_via_files(
+    files: &[JournalFile],
+) -> Result<Vec<JournalTransaction>, String> {
     let mut transactions: Vec<JournalTransaction> = files
         .iter()
         .flat_map(|file| parse_transactions(&file.content, &file.path))
@@ -939,7 +1566,7 @@ where
         fs::write(source_path, original).map_err(|rollback_error| {
             to_error_string_with_details(
                 "JOURNAL_WRITE_FAILED",
-                "Journal file may be corrupted — rollback failed.",
+                "Journal file may be corrupted - rollback failed.",
                 rollback_error.to_string(),
             )
         })?;
@@ -1583,7 +2210,13 @@ fn normalize_quantity(value: &str) -> String {
 
     let normalized = trimmed.replace(',', ".");
     match normalized.parse::<f64>() {
-        Ok(value) => format!("{:.2}", value),
+        Ok(val) => {
+            let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+                static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+                DEFAULT.get_or_init(AmountStyle::default)
+            });
+            style.format(val)
+        }
         Err(_) => trimmed.to_string(),
     }
 }
@@ -1648,20 +2281,31 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .first()
         .map(|posting| format_posting_amount(&posting.amount, &posting.commodity))
         .unwrap_or_default();
+    let inferred_values = infer_posting_values(postings);
+    let flow = summarize_transaction_flow(postings, &inferred_values);
 
     if let Some(posting) = postings
         .iter()
         .find(|posting| posting.account.to_lowercase().starts_with("expenses"))
     {
-        let amount = if posting.amount.trim().is_empty() {
-            balancing_amount
-        } else {
-            format_posting_amount(&posting.amount, &posting.commodity)
-        };
+        let display_amount = summarize_kind_amount(postings, &inferred_values, "expense")
+            .unwrap_or_else(|| {
+                let amount = if posting.amount.trim().is_empty() {
+                    balancing_amount
+                } else {
+                    format_posting_amount(&posting.amount, &posting.commodity)
+                };
+                DisplayAmount {
+                    amount: format_display_amount(&amount, "expense"),
+                    formatted: format_amount_styled(&amount),
+                }
+            });
         return TransactionDisplay {
             account: posting.account.clone(),
-            amount: format_display_amount(&amount, "expense"),
+            amount: display_amount.amount,
+            formatted: display_amount.formatted,
             kind: "expense".to_string(),
+            flow,
         };
     }
 
@@ -1669,27 +2313,24 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .iter()
         .find(|posting| posting.account.to_lowercase().starts_with("income"))
     {
-        let amount = if posting.amount.trim().is_empty() {
-            balancing_amount
-        } else {
-            format_posting_amount(&posting.amount, &posting.commodity)
-        };
+        let display_amount = summarize_kind_amount(postings, &inferred_values, "income")
+            .unwrap_or_else(|| {
+                let amount = if posting.amount.trim().is_empty() {
+                    balancing_amount.clone()
+                } else {
+                    format_posting_amount(&posting.amount, &posting.commodity)
+                };
+                DisplayAmount {
+                    amount: format_display_amount(&amount, "income"),
+                    formatted: format_amount_styled(&amount),
+                }
+            });
         return TransactionDisplay {
             account: posting.account.clone(),
-            amount: format_display_amount(&amount, "income"),
+            amount: display_amount.amount,
+            formatted: display_amount.formatted,
             kind: "income".to_string(),
-        };
-    }
-
-    if let Some(posting) = postings_with_amounts.iter().find(|posting| {
-        posting.account.to_lowercase().starts_with("assets")
-            && parse_amount_value(&posting.amount) > 0.0
-    }) {
-        let amount = format_posting_amount(&posting.amount, &posting.commodity);
-        return TransactionDisplay {
-            account: posting.account.clone(),
-            amount: format_display_amount(&amount, "income"),
-            kind: "income".to_string(),
+            flow,
         };
     }
 
@@ -1699,25 +2340,161 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .or_else(|| postings.first())
     {
         let amount = format_posting_amount(&posting.amount, &posting.commodity);
+        let formatted = if amount.is_empty() {
+            "-".to_string()
+        } else {
+            format_amount_styled(&amount)
+        };
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: if amount.is_empty() {
-                "—".to_string()
+                "-".to_string()
             } else {
                 amount
             },
+            formatted,
             kind: if posting.amount.trim().is_empty() {
                 "unknown".to_string()
             } else {
                 "transfer".to_string()
             },
+            flow,
         };
     }
 
     TransactionDisplay {
-        account: "—".to_string(),
-        amount: "—".to_string(),
+        account: "-".to_string(),
+        amount: "-".to_string(),
+        formatted: "-".to_string(),
         kind: "unknown".to_string(),
+        flow,
+    }
+}
+
+#[derive(Debug)]
+struct DisplayAmount {
+    amount: String,
+    formatted: String,
+}
+
+fn infer_posting_values(postings: &[JournalPosting]) -> Vec<Option<f64>> {
+    let mut values = postings
+        .iter()
+        .map(|posting| {
+            if posting.amount.trim().is_empty() {
+                None
+            } else {
+                Some(parse_amount_value(&posting.amount))
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let missing_indexes = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| if value.is_none() { Some(index) } else { None })
+        .collect::<Vec<_>>();
+
+    if missing_indexes.len() == 1 {
+        let explicit_total = values.iter().flatten().sum::<f64>();
+        values[missing_indexes[0]] = Some(-explicit_total);
+    }
+
+    values
+}
+
+fn summarize_kind_amount(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+    kind: &str,
+) -> Option<DisplayAmount> {
+    let selected_indexes = postings
+        .iter()
+        .enumerate()
+        .filter_map(|(index, posting)| {
+            let account = posting.account.to_lowercase();
+            let is_selected = match kind {
+                "expense" => account.starts_with("expenses"),
+                "income" => account.starts_with("income"),
+                _ => false,
+            };
+            if is_selected {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let total = selected_indexes
+        .iter()
+        .filter_map(|index| values.get(*index).and_then(|value| *value))
+        .map(f64::abs)
+        .sum::<f64>();
+
+    if total == 0.0 {
+        return None;
+    }
+
+    let fallback_commodity = postings
+        .iter()
+        .find(|posting| !posting.commodity.trim().is_empty())
+        .map(|posting| posting.commodity.trim())
+        .unwrap_or_default();
+    let commodity = selected_indexes
+        .iter()
+        .filter_map(|index| postings.get(*index))
+        .find(|posting| !posting.commodity.trim().is_empty())
+        .map(|posting| posting.commodity.trim())
+        .unwrap_or(fallback_commodity);
+    let amount = format_posting_amount(&format_amount_quantity(total), commodity);
+
+    Some(DisplayAmount {
+        amount: format_display_amount(&amount, kind),
+        formatted: format_amount_value_styled(total),
+    })
+}
+
+fn summarize_transaction_flow(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+) -> TransactionFlow {
+    let mut from = Vec::new();
+    let mut to = Vec::new();
+
+    for (posting, value) in postings.iter().zip(values.iter()) {
+        let account = posting.account.trim();
+        if account.is_empty() {
+            continue;
+        }
+
+        match value {
+            Some(value) if *value < 0.0 => push_unique(&mut from, account),
+            Some(value) if *value > 0.0 => push_unique(&mut to, account),
+            _ => {}
+        }
+    }
+
+    if from.is_empty() && to.is_empty() {
+        let accounts = postings
+            .iter()
+            .map(|posting| posting.account.trim())
+            .filter(|account| !account.is_empty())
+            .collect::<Vec<_>>();
+        if accounts.len() > 1 {
+            push_unique(&mut from, accounts[accounts.len() - 1]);
+            push_unique(&mut to, accounts[0]);
+        } else if let Some(account) = accounts.first() {
+            push_unique(&mut to, account);
+        }
+    }
+
+    TransactionFlow { from, to }
+}
+
+fn push_unique(accounts: &mut Vec<String>, account: &str) {
+    if !accounts.iter().any(|existing| existing == account) {
+        accounts.push(account.to_string());
     }
 }
 
@@ -1730,12 +2507,32 @@ fn parse_amount_value(amount: &str) -> f64 {
         .unwrap_or_default()
 }
 
+fn format_amount_quantity(value: f64) -> String {
+    let rounded = format!("{:.2}", value);
+    rounded
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
+}
+
+fn format_amount_value_styled(value: f64) -> String {
+    let style_ref = AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT_STYLE.get_or_init(AmountStyle::default)
+    });
+    style_ref.format(value)
+}
+
+/// Formats a numeric string using the journal's display style.
+fn format_amount_styled(raw: &str) -> String {
+    // Use parse_posting_amount to extract just the quantity
+    let (quantity, _commodity) = parse_posting_amount(raw);
+    let value = parse_amount_value(&quantity);
+    format_amount_value_styled(value)
+}
+
 /// Formats the display amount sign according to the inferred transaction kind.
 fn format_display_amount(amount: &str, kind: &str) -> String {
-    if amount.trim().is_empty() {
-        return "—".to_string();
-    }
-
     let normalized = amount.replace('-', "");
     match kind {
         "income" => format!("+{}", normalized),
@@ -1881,23 +2678,35 @@ fn most_frequent(values: std::collections::HashMap<String, usize>) -> String {
         .unwrap_or_default()
 }
 
-fn collect_commodities(transactions: &[JournalTransaction]) -> Vec<String> {
-    let mut commodities = transactions
+fn collect_declared_commodities(files: &[JournalFile]) -> Vec<String> {
+    let mut commodities = files
         .iter()
-        .flat_map(|transaction| transaction.postings.iter())
-        .filter_map(|posting| {
-            if posting.commodity.trim().is_empty() {
-                None
-            } else {
-                Some(posting.commodity.as_str())
-            }
-        })
-        .map(ToString::to_string)
+        .flat_map(|file| file.content.lines())
+        .filter_map(parse_commodity_directive)
         .collect::<Vec<_>>();
 
     commodities.sort();
     commodities.dedup();
     commodities
+}
+
+fn parse_commodity_directive(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.starts_with('#') {
+        return None;
+    }
+
+    let (directive, rest) = split_first_token(trimmed);
+    if directive != "commodity" {
+        return None;
+    }
+
+    let commodity = split_inline_comment(rest.trim()).0.trim().trim_matches('"');
+    if commodity.is_empty() {
+        None
+    } else {
+        Some(commodity.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -1915,13 +2724,27 @@ mod tests {
         dir
     }
 
-    fn settings_for(journal_path: &Path) -> AppSettings {
+    fn settings_for(path: &Path) -> AppSettings {
         AppSettings {
-            journal_path: journal_path.to_string_lossy().to_string(),
+            journal_path: path.to_string_lossy().to_string(),
             hledger_path: "true".to_string(),
             theme: default_theme(),
             power_user: false,
             default_commodity: String::new(),
+            fetch_prices: false,
+            commodity_symbols: String::new(),
+            exclude_balances: String::new(),
+            include_investments: String::new(),
+        }
+    }
+
+    fn posting(account: &str, amount: &str, commodity: &str) -> JournalPosting {
+        JournalPosting {
+            account: account.to_string(),
+            amount: amount.to_string(),
+            commodity: commodity.to_string(),
+            comment: String::new(),
+            raw: String::new(),
         }
     }
 
@@ -1929,7 +2752,72 @@ mod tests {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).expect("parent dir should be created");
         }
-        fs::write(path, content).expect("sample file should be written");
+        fs::write(path, content).expect("file should be written");
+    }
+
+    #[test]
+    fn collects_only_declared_commodities() {
+        let files = vec![JournalFile {
+            path: PathBuf::from("main.journal"),
+            content: "commodity €\n  format €1.000,00\ncommodity XEON\n\n2026-05-16 Opening balances\n    assets:investments:xeon  209 XEON @ €148,70087\n    equity:opening-balances\n"
+                .to_string(),
+        }];
+
+        assert_eq!(collect_declared_commodities(&files), vec!["XEON", "€"]);
+    }
+
+    #[test]
+    fn summarizes_income_flow_from_income_to_asset_with_implicit_posting() {
+        let display = summarize_transaction(&[
+            posting("assets:bank:postepay", "5.20", "€"),
+            posting("income:other", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "income");
+        assert_eq!(display.flow.from, vec!["income:other"]);
+        assert_eq!(display.flow.to, vec!["assets:bank:postepay"]);
+    }
+
+    #[test]
+    fn summarizes_expense_flow_from_asset_to_expense_with_implicit_posting() {
+        let display = summarize_transaction(&[
+            posting("expenses:food", "20", "€"),
+            posting("assets:bank", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "expense");
+        assert_eq!(display.flow.from, vec!["assets:bank"]);
+        assert_eq!(display.flow.to, vec!["expenses:food"]);
+    }
+
+    #[test]
+    fn summarizes_transfer_flow_from_negative_to_positive_posting() {
+        let display = summarize_transaction(&[
+            posting("assets:wallet", "-50", "€"),
+            posting("assets:bank", "50", "€"),
+        ]);
+
+        assert_eq!(display.kind, "transfer");
+        assert_eq!(display.flow.from, vec!["assets:wallet"]);
+        assert_eq!(display.flow.to, vec!["assets:bank"]);
+    }
+
+    #[test]
+    fn summarizes_split_expense_flow_and_total_amount() {
+        let display = summarize_transaction(&[
+            posting("expenses:shopping", "26.58", "€"),
+            posting("expenses:shopping:gifts", "19.99", "€"),
+            posting("assets:bank:fineco", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "expense");
+        assert_eq!(display.amount, "-€46.57");
+        assert_eq!(display.formatted, "46.57");
+        assert_eq!(display.flow.from, vec!["assets:bank:fineco"]);
+        assert_eq!(
+            display.flow.to,
+            vec!["expenses:shopping", "expenses:shopping:gifts"]
+        );
     }
 
     fn input(date: &str, description: &str) -> TransactionInput {
@@ -2229,7 +3117,12 @@ mod tests {
                 display: TransactionDisplay {
                     account: "expenses:food".to_string(),
                     amount: "-€25".to_string(),
+                    formatted: "-25,00".to_string(),
                     kind: "expense".to_string(),
+                    flow: TransactionFlow {
+                        from: vec!["assets:bank:fineco".to_string()],
+                        to: vec!["expenses:food".to_string()],
+                    },
                 },
                 raw: String::new(),
                 start_line: 1,
@@ -2261,7 +3154,15 @@ mod tests {
                 display: TransactionDisplay {
                     account: "assets:investments:xeon".to_string(),
                     amount: "10 XEON".to_string(),
+                    formatted: "10 XEON".to_string(),
                     kind: "transfer".to_string(),
+                    flow: TransactionFlow {
+                        from: Vec::new(),
+                        to: vec![
+                            "assets:investments:xeon".to_string(),
+                            "assets:bank:fineco".to_string(),
+                        ],
+                    },
                 },
                 raw: String::new(),
                 start_line: 5,
@@ -2288,9 +3189,51 @@ mod tests {
             theme: default_theme(),
             power_user: false,
             default_commodity: String::new(),
+            fetch_prices: false,
+            commodity_symbols: String::new(),
+            exclude_balances: String::new(),
+            include_investments: String::new(),
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");
+    }
+
+    #[test]
+    fn formats_amount_with_italian_locale() {
+        let bal = serde_json::json!({
+            "astyle": {
+                "asdecimalmark": ",",
+                "asdigitgroups": [".", [3]],
+                "asprecision": 2
+            }
+        });
+        assert_eq!(format_hledger_amount(33452.31, &bal), "33.452,31");
+        assert_eq!(format_hledger_amount(-1858.0, &bal), "-1.858,00");
+        assert_eq!(format_hledger_amount(2303.51, &bal), "2.303,51");
+    }
+
+    #[test]
+    fn formats_amount_with_english_locale() {
+        let bal = serde_json::json!({
+            "astyle": {
+                "asdecimalmark": ".",
+                "asdigitgroups": [",", [3]],
+                "asprecision": 2
+            }
+        });
+        assert_eq!(format_hledger_amount(1234567.89, &bal), "1,234,567.89");
+    }
+
+    #[test]
+    fn formats_amount_without_digit_groups() {
+        let bal = serde_json::json!({
+            "astyle": {
+                "asdecimalmark": ".",
+                "asdigitgroups": null,
+                "asprecision": 0
+            }
+        });
+        assert_eq!(format_hledger_amount(209.0, &bal), "209");
     }
 
     #[test]

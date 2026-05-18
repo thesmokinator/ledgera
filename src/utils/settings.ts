@@ -6,6 +6,10 @@ export const defaultSettings: AppSettings = {
   theme: "system",
   powerUser: false,
   defaultCommodity: "",
+  fetchPrices: false,
+  commoditySymbols: "",
+  excludeBalances: "",
+  includeInvestments: "",
 };
 
 export function normalizeSettings(settings?: Partial<AppSettings>): AppSettings {
@@ -14,5 +18,6 @@ export function normalizeSettings(settings?: Partial<AppSettings>): AppSettings 
     ...settings,
     theme: settings?.theme ?? "system",
     powerUser: settings?.powerUser ?? false,
+    fetchPrices: settings?.fetchPrices ?? false,
   };
 }

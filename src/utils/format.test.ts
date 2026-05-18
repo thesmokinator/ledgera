@@ -3,6 +3,7 @@ import {
   formatCount,
   toAutocompleteOptions,
   formatJournalName,
+  formatFileSize,
 } from "./format";
 
 describe("formatCount", () => {
@@ -74,5 +75,19 @@ describe("formatJournalName", () => {
 
   it("returns whitespace-only input as empty", () => {
     expect(formatJournalName("   ")).toBe("");
+  });
+});
+
+describe("formatFileSize", () => {
+  it("shows bytes", () => {
+    expect(formatFileSize(0)).toBe("0 B");
+    expect(formatFileSize(512)).toBe("512 B");
+  });
+  it("shows KB", () => {
+    expect(formatFileSize(1024)).toBe("1.0 KB");
+    expect(formatFileSize(1536)).toBe("1.5 KB");
+  });
+  it("shows MB", () => {
+    expect(formatFileSize(1048576)).toBe("1.0 MB");
   });
 });

@@ -10,6 +10,10 @@ describe("defaultSettings", () => {
       theme: "system",
       powerUser: false,
       defaultCommodity: "",
+      fetchPrices: false,
+      commoditySymbols: "",
+      excludeBalances: "",
+      includeInvestments: "",
     });
   });
 });
@@ -64,6 +68,10 @@ describe("normalizeSettings", () => {
       theme: "dark",
       powerUser: true,
       defaultCommodity: "USD",
+      fetchPrices: true,
+      commoditySymbols: "TEST=TEST.DE",
+      excludeBalances: "",
+      includeInvestments: "",
     };
     expect(normalizeSettings(full)).toEqual(full);
   });

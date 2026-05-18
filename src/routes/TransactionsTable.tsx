@@ -1,7 +1,38 @@
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Modal, Space, Table } from "antd";
+import { DeleteOutlined, EditOutlined, ArrowRightOutlined, SwapOutlined } from "@ant-design/icons";
+import { Button, Modal, Popover, Space, Table, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction } from "./types";
+import styles from "./TransactionsTable.module.css";
+
+function flowIcon(kind: string) {
+  if (kind === "transfer") return <SwapOutlined className={`${styles.flowIcon} ${styles.flowIconTransfer}`} />;
+  return <ArrowRightOutlined className={`${styles.flowIcon} ${styles[`flowIcon${kind.charAt(0).toUpperCase() + kind.slice(1)}`]}`} />;
+}
+
+function AccountList({ accounts }: { accounts: string[] }) {
+  return (
+    <span className={styles.accountFlowSide}>
+      {accounts.map((account) => (
+        <span key={account}>{account}</span>
+      ))}
+    </span>
+  );
+}
+
+export function accountFlow(transaction: JournalTransaction) {
+  const { from, to } = transaction.display.flow;
+  if (from.length === 0 && to.length === 0) return transaction.display.account || "-";
+  if (from.length === 0) return <AccountList accounts={to} />;
+  if (to.length === 0) return <AccountList accounts={from} />;
+
+  return (
+    <span className={styles.accountFlow}>
+      <AccountList accounts={from} />
+      {flowIcon(transaction.display.kind)}
+      <AccountList accounts={to} />
+    </span>
+  );
+}
 
 export function TransactionsTable({
   transactions,
@@ -38,32 +69,45 @@ export function TransactionsTable({
         rowKey="id"
         loading={loading}
         dataSource={transactions}
-        pagination={{ pageSize: 8 }}
+        pagination={{ pageSize: 12 }}
+        scroll={{ x: 900 }}
         expandable={
           powerUser
             ? {
               expandedRowRender: (transaction) => (
-                <pre className="transaction-raw">{transaction.raw}</pre>
+                <pre className={styles.raw}>{transaction.raw}</pre>
               ),
             }
             : undefined
         }
         columns={[
-          { title: t("transactions.date"), dataIndex: "date", width: 132 },
-          { title: t("transactions.status"), dataIndex: "status", width: 88, render: (status: string) => status || "-" },
-          { title: t("transactions.description"), dataIndex: "description" },
+          { title: t("transactions.date"), dataIndex: "date", width: 120 },
+          { title: t("transactions.status"), dataIndex: "status", width: 76, render: (status: string) => status || "-" },
+          {
+            title: t("transactions.description"),
+            dataIndex: "description",
+            width: 200,
+            ellipsis: true,
+            render: (desc: string) => (
+              <Popover content={desc} trigger="hover" placement="topLeft">
+                <Typography.Text ellipsis style={{ maxWidth: 180 }}>
+                  {desc}
+                </Typography.Text>
+              </Popover>
+            ),
+          },
           {
             title: t("transactions.account"),
-            width: 260,
-            render: (_, transaction) => transaction.display.account,
+            width: 320,
+            render: (_, transaction) => accountFlow(transaction),
           },
           {
             title: t("transactions.amount"),
             width: 160,
             align: "right",
             render: (_, transaction) => (
-              <span className={`transaction-amount transaction-amount-${transaction.display.kind}`}>
-                {transaction.display.amount}
+              <span className={`${styles.amount} ${styles[`amount${transaction.display.kind.charAt(0).toUpperCase() + transaction.display.kind.slice(1)}`]}`}>
+                {transaction.display.formatted || transaction.display.amount}
               </span>
             ),
           },

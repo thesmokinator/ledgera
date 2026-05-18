@@ -1,40 +1,54 @@
 import { Card, Select, Space, Table, Typography } from "antd";
+import { invoke } from "@tauri-apps/api/core";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
-import type { AccountActivityRange, AccountSummary, JournalTransaction } from "./types";
+import type { AccountActivityRange, AccountSummary, JournalSummary, JournalTransaction } from "./types";
 import { formatCount } from "../utils/format";
+import { groupAccounts, collectAccounts } from "../utils/account";
+import { isInAccountActivityRange } from "../utils/date";
+import styles from "./AccountsRoute.module.css";
+
+const accountActivityRangeOptions: AccountActivityRange[] = [
+  "current-month", "30", "60", "90", "180", "365",
+];
 
 export function AccountsRoute({
-  accounts,
-  accountActivityRange,
-  accountActivityRangeOptions,
-  loading,
   powerUser,
-  onActivityRangeChange,
   onEditTransaction,
   onDeleteTransaction,
 }: {
-  accounts: AccountSummary[];
-  accountActivityRange: AccountActivityRange;
-  accountActivityRangeOptions: AccountActivityRange[];
-  loading: boolean;
   powerUser: boolean;
-  onActivityRangeChange: (range: AccountActivityRange) => void;
   onEditTransaction: (transaction: JournalTransaction) => void;
   onDeleteTransaction: (id: string) => void;
 }) {
   const { t } = useTranslation();
+  const [activityRange, setActivityRange] = useState<AccountActivityRange>("current-month");
+
+  const transactionsQuery = useQuery({
+    queryKey: ["transactions"],
+    queryFn: () => invoke<JournalSummary>("list_transactions"),
+    retry: false,
+    refetchOnMount: true,
+  });
+
+  const transactions = transactionsQuery.data?.transactions ?? [];
+  const visible = transactions.filter((tx) => isInAccountActivityRange(tx, activityRange));
+  const accounts = collectAccounts(transactions, visible);
+  const grouped = groupAccounts(accounts);
 
   return (
     <Space direction="vertical" size={24} className="content-stack">
       <Card
-        className="settings-card accounts-card"
-        title={t("accounts.allAccounts")}
+        className={styles.card}
+        title={t("accounts.title")}
         extra={(
-          <Space className="accounts-range-control">
+          <Space className={styles.rangeControl}>
+            <Typography.Text>{t("accounts.activityRange")}</Typography.Text>
             <Select<AccountActivityRange>
-              value={accountActivityRange}
-              onChange={onActivityRangeChange}
+              value={activityRange}
+              onChange={setActivityRange}
               options={accountActivityRangeOptions.map((range) => ({
                 value: range,
                 label: range === "current-month"
@@ -45,42 +59,54 @@ export function AccountsRoute({
           </Space>
         )}
       >
-        <Table<AccountSummary>
-          rowKey="account"
-          loading={loading}
-          dataSource={accounts}
-          pagination={{ pageSize: 12 }}
-          expandable={{
-            expandedRowRender: (account) => (
-              <div className="account-transactions-panel">
-                <Typography.Text className="account-transactions-title">
-                  {t("accounts.accountActivity", {
-                    account: account.account,
-                    count: account.transactions,
-                  })}
-                </Typography.Text>
-                <TransactionsTable
-                  transactions={account.accountTransactions}
-                  loading={loading}
-                  powerUser={powerUser}
-                  onEdit={onEditTransaction}
-                  onDelete={onDeleteTransaction}
-                />
-              </div>
-            ),
-            rowExpandable: (account) => account.transactions > 0,
-          }}
-          columns={[
-            { title: t("transactions.account"), dataIndex: "account" },
-            {
-              title: t("accounts.transactionsCount"),
-              dataIndex: "transactions",
-              width: 180,
-              align: "right",
-              render: (count: number) => formatCount(count),
-            },
-          ]}
-        />
+        {grouped.map(({ group, items }) => (
+          <div key={group} className={styles.group}>
+            <Typography.Title level={5} className={styles.groupTitle}>
+              {t(`accounts.groups.${group}`)}
+              <Typography.Text type="secondary" className={styles.groupCount}>
+                {formatCount(items.length)}
+              </Typography.Text>
+            </Typography.Title>
+            <Table<AccountSummary>
+              rowKey="account"
+              loading={transactionsQuery.isFetching}
+              dataSource={items}
+              pagination={false}
+              showHeader={false}
+              scroll={{ x: 400 }}
+              expandable={{
+                expandedRowRender: (account) => (
+                  <div className={styles.transactionsPanel}>
+                    <Typography.Text className={styles.transactionsTitle}>
+                      {t("accounts.accountActivity", {
+                        account: account.account,
+                        count: account.transactions,
+                      })}
+                    </Typography.Text>
+                    <TransactionsTable
+                      transactions={account.accountTransactions}
+                      loading={transactionsQuery.isFetching}
+                      powerUser={powerUser}
+                      onEdit={onEditTransaction}
+                      onDelete={onDeleteTransaction}
+                    />
+                  </div>
+                ),
+                rowExpandable: (account) => account.transactions > 0,
+              }}
+              columns={[
+                { title: t("transactions.account"), dataIndex: "account" },
+                {
+                  title: t("accounts.transactionsCount"),
+                  dataIndex: "transactions",
+                  width: 120,
+                  align: "right",
+                  render: (count: number) => formatCount(count),
+                },
+              ]}
+            />
+          </div>
+        ))}
       </Card>
     </Space>
   );

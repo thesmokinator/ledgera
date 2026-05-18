@@ -8,6 +8,10 @@ export type AppSettings = {
   theme: ThemePreference;
   powerUser: boolean;
   defaultCommodity: string;
+  fetchPrices: boolean;
+  commoditySymbols: string;
+  excludeBalances: string;
+  includeInvestments: string;
 };
 
 export type HledgerStatus = {
@@ -26,10 +30,17 @@ export type JournalPosting = {
   raw: string;
 };
 
+export type TransactionFlow = {
+  from: string[];
+  to: string[];
+};
+
 export type TransactionDisplay = {
   account: string;
   amount: string;
+  formatted: string;
   kind: string;
+  flow: TransactionFlow;
 };
 
 export type JournalTransaction = {
@@ -105,6 +116,25 @@ export type LogEntry = {
   code: string;
   message: string;
   details?: string;
+};
+
+export type Holding = {
+  commodity: string;
+  quantity: number;
+  account: string;
+};
+
+export type PriceInfo = {
+  price: number;
+  currency: string;
+  formatted: string;
+};
+
+export type Balance = {
+  account: string;
+  amount: number;
+  commodity: string;
+  formatted: string;
 };
 
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";
