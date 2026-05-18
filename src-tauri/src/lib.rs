@@ -2287,7 +2287,9 @@ fn parse_amount_value(amount: &str) -> f64 {
 
 /// Formats a numeric string using the journal's display style.
 fn format_amount_styled(raw: &str) -> String {
-    let value = parse_amount_value(raw);
+    // Use parse_posting_amount to extract just the quantity
+    let (quantity, _commodity) = parse_posting_amount(raw);
+    let value = parse_amount_value(&quantity);
     let style_ref = AMOUNT_STYLE.get().unwrap_or_else(|| {
         static DEFAULT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
         DEFAULT_STYLE.get_or_init(AmountStyle::default)
