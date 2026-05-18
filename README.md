@@ -1,17 +1,17 @@
 # Ledgera
 
-A desktop app for managing [hledger](https://hledger.org) journals — built with Tauri, React, and Rust.
+A desktop app for managing [hledger](https://hledger.org) journals - built with Tauri, React, and Rust.
 
 ![Screenshot](screenshots/001.png)
 
 ## Features
 
-- **Browse & filter** — monthly transactions, scheduled entries, accounts overview with time-range filters
-- **Edit, create & delete** — full CRUD on journal entries with date, status, code, description, and postings
-- **Investment mode** — enter quantity, commodity, and unit price; the balancing cash posting is calculated automatically using hledger's `@` syntax
-- **Split journal support** — flat, nested, and glob-based include structures are auto-detected
-- **Logs** — structured event log (errors, warnings, mutations), visible for power users, with one-click copy
-- **Structured errors** — backend-driven error codes with localised messages and technical details
+- **Browse & filter** - monthly transactions, scheduled entries, accounts overview with time-range filters
+- **Edit, create & delete** - full CRUD on journal entries with date, status, code, description, and postings
+- **Investment mode** - enter quantity, commodity, and unit price; the balancing cash posting is calculated automatically using hledger's `@` syntax
+- **Split journal support** - flat, nested, and glob-based include structures are auto-detected
+- **Logs** - structured event log (errors, warnings, mutations), visible for power users, with one-click copy
+- **Structured errors** - backend-driven error codes with localised messages and technical details
 
 ## Requirements
 
@@ -44,17 +44,17 @@ Open the **Settings** tab to configure:
 
 The `examples/` directory contains ready-to-use journals:
 
-- `examples/sample.journal` — single-file journal
-- `examples/split-flat/` — month-based split (`include YYYY-MM.journal`)
-- `examples/split-glob/` — year/month glob split (`include YYYY/*.journal`)
-- `examples/custom-hledger-path/` — custom CLI setup
+- `examples/sample.journal` - single-file journal
+- `examples/split-flat/` - month-based split (`include YYYY-MM.journal`)
+- `examples/split-glob/` - year/month glob split (`include YYYY/*.journal`)
+- `examples/custom-hledger-path/` - custom CLI setup
 
 ## Project structure
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/` | React frontend — routes, components, i18n |
-| `src-tauri/` | Rust backend — journal parsing, mutation, logging |
+| `src/` | React frontend - routes, components, i18n |
+| `src-tauri/` | Rust backend - journal parsing, mutation, logging |
 | `examples/` | Sample hledger journal layouts |
 | `screenshots/` | Screenshots |
 

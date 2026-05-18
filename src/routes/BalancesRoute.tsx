@@ -126,16 +126,16 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
                     title: t("balances.price"), width: 140, align: "right" as const,
                     render: (_: unknown, record: Balance) => {
                       const info = prices[record.commodity];
-                      return info ? `${info.currency} ${info.formatted}` : "—";
+                      return info ? `${info.currency} ${info.formatted}` : "-";
                     },
                   },
                   {
                     title: t("balances.value"), width: 160, align: "right" as const,
                     render: (_: unknown, record: Balance) => {
                       const info = prices[record.commodity];
-                      if (!info) return "—";
+                      if (!info) return "-";
                       const mv = marketValues[record.commodity];
-                      return mv ? `${info.currency} ${mv}` : "—";
+                      return mv ? `${info.currency} ${mv}` : "-";
                     },
                   },
                 ]

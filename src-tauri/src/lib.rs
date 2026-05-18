@@ -2339,20 +2339,27 @@ fn summarize_transaction(postings: &[JournalPosting]) -> TransactionDisplay {
         .copied()
         .or_else(|| postings.first())
     {
-        let amount = format_posting_amount(&posting.amount, &posting.commodity);
-        let formatted = if amount.is_empty() {
-            "-".to_string()
-        } else {
-            format_amount_styled(&amount)
-        };
+        let display_amount =
+            summarize_balanced_amount(postings, &inferred_values).unwrap_or_else(|| {
+                let amount = format_posting_amount(&posting.amount, &posting.commodity);
+                let formatted = if amount.is_empty() {
+                    "-".to_string()
+                } else {
+                    format_amount_styled(&amount)
+                };
+                DisplayAmount {
+                    amount: if amount.is_empty() {
+                        "-".to_string()
+                    } else {
+                        amount
+                    },
+                    formatted,
+                }
+            });
         return TransactionDisplay {
             account: posting.account.clone(),
-            amount: if amount.is_empty() {
-                "-".to_string()
-            } else {
-                amount
-            },
-            formatted,
+            amount: display_amount.amount,
+            formatted: display_amount.formatted,
             kind: if posting.amount.trim().is_empty() {
                 "unknown".to_string()
             } else {
@@ -2426,33 +2433,127 @@ fn summarize_kind_amount(
         })
         .collect::<Vec<_>>();
 
-    let total = selected_indexes
-        .iter()
-        .filter_map(|index| values.get(*index).and_then(|value| *value))
-        .map(f64::abs)
-        .sum::<f64>();
+    summarize_amount_indexes(postings, values, &selected_indexes, Some(kind), false)
+}
 
-    if total == 0.0 {
+fn summarize_balanced_amount(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+) -> Option<DisplayAmount> {
+    let positive_indexes = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| match value {
+            Some(value) if *value > 0.0 => Some(index),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let negative_indexes = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| match value {
+            Some(value) if *value < 0.0 => Some(index),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let selected_indexes = if positive_indexes.is_empty() {
+        negative_indexes
+    } else {
+        positive_indexes
+    };
+
+    summarize_amount_indexes(postings, values, &selected_indexes, None, true)
+}
+
+fn summarize_amount_indexes(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+    indexes: &[usize],
+    kind: Option<&str>,
+    formatted_with_commodity: bool,
+) -> Option<DisplayAmount> {
+    let mut parts = Vec::<(String, f64)>::new();
+
+    for index in indexes {
+        let Some(value) = values.get(*index).and_then(|value| *value) else {
+            continue;
+        };
+        if value == 0.0 {
+            continue;
+        }
+        let commodity = postings
+            .get(*index)
+            .map(|posting| clean_commodity(&posting.commodity).to_string())
+            .unwrap_or_default();
+        if let Some((_, total)) = parts
+            .iter_mut()
+            .find(|(existing_commodity, _)| existing_commodity == &commodity)
+        {
+            *total += value.abs();
+        } else {
+            parts.push((commodity, value.abs()));
+        }
+    }
+
+    parts.retain(|(_, total)| *total != 0.0);
+    if parts.is_empty() {
         return None;
     }
 
-    let fallback_commodity = postings
+    let amount = parts
         .iter()
-        .find(|posting| !posting.commodity.trim().is_empty())
-        .map(|posting| posting.commodity.trim())
-        .unwrap_or_default();
-    let commodity = selected_indexes
-        .iter()
-        .filter_map(|index| postings.get(*index))
-        .find(|posting| !posting.commodity.trim().is_empty())
-        .map(|posting| posting.commodity.trim())
-        .unwrap_or(fallback_commodity);
-    let amount = format_posting_amount(&format_amount_quantity(total), commodity);
+        .map(|(commodity, total)| format_amount_part(*total, commodity, false))
+        .collect::<Vec<_>>()
+        .join(" + ");
+    let formatted = if !formatted_with_commodity && parts.len() == 1 {
+        format_amount_value_styled(parts[0].1)
+    } else {
+        parts
+            .iter()
+            .map(|(commodity, total)| format_amount_part(*total, commodity, true))
+            .collect::<Vec<_>>()
+            .join(" + ")
+    };
 
     Some(DisplayAmount {
-        amount: format_display_amount(&amount, kind),
-        formatted: format_amount_value_styled(total),
+        amount: kind
+            .map(|kind| format_display_amount(&amount, kind))
+            .unwrap_or(amount),
+        formatted,
     })
+}
+
+fn clean_commodity(commodity: &str) -> &str {
+    commodity
+        .split("@@")
+        .next()
+        .unwrap_or(commodity)
+        .split('@')
+        .next()
+        .unwrap_or(commodity)
+        .trim()
+}
+
+fn format_amount_part(value: f64, commodity: &str, styled: bool) -> String {
+    let commodity = clean_commodity(commodity);
+    if commodity.is_empty() {
+        return if styled {
+            format_amount_value_styled(value)
+        } else {
+            format_amount_quantity(value)
+        };
+    }
+
+    if commodity.chars().all(|character| character.is_alphabetic()) {
+        format!("{} {}", format_commodity_quantity(value), commodity)
+    } else {
+        let quantity = if styled {
+            format_amount_value_styled(value)
+        } else {
+            format_amount_quantity(value)
+        };
+        format!("{}{}", commodity, quantity)
+    }
 }
 
 fn summarize_transaction_flow(
@@ -2500,15 +2601,56 @@ fn push_unique(accounts: &mut Vec<String>, account: &str) {
 
 /// Parses a numeric value from an amount quantity.
 fn parse_amount_value(amount: &str) -> f64 {
-    amount
-        .trim()
-        .replace(',', ".")
-        .parse::<f64>()
-        .unwrap_or_default()
+    let compact = amount.trim().replace(char::is_whitespace, "");
+    if compact.is_empty() {
+        return 0.0;
+    }
+
+    let last_comma = compact.rfind(',');
+    let last_dot = compact.rfind('.');
+    let decimal_index = match (last_comma, last_dot) {
+        (Some(comma), Some(dot)) => Some(comma.max(dot)),
+        (Some(comma), None) => Some(comma),
+        (None, Some(dot)) => {
+            let style_decimal_mark = AMOUNT_STYLE
+                .get()
+                .map(|style| style.decimal_mark.as_str())
+                .unwrap_or(".");
+            let fraction_len = compact[dot + 1..]
+                .chars()
+                .filter(|character| character.is_ascii_digit())
+                .count();
+            if style_decimal_mark == "," && fraction_len == 3 {
+                None
+            } else {
+                Some(dot)
+            }
+        }
+        (None, None) => None,
+    };
+
+    let mut normalized = String::new();
+    for (index, character) in compact.char_indices() {
+        if character.is_ascii_digit() || (character == '-' && normalized.is_empty()) {
+            normalized.push(character);
+        } else if Some(index) == decimal_index {
+            normalized.push('.');
+        }
+    }
+
+    normalized.parse::<f64>().unwrap_or_default()
 }
 
 fn format_amount_quantity(value: f64) -> String {
     let rounded = format!("{:.2}", value);
+    rounded
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
+}
+
+fn format_commodity_quantity(value: f64) -> String {
+    let rounded = format!("{:.8}", value);
     rounded
         .trim_end_matches('0')
         .trim_end_matches('.')
@@ -2817,6 +2959,29 @@ mod tests {
         assert_eq!(
             display.flow.to,
             vec!["expenses:shopping", "expenses:shopping:gifts"]
+        );
+    }
+
+    #[test]
+    fn summarizes_opening_balance_amount_by_positive_commodities() {
+        let display = summarize_transaction(&[
+            posting("assets:bank:fineco", "5.706,51", "€"),
+            posting("assets:bank:postepay", "890,05", "€"),
+            posting("assets:investments:xeon", "209", "XEON @ €148,70087"),
+            posting("equity:opening-balances", "", ""),
+        ]);
+
+        assert_eq!(display.kind, "transfer");
+        assert_eq!(display.amount, "€6596.56 + 209 XEON");
+        assert_eq!(display.formatted, "€6,596.56 + 209 XEON");
+        assert_eq!(display.flow.from, vec!["equity:opening-balances"]);
+        assert_eq!(
+            display.flow.to,
+            vec![
+                "assets:bank:fineco",
+                "assets:bank:postepay",
+                "assets:investments:xeon"
+            ]
         );
     }
 
