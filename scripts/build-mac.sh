@@ -25,7 +25,7 @@ if [ "${SKIP_SIGNING}" != "true" ] && [ -f ".env.local" ]; then
   echo "[mac] Notary key      : ${APPLE_API_KEY:-<none>}"
 
   if [ -z "${APPLE_SIGNING_IDENTITY:-}" ] || [ -z "${APPLE_API_KEY:-}" ]; then
-    echo "[mac] ⚠️  Missing signing credentials — building unsigned."
+    echo "[mac] ⚠️  Missing signing credentials - building unsigned."
     unset APPLE_SIGNING_IDENTITY APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
   fi
 else

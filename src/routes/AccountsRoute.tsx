@@ -45,7 +45,6 @@ export function AccountsRoute({
         title={t("accounts.title")}
         extra={(
           <Space className={styles.rangeControl}>
-            <Typography.Text>{t("accounts.activityRange")}</Typography.Text>
             <Select<AccountActivityRange>
               value={activityRange}
               onChange={setActivityRange}
