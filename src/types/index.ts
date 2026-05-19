@@ -175,6 +175,18 @@ export type AccountSummary = {
   accountTransactions: JournalTransaction[];
 };
 
+export type InvestmentOverview = {
+  commodity: string;
+  account: string;
+  quantity: number;
+  quantityFormatted: string;
+  price: number | null;
+  priceFormatted: string | null;
+  currency: string | null;
+  marketValueFormatted: string | null;
+  tint: AmountTint;
+};
+
 export type MonthSetter = (updater: (month: Dayjs) => Dayjs) => void;
 
 export type NavigationItem = {

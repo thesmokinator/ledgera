@@ -312,6 +312,82 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
     parse_balance_output(&app, &stdout, &settings, false)
 }
 
+/// Aggregated investment row with price and market value pre-computed
+/// so the frontend never has to combine data client-side.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InvestmentOverview {
+    commodity: String,
+    account: String,
+    quantity: f64,
+    quantity_formatted: String,
+    price: Option<f64>,
+    price_formatted: Option<String>,
+    currency: Option<String>,
+    market_value_formatted: Option<String>,
+    tint: String,
+}
+
+#[tauri::command]
+async fn get_investments_overview(app: AppHandle) -> Result<Vec<InvestmentOverview>, String> {
+    let settings = read_settings(&app)?;
+    let holdings = get_investments(app.clone()).await?;
+    if holdings.is_empty() || !settings.fetch_prices {
+        return Ok(holdings
+            .into_iter()
+            .map(|h| InvestmentOverview {
+                commodity: h.commodity.clone(),
+                account: h.account,
+                quantity: h.amount,
+                quantity_formatted: h.formatted,
+                price: None,
+                price_formatted: None,
+                currency: None,
+                market_value_formatted: None,
+                tint: h.tint,
+            })
+            .collect());
+    }
+
+    let symbols: Vec<String> = holdings.iter().map(|h| h.commodity.clone()).collect();
+    let prices = fetch_prices(app.clone(), symbols).await.unwrap_or_default();
+
+    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT.get_or_init(AmountStyle::default)
+    });
+
+    Ok(holdings
+        .into_iter()
+        .map(|h| {
+            let price_info = prices.get(&h.commodity);
+            let (price, price_formatted, currency, market_value_formatted) =
+                if let Some(info) = price_info {
+                    let mv = h.amount * info.price;
+                    (
+                        Some(info.price),
+                        Some(info.formatted.clone()),
+                        Some(info.currency.clone()),
+                        Some(format!("{} {}", info.currency, style.format(mv))),
+                    )
+                } else {
+                    (None, None, None, None)
+                };
+            InvestmentOverview {
+                commodity: h.commodity.clone(),
+                account: h.account,
+                quantity: h.amount,
+                quantity_formatted: h.formatted,
+                price,
+                price_formatted,
+                currency,
+                market_value_formatted,
+                tint: h.tint,
+            }
+        })
+        .collect())
+}
+
 fn parse_balance_output(
     _app: &AppHandle,
     stdout: &str,
@@ -361,10 +437,28 @@ fn parse_balance_output(
                     .get("floatingPoint")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
-                let fmt = format_hledger_display_amount(qty, &comm, bal);
-                (qty, comm, fmt)
+                // If hledger didn't report a commodity, fall back to the
+                // user-configured default so the formatted string always
+                // includes a commodity when one is expected.
+                let effective_commodity = if comm.is_empty() {
+                    settings.default_commodity.trim().to_string()
+                } else {
+                    comm
+                };
+                let fmt = format_hledger_display_amount(qty, &effective_commodity, bal);
+                (qty, effective_commodity, fmt)
             } else {
-                (0.0, String::new(), String::new())
+                let default_comm = settings.default_commodity.trim().to_string();
+                let fmt = if default_comm.is_empty() {
+                    "0".to_string()
+                } else {
+                    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
+                        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+                        DEFAULT.get_or_init(AmountStyle::default)
+                    });
+                    style.format_amount(0.0, &default_comm)
+                };
+                (0.0, default_comm, fmt)
             };
         let tint = if amount < 0.0 {
             "negative".to_string()
@@ -1126,6 +1220,7 @@ pub fn run() {
             clear_logs,
             get_holdings,
             get_investments,
+            get_investments_overview,
             fetch_prices,
             get_balances,
             get_accounts_overview,

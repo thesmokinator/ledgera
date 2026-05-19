@@ -22,6 +22,7 @@ export type {
   AccountOverviewGroup,
   AccountsOverview,
   AccountSummary,
+  InvestmentOverview,
   MonthSetter,
   NavigationItem,
 } from "../types";
