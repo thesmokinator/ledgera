@@ -3,6 +3,7 @@ import { ReloadOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Amount } from "../components/Amount";
 import type { Balance, PriceInfo } from "./types";
 import styles from "./BalancesRoute.module.css";
 
@@ -56,11 +57,12 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
 
   const balances = balancesQuery.data ?? [];
 
-  function renderAmount(amount: number, formatted: string) {
+  function renderAmount(balance: Balance) {
     return (
-      <span style={{ color: amount < 0 ? "#ef4444" : amount > 0 ? "#22c55e" : undefined, fontWeight: 500 }}>
-        {formatted}
-      </span>
+      <Amount
+        formatted={balance.formatted || "-"}
+        tint={balance.tint}
+      />
     );
   }
 
@@ -97,7 +99,7 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
               {
                 align: "right",
                 width: 200,
-                render: (_: unknown, record: Balance) => renderAmount(record.amount, record.formatted),
+                render: (_: unknown, record: Balance) => renderAmount(record),
               },
             ]}
           />
@@ -117,8 +119,13 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
               { title: t("balances.commodity"), dataIndex: "commodity", width: 140, render: (c: string) => <strong>{c}</strong> },
               { title: t("balances.account"), dataIndex: "account", ellipsis: true },
               {
-                title: t("balances.quantity"), dataIndex: "amount", width: 140, align: "right",
-                render: (q: number) => Number.isInteger(q) ? q.toString() : q.toFixed(4).replace(/\.?0+$/, ""),
+                title: t("balances.quantity"), width: 140, align: "right",
+                render: (_: unknown, record: Balance) => (
+                  <Amount
+                    formatted={record.formatted || record.amount.toString()}
+                    tint={record.tint}
+                  />
+                ),
               },
               ...(fetchPrices
                 ? [

@@ -35,11 +35,23 @@ export type TransactionFlow = {
   to: string[];
 };
 
+export type AmountTint = "negative" | "positive" | "neutral";
+
+export type AmountStyle = {
+  decimalMark: string;
+  digitSeparator: string;
+  digitGroups: number[];
+  precision: number;
+  commodityPosition: string;
+  commoditySpaced: boolean;
+};
+
 export type TransactionDisplay = {
   account: string;
   amount: string;
   formatted: string;
   kind: string;
+  tint: AmountTint;
   flow: TransactionFlow;
 };
 
@@ -69,6 +81,7 @@ export type JournalSummary = {
   commodities: string[];
   fileCount: number;
   totalSizeBytes: number;
+  amountStyle: AmountStyle;
   dashboard: DashboardSummary;
 };
 
@@ -135,9 +148,26 @@ export type Balance = {
   amount: number;
   commodity: string;
   formatted: string;
+  tint: AmountTint;
 };
 
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";
+
+export type AccountOverviewRow = {
+  account: string;
+  balance: Balance | null;
+  activityCount: number;
+  transactions: JournalTransaction[];
+};
+
+export type AccountOverviewGroup = {
+  group: string;
+  accounts: AccountOverviewRow[];
+};
+
+export type AccountsOverview = {
+  groups: AccountOverviewGroup[];
+};
 
 export type AccountSummary = {
   account: string;

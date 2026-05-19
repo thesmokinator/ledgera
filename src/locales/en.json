@@ -26,16 +26,20 @@
     "scheduledTransactionsTab": "Scheduled transactions"
   },
   "accounts": {
-    "title": "All accounts",
-    "transactionsCount": "Transactions",
+    "title": "Chart of accounts and activity",
+    "transactionsCount": "Activity",
+    "currentBalance": "Balance",
     "currentMonth": "Current month",
     "lastDays": "Last {{count}} days",
     "accountActivity": "{{count}} transactions for {{account}}",
+    "searchPlaceholder": "Search accounts",
+    "empty": "No accounts detected.",
+    "noSearchResults": "No accounts match your search.",
     "groups": {
       "assets": "Assets",
       "liabilities": "Liabilities",
       "equity": "Equity",
-      "income": "Income",
+      "income": "Income / Revenues",
       "expenses": "Expenses",
       "other": "Other"
     }

@@ -15,7 +15,12 @@
 .rangeControl {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 12px;
+}
+
+.searchInput {
+    width: 260px;
 }
 
 .group {
