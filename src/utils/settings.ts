@@ -10,6 +10,7 @@ export const defaultSettings: AppSettings = {
   commoditySymbols: "",
   excludeBalances: "",
   includeInvestments: "",
+  prefillPostings: false,
 };
 
 export function normalizeSettings(settings?: Partial<AppSettings>): AppSettings {

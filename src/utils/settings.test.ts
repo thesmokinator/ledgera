@@ -14,6 +14,7 @@ describe("defaultSettings", () => {
       commoditySymbols: "",
       excludeBalances: "",
       includeInvestments: "",
+      prefillPostings: false,
     });
   });
 });
@@ -72,6 +73,7 @@ describe("normalizeSettings", () => {
       commoditySymbols: "TEST=TEST.DE",
       excludeBalances: "",
       includeInvestments: "",
+      prefillPostings: false,
     };
     expect(normalizeSettings(full)).toEqual(full);
   });

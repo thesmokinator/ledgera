@@ -12,6 +12,7 @@ export type AppSettings = {
   commoditySymbols: string;
   excludeBalances: string;
   includeInvestments: string;
+  prefillPostings: boolean;
 };
 
 export type HledgerStatus = {

@@ -842,6 +842,8 @@ struct AppSettings {
     exclude_balances: String,
     #[serde(default)]
     include_investments: String,
+    #[serde(default)]
+    prefill_postings: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -997,6 +999,7 @@ impl Default for AppSettings {
             commodity_symbols: String::new(),
             exclude_balances: String::new(),
             include_investments: String::new(),
+            prefill_postings: false,
         }
     }
 }
@@ -3195,6 +3198,7 @@ mod tests {
             commodity_symbols: String::new(),
             exclude_balances: String::new(),
             include_investments: String::new(),
+            prefill_postings: false,
         }
     }
 
@@ -3678,6 +3682,7 @@ mod tests {
             commodity_symbols: String::new(),
             exclude_balances: String::new(),
             include_investments: String::new(),
+            prefill_postings: false,
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");

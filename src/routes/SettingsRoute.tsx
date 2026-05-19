@@ -236,12 +236,12 @@ export function SettingsRoute({
             </Form.Item>
             <div className={styles.developerSettings}>
               <div>
-                <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
+                <Typography.Text strong>{t("settings.prefillPostings")}</Typography.Text>
                 <Typography.Paragraph type="secondary">
-                  {t("settings.advancedModeHelp")}
+                  {t("settings.prefillPostingsHelp")}
                 </Typography.Paragraph>
               </div>
-              <Form.Item name="powerUser" valuePropName="checked" noStyle>
+              <Form.Item name="prefillPostings" valuePropName="checked" noStyle>
                 <Switch />
               </Form.Item>
             </div>
@@ -298,6 +298,17 @@ export function SettingsRoute({
                 style={{ fontFamily: "monospace", fontSize: 13 }}
               />
             </Form.Item>
+            <div className={styles.developerSettings}>
+              <div>
+                <Typography.Text strong>{t("settings.developerOptions")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.advancedModeHelp")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name="powerUser" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
           </div>
         </Card>
 
