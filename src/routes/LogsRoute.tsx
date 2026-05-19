@@ -4,7 +4,6 @@ import {
   Modal,
   Space,
   Table,
-  Tag,
   Tooltip,
   Typography,
 } from "antd";
@@ -20,17 +19,7 @@ import { useTranslation } from "react-i18next";
 import type { LogEntry } from "./types";
 import styles from "./LogsRoute.module.css";
 
-const levelColors: Record<LogEntry["level"], string> = {
-  info: "blue",
-  warn: "orange",
-  error: "red",
-};
 
-const levelLabels: Record<LogEntry["level"], string> = {
-  info: "INFO",
-  warn: "WARN",
-  error: "ERROR",
-};
 
 export function LogsRoute() {
   const { t } = useTranslation();
@@ -105,14 +94,7 @@ export function LogsRoute() {
               render: (ts: string) =>
                 dayjs(ts).format("YYYY-MM-DD HH:mm:ss"),
             },
-            {
-              title: t("logs.level"),
-              dataIndex: "level",
-              width: 80,
-              render: (level: LogEntry["level"]) => (
-                <Tag color={levelColors[level]}>{levelLabels[level]}</Tag>
-              ),
-            },
+
             {
               title: t("logs.code"),
               dataIndex: "code",

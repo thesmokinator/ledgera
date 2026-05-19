@@ -87,8 +87,8 @@ fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
         .join("ledgera.log.jsonl"))
 }
 
-fn log_event(app: &AppHandle, level: &str, code: &str, message: &str) {
-    log_event_with_details(app, level, code, message, None);
+fn should_log(level: &str) -> bool {
+    level == "error"
 }
 
 fn log_event_with_details(
@@ -98,6 +98,9 @@ fn log_event_with_details(
     message: &str,
     details: Option<String>,
 ) {
+    if !should_log(level) {
+        return;
+    }
     let path = match log_path(app) {
         Ok(p) => p,
         Err(_) => return,
@@ -140,6 +143,14 @@ fn cleanup_old_logs(app: &AppHandle) {
     }
 }
 
+fn filter_log_entries(content: &str) -> Vec<LogEntry> {
+    content
+        .lines()
+        .filter_map(|line| serde_json::from_str::<LogEntry>(line).ok())
+        .filter(|entry| entry.level == "error")
+        .collect()
+}
+
 #[tauri::command]
 fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
     let path = log_path(&app)?;
@@ -153,10 +164,7 @@ fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
             error.to_string(),
         )
     })?;
-    let mut entries: Vec<LogEntry> = content
-        .lines()
-        .filter_map(|line| serde_json::from_str::<LogEntry>(line).ok())
-        .collect();
+    let mut entries = filter_log_entries(&content);
     entries.reverse();
     Ok(entries)
 }
@@ -372,12 +380,6 @@ async fn fetch_prices(
     symbols: Vec<String>,
 ) -> Result<std::collections::HashMap<String, PriceInfo>, String> {
     let settings = read_settings(&app)?;
-    log_event(
-        &app,
-        "info",
-        "PRICE_FETCH_START",
-        &format!("Fetching prices for {} symbols", symbols.len()),
-    );
 
     if !settings.fetch_prices {
         return Err(to_error_string(
@@ -404,12 +406,6 @@ async fn fetch_prices(
 
     for symbol in &symbols {
         let yahoo_symbol = mapping.get(symbol).unwrap_or(symbol);
-        log_event(
-            &app,
-            "info",
-            "PRICE_FETCH_TRY",
-            &format!("Trying {} → {}", symbol, yahoo_symbol),
-        );
 
         let url = format!(
             "https://query1.finance.yahoo.com/v8/finance/chart/{}",
@@ -427,12 +423,6 @@ async fn fetch_prices(
             .await;
         match response {
             Ok(response) => {
-                log_event(
-                    &app,
-                    "info",
-                    "PRICE_FETCH_RESPONSE",
-                    &format!("Got response for {}", yahoo_symbol),
-                );
                 let body_text = response.text().await.unwrap_or_default();
                 match serde_json::from_str::<serde_json::Value>(&body_text) {
                     Ok(json) => {
@@ -454,31 +444,9 @@ async fn fetch_prices(
                                     formatted,
                                 },
                             );
-                            log_event(
-                                &app,
-                                "info",
-                                "PRICE_FETCHED",
-                                &format!("{} = {} {}", symbol, price, currency),
-                            );
-                        } else {
-                            log_event_with_details(
-                                &app,
-                                "warn",
-                                "PRICE_PARSE_FAILED",
-                                &format!("Could not parse price/currency for {}", symbol),
-                                Some(body_text),
-                            );
                         }
                     }
-                    Err(e) => {
-                        log_event_with_details(
-                            &app,
-                            "warn",
-                            "PRICE_JSON_FAILED",
-                            &format!("Response not valid JSON for {}", symbol),
-                            Some(format!("Parse error: {}\nBody: {}", e, body_text)),
-                        );
-                    }
+                    Err(_) => {}
                 }
             }
             Err(error) => {
@@ -615,8 +583,6 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     let journal_path = require_journal_path(&settings)?;
     let executable = hledger_executable(&settings);
 
-    log_event(&app, "info", "BALANCE_START", "Running hledger balance");
-
     let output = tauri::async_runtime::spawn_blocking(move || {
         Command::new(&executable)
             .arg("-f")
@@ -653,13 +619,6 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    log_event_with_details(
-        &app,
-        "info",
-        "BALANCE_RAW",
-        "hledger balance output",
-        Some(stdout.clone()),
-    );
 
     parse_balance_output(&app, &stdout, &settings, true)
 }
@@ -855,12 +814,6 @@ fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
 #[tauri::command]
 fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
     let path = settings_path(&app)?;
-    log_event(
-        &app,
-        "info",
-        "SETTINGS_SAVE",
-        &format!("Saving exclude_balances: '{}'", settings.exclude_balances),
-    );
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             to_error_string_with_details(
@@ -981,15 +934,14 @@ fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
 fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let result = create_transaction_for_settings(&settings, &input);
-    match &result {
-        Ok(_) => log_event(&app, "info", "TRANSACTION_CREATED", &input.description),
-        Err(e) => log_event_with_details(
+    if let Err(e) = &result {
+        log_event_with_details(
             &app,
             "error",
             "TRANSACTION_CREATE_FAILED",
             "Failed to create transaction",
             Some(e.clone()),
-        ),
+        );
     }
     result
 }
@@ -1003,15 +955,14 @@ fn update_transaction(
 ) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let result = update_transaction_for_settings(&settings, &id, &input);
-    match &result {
-        Ok(_) => log_event(&app, "info", "TRANSACTION_UPDATED", &input.description),
-        Err(e) => log_event_with_details(
+    if let Err(e) = &result {
+        log_event_with_details(
             &app,
             "error",
             "TRANSACTION_UPDATE_FAILED",
             "Failed to update transaction",
             Some(e.clone()),
-        ),
+        );
     }
     result
 }
@@ -1021,15 +972,14 @@ fn update_transaction(
 fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let result = delete_transaction_for_settings(&settings, &id);
-    match &result {
-        Ok(_) => log_event(&app, "info", "TRANSACTION_DELETED", &id),
-        Err(e) => log_event_with_details(
+    if let Err(e) = &result {
+        log_event_with_details(
             &app,
             "error",
             "TRANSACTION_DELETE_FAILED",
             "Failed to delete transaction",
             Some(e.clone()),
-        ),
+        );
     }
     result
 }
@@ -3442,5 +3392,53 @@ mod tests {
         let result = format_posting(&posting);
         assert!(result.contains("@ 45000 USD"));
         assert!(result.contains("; limit order"));
+    }
+
+    #[test]
+    fn should_log_returns_true_only_for_error() {
+        assert!(should_log("error"));
+        assert!(!should_log("info"));
+        assert!(!should_log("warn"));
+        assert!(!should_log("notice"));
+        assert!(!should_log("debug"));
+        assert!(!should_log(""));
+    }
+
+    #[test]
+    fn filter_log_entries_returns_only_error_entries() {
+        let content = r#"
+{"ts":"2025-01-01T00:00:00.000Z","level":"info","code":"TEST","message":"info msg"}
+{"ts":"2025-01-01T00:00:01.000Z","level":"warn","code":"TEST","message":"warn msg"}
+{"ts":"2025-01-01T00:00:02.000Z","level":"error","code":"TEST","message":"error msg"}
+{"ts":"2025-01-01T00:00:03.000Z","level":"error","code":"ERR2","message":"another error"}
+"#;
+
+        let entries = filter_log_entries(content);
+
+        assert_eq!(entries.len(), 2, "should return only error entries");
+        assert_eq!(entries[0].level, "error");
+        assert_eq!(entries[0].message, "error msg");
+        assert_eq!(entries[1].level, "error");
+        assert_eq!(entries[1].message, "another error");
+    }
+
+    #[test]
+    fn filter_log_entries_returns_empty_when_no_errors() {
+        let content = r#"
+{"ts":"2025-01-01T00:00:00.000Z","level":"info","code":"TEST","message":"info msg"}
+{"ts":"2025-01-01T00:00:01.000Z","level":"warn","code":"TEST","message":"warn msg"}
+"#;
+
+        let entries = filter_log_entries(content);
+        assert!(entries.is_empty(), "should be empty when no errors");
+    }
+
+    #[test]
+    fn filter_log_entries_ignores_malformed_lines() {
+        let content =
+            "not json\n{\"level\":\"error\",\"code\":\"OK\",\"message\":\"good\",\"ts\":\"0\"}\n";
+        let entries = filter_log_entries(content);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].message, "good");
     }
 }
