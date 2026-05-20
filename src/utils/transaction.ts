@@ -12,7 +12,10 @@ export const emptyTransaction: TransactionInput = {
   ],
 };
 
-export function toTransactionInput(transaction: JournalTransaction): TransactionInput {
+export function toTransactionInput(
+  transaction: JournalTransaction,
+  defaultCommodity = "",
+): TransactionInput {
   return {
     date: transaction.date,
     status: transaction.status,
@@ -23,12 +26,22 @@ export function toTransactionInput(transaction: JournalTransaction): Transaction
         ? transaction.postings.map((posting): PostingInput => ({
           account: posting.account,
           amount: posting.amount,
-          commodity: posting.commodity,
+          commodity: posting.commodity.trim() || defaultCommodity,
           unitPrice: "",
           comment: posting.comment,
         }))
-        : emptyTransaction.postings,
+        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
   };
+}
+
+export function withDefaultCommodity(
+  postings: PostingInput[],
+  defaultCommodity: string,
+): PostingInput[] {
+  return postings.map((posting) => ({
+    ...posting,
+    commodity: posting.commodity.trim() || defaultCommodity,
+  }));
 }
 
 export function parseAmountValue(amount: string): number {

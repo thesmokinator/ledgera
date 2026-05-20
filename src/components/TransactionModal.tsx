@@ -28,12 +28,14 @@ function PostingRow({
   accountOptions,
   commodityOptions,
   isInvestmentMode,
+  defaultCommodity,
   onRemove,
 }: {
   field: { key: number; name: number };
   accountOptions: { value: string }[];
   commodityOptions: { value: string }[];
   isInvestmentMode: boolean;
+  defaultCommodity: string;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
@@ -46,7 +48,7 @@ function PostingRow({
       <Form.Item
         label={t("transactions.commodity")}
         name={[field.name, "commodity"]}
-        rules={[{ required: true, message: t("transactions.commodity_required") }]}
+        rules={defaultCommodity.trim() ? [] : [{ required: true, message: t("transactions.commodity_required") }]}
       >
         <AutoComplete options={commodityOptions} placeholder="EUR" filterOption />
       </Form.Item>
@@ -216,6 +218,7 @@ export function TransactionModal({
                   accountOptions={accountOptions}
                   commodityOptions={commodityOptions}
                   isInvestmentMode={isInvestmentMode}
+                  defaultCommodity={defaultCommodity}
                   onRemove={() => remove(field.name)}
                 />
               ))}

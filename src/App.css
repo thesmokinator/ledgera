@@ -173,40 +173,90 @@ button {
     gap: 12px;
 }
 
-.spotlight-hint {
+.search_trigger {
+    display: inline-grid;
+    grid-template-columns: auto minmax(110px, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 240px;
+    height: 34px;
+    padding: 0 8px 0 11px;
+    color: #a3a3a3;
+    text-align: left;
+    cursor: pointer;
+    background: #111111;
+    border: 1px solid #2c2c2c;
+    border-radius: 10px;
+    transition:
+        color 150ms,
+        background 150ms,
+        border-color 150ms,
+        box-shadow 150ms;
+}
+
+.search_trigger:hover {
+    color: #f5f5f5;
+    background: #171717;
+    border-color: #3f3f46;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.08);
+}
+
+.search_trigger_icon {
+    color: #737373;
+    font-size: 14px;
+}
+
+.search_trigger_label {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search_trigger_shortcut {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 32px;
-    height: 28px;
-    padding: 0 8px;
-    font-size: 12px;
-    font-weight: 600;
+    height: 22px;
+    padding: 0 6px;
     color: #a3a3a3;
-    background: #1e1e1e;
-    border: 1px solid #333;
-    border-radius: 6px;
-    cursor: pointer;
+    font-size: 11px;
+    font-weight: 650;
     letter-spacing: 0.02em;
-    transition: all 150ms;
+    background: #1f1f1f;
+    border: 1px solid #333333;
+    border-radius: 6px;
 }
 
-.spotlight-hint:hover {
-    color: #f5f5f5;
-    background: #2a2a2a;
-    border-color: #525252;
+.search_trigger:hover .search_trigger_icon,
+.search_trigger:hover .search_trigger_shortcut {
+    color: #d4d4d4;
 }
 
-:global(.theme-light) .spotlight-hint {
+:global(.theme-light) .search_trigger {
+    color: #6b7280;
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+:global(.theme-light) .search_trigger:hover {
+    color: #111827;
+    background: #ffffff;
+    border-color: #d1d5db;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+:global(.theme-light) .search_trigger_icon {
+    color: #9ca3af;
+}
+
+:global(.theme-light) .search_trigger_shortcut {
     color: #6b7280;
     background: #f3f4f6;
     border-color: #d1d5db;
-}
-
-:global(.theme-light) .spotlight-hint:hover {
-    color: #111827;
-    background: #e5e7eb;
-    border-color: #9ca3af;
 }
 
 .app-main {

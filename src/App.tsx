@@ -12,6 +12,7 @@ import {
   FileTextOutlined,
   HomeOutlined,
   PieChartOutlined,
+  SearchOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
@@ -55,6 +56,7 @@ import {
   emptyTransaction,
   toTransactionInput,
   autoCalculateBalancingAmounts,
+  withDefaultCommodity,
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
 import { navShortcut, newTransactionShortcut, spotlightShortcut } from "./utils/shortcut";
@@ -234,7 +236,7 @@ function App() {
       "postings",
       activeSettings.prefillPostings
         ? transactionTemplatePostings(type, autocompleteSuggestions, defaultCommodity)
-        : emptyTransaction.postings,
+        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
     );
   }
 
@@ -246,7 +248,7 @@ function App() {
       date: todayJournalDate(),
       postings: activeSettings.prefillPostings
         ? transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity)
-        : emptyTransaction.postings,
+        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
     });
     setTransactionModalOpen(true);
   }
@@ -254,7 +256,7 @@ function App() {
   function openEditTransaction(transaction: JournalTransaction) {
     setEditingTransaction(transaction);
     setTransactionType("custom");
-    transactionForm.setFieldsValue(toTransactionInput(transaction));
+    transactionForm.setFieldsValue(toTransactionInput(transaction, defaultCommodity));
     setTransactionModalOpen(true);
   }
 
@@ -283,7 +285,9 @@ function App() {
       .map((posting) => ({
         account: posting.account,
         amount: posting.amount ?? "",
-        commodity: posting.amount?.trim() ? (posting.commodity ?? defaultCommodity) : (posting.commodity ?? ""),
+        commodity: posting.amount?.trim()
+          ? (posting.commodity?.trim() || defaultCommodity)
+          : (posting.commodity?.trim() || ""),
         unitPrice: posting.unitPrice ?? "",
         comment: posting.comment ?? "",
       }));
@@ -365,13 +369,17 @@ function App() {
               <Typography.Title level={3}>{activeTitle}</Typography.Title>
             </div>
             <div className="header-actions">
-              <span
-                className="spotlight-hint"
+              <button
+                type="button"
+                className="search_trigger"
                 onClick={() => setSpotlightOpen(true)}
                 title={t("common.search")}
+                aria-label={t("common.search")}
               >
-                {spotlightShortcut()}
-              </span>
+                <SearchOutlined className="search_trigger_icon" />
+                <span className="search_trigger_label">Search journal…</span>
+                <span className="search_trigger_shortcut">{spotlightShortcut()}</span>
+              </button>
               <Button type="primary" disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
                 {t("transactions.new_transaction")} ({newTransactionShortcut()})
               </Button>
