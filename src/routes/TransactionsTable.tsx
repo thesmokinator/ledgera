@@ -53,8 +53,8 @@ export function TransactionsTable({
 
   function confirmDelete(transaction: JournalTransaction) {
     modal.confirm({
-      title: t("transactions.deleteTransactionAction"),
-      content: t("transactions.deleteTransactionDescription"),
+      title: t("transactions.delete_transaction_action"),
+      content: t("transactions.delete_transaction_description"),
       okText: t("transactions.delete"),
       cancelText: t("common.cancel"),
       okButtonProps: { danger: true },
@@ -129,10 +129,10 @@ export function TransactionsTable({
             width: 136,
             render: (_, transaction) => (
               <Space>
-                <Button aria-label={t("transactions.editTransactionAction")} icon={<EditOutlined />} onClick={() => onEdit(transaction)} />
+                <Button aria-label={t("transactions.edit_transaction_action")} icon={<EditOutlined />} onClick={() => onEdit(transaction)} />
                 <Button
                   danger
-                  aria-label={t("transactions.deleteTransactionAction")}
+                  aria-label={t("transactions.delete_transaction_action")}
                   icon={<DeleteOutlined />}
                   onClick={() => confirmDelete(transaction)}
                 />

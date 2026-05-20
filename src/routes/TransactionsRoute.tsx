@@ -99,19 +99,19 @@ export function TransactionsRoute({
     <div className={`${styles.contentStack} content-stack`}>
       <div className="metric-grid">
         <Card className="metric-card">
-          <span>{t("dashboard.monthlyTransactions")}</span>
+          <span>{t("dashboard.monthly_transactions")}</span>
           <strong>{formatCount(monthlyTransactions.length)}</strong>
-          <p>{t("dashboard.monthlyTransactionsDescription", { month: activeMonthLabel })}</p>
+          <p>{t("dashboard.monthly_transactions_description", { month: activeMonthLabel })}</p>
         </Card>
         <Card className="metric-card">
-          <span>{t("dashboard.scheduledTransactions")}</span>
+          <span>{t("dashboard.scheduled_transactions")}</span>
           <strong>{formatCount(scheduledTransactions.length)}</strong>
-          <p>{t("dashboard.scheduledTransactionsDescription", { month: activeMonthLabel })}</p>
+          <p>{t("dashboard.scheduled_transactions_description", { month: activeMonthLabel })}</p>
         </Card>
         <Card className="metric-card">
-          <span>{t("dashboard.activeAccounts")}</span>
+          <span>{t("dashboard.active_accounts")}</span>
           <strong>{formatCount(accountsCount)}</strong>
-          <p>{t("dashboard.activeAccountsDescription")}</p>
+          <p>{t("dashboard.active_accounts_description")}</p>
         </Card>
       </div>
 
@@ -137,7 +137,7 @@ export function TransactionsRoute({
           className={styles.currentMonthButton}
           onClick={goToCurrentMonth}
         >
-          {t("common.currentMonth")}&nbsp;<span className={styles.shortcutBadge}>{currentMonthShortcut()}</span>
+          {t("common.current_month")}&nbsp;<span className={styles.shortcutBadge}>{currentMonthShortcut()}</span>
         </Button>
       </div>
 
@@ -146,7 +146,7 @@ export function TransactionsRoute({
         items={[
           {
             key: "executed",
-            label: t("dashboard.monthlyTransactionsTab"),
+            label: t("dashboard.monthly_transactions_tab"),
             children: (
               <TransactionsTable
                 transactions={monthlyTransactions}
@@ -159,7 +159,7 @@ export function TransactionsRoute({
           },
           {
             key: "scheduled",
-            label: t("dashboard.scheduledTransactionsTab"),
+            label: t("dashboard.scheduled_transactions_tab"),
             children: (
               <TransactionsTable
                 transactions={scheduledTransactions}

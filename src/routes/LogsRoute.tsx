@@ -45,9 +45,9 @@ export function LogsRoute() {
 
   function confirmClear() {
     modal.confirm({
-      title: t("logs.clearAll"),
-      content: t("logs.clearConfirmation"),
-      okText: t("logs.clearConfirm"),
+      title: t("logs.clear_all"),
+      content: t("logs.clear_confirmation"),
+      okText: t("logs.clear_confirm"),
       cancelText: t("common.cancel"),
       okButtonProps: { danger: true },
       centered: true,
@@ -75,7 +75,7 @@ export function LogsRoute() {
               disabled={logs.length === 0}
               onClick={confirmClear}
             >
-              {t("logs.clearAll")}
+              {t("logs.clear_all")}
             </Button>
           </Space>
         )}
