@@ -23,6 +23,18 @@ export type HledgerStatus = {
   source: "configured" | "detected" | "fallback";
 };
 
+export type UpdateStatus = {
+  currentVersion: string;
+  latestVersion: string | null;
+  available: boolean;
+  releaseUrl: string | null;
+  releaseName: string | null;
+  publishedAt: string | null;
+  checkedAt: string | null;
+  source: "cache" | "network";
+  error: string | null;
+};
+
 export type JournalPosting = {
   account: string;
   amount: string;
@@ -201,4 +213,5 @@ export type NavigationItem = {
   icon: React.ReactNode;
   disabled?: boolean;
   shortcut?: string;
+  badge?: string;
 };

@@ -5,6 +5,7 @@ export type {
   LogEntry,
   Balance,
   HledgerStatus,
+  UpdateStatus,
   JournalPosting,
   TransactionFlow,
   TransactionDisplay,

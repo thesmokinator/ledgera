@@ -44,6 +44,7 @@ import type {
   NavigationItem,
   TransactionInput,
   TransactionType,
+  UpdateStatus,
 } from "./types";
 import {
   journalDateFormat,
@@ -98,6 +99,29 @@ function App() {
     queryKey: ["hledger-status"],
     queryFn: () => callCommand<HledgerStatus>("check_hledger"),
   });
+
+  const updateStatusQuery = useQuery({
+    queryKey: ["update-status"],
+    queryFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: false }),
+    retry: false,
+  });
+
+  const checkForUpdatesMutation = useMutation({
+    mutationFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: true }),
+    onSuccess: (status) => {
+      queryClient.setQueryData(["update-status"], status);
+      if (status.available) {
+        messageApi.success(t("settings.update_available", { version: status.latestVersion }));
+      } else if (status.error) {
+        messageApi.error(t("settings.update_check_failed"));
+      } else {
+        messageApi.success(t("settings.up_to_date"));
+      }
+    },
+    onError: () => messageApi.error(t("settings.update_check_failed")),
+  });
+
+  const updateStatus = checkForUpdatesMutation.data ?? updateStatusQuery.data;
 
   const transactionsQuery = useQuery({
     queryKey: ["transactions"],
@@ -324,13 +348,13 @@ function App() {
         { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal, shortcut: navShortcut(1) },
         { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
         { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
-        { key: "settings", label: "common.settings", icon: <SettingOutlined />, shortcut: navShortcut(4) },
+        { key: "settings", label: "common.settings", icon: <SettingOutlined />, shortcut: navShortcut(4), badge: updateStatus?.available ? t("settings.update_badge") : undefined },
         ...(activeSettings.powerUser
           ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(5) }]
           : []),
       ];
     },
-    [activeSettings.powerUser, activeSettings.journalPath],
+    [activeSettings.powerUser, activeSettings.journalPath, updateStatus?.available, t],
   );
 
   // Show a loading spinner while the initial settings are being fetched
@@ -395,6 +419,9 @@ function App() {
                 hledgerStatus={hledgerQuery.data}
                 journalSummary={transactionsQuery.data}
                 journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
+                updateStatus={updateStatus}
+                isCheckingForUpdates={updateStatusQuery.isFetching || checkForUpdatesMutation.isPending}
+                onCheckForUpdates={() => checkForUpdatesMutation.mutate()}
                 onValuesChange={updateSettingsOnChange}
               />
             ) : activeView === "logs" ? (

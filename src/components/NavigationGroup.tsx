@@ -27,6 +27,7 @@ export function NavigationGroup({
         >
           {item.icon}
           <span>{t(item.label)}</span>
+          {item.badge ? <span className={styles.nav_badge}>{item.badge}</span> : null}
           {item.shortcut ? <span className={styles.nav_shortcut}>{item.shortcut}</span> : null}
           {item.disabled ? <span className={styles.nav_item_lock}>🔒</span> : null}
         </button>
