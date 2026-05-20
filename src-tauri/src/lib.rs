@@ -5,12 +5,14 @@
 
 mod amount_format;
 mod app_error;
+mod settings;
 mod updates;
 
 use amount_format::{AmountFormatConfig, CommodityPosition};
 use app_error::{to_error_string, to_error_string_with_details};
 use chrono::{Datelike, Local, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use settings::{read_settings, AppSettings};
 use std::{
     collections::{HashMap, HashSet},
     env, fs,
@@ -687,29 +689,6 @@ async fn get_accounts_overview(
     ))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AppSettings {
-    journal_path: String,
-    hledger_path: String,
-    #[serde(default = "default_theme")]
-    theme: String,
-    #[serde(default)]
-    power_user: bool,
-    #[serde(default)]
-    default_commodity: String,
-    #[serde(default)]
-    fetch_prices: bool,
-    #[serde(default)]
-    commodity_symbols: String,
-    #[serde(default)]
-    exclude_balances: String,
-    #[serde(default)]
-    include_investments: String,
-    #[serde(default)]
-    prefill_postings: bool,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct HledgerStatus {
@@ -878,64 +857,6 @@ struct JournalProfile {
     default_transfer_account: String,
     default_investment_account: String,
     default_investment_commodity: String,
-}
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        Self {
-            journal_path: String::new(),
-            hledger_path: String::new(),
-            theme: default_theme(),
-            power_user: false,
-            default_commodity: String::new(),
-            fetch_prices: false,
-            commodity_symbols: String::new(),
-            exclude_balances: String::new(),
-            include_investments: String::new(),
-            prefill_postings: false,
-        }
-    }
-}
-
-fn default_theme() -> String {
-    "system".to_string()
-}
-
-/// Returns persisted application settings from the platform config directory.
-#[tauri::command]
-fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
-    read_settings(&app)
-}
-
-/// Persists application settings in the platform config directory.
-#[tauri::command]
-fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSettings, String> {
-    let path = settings_path(&app)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            to_error_string_with_details(
-                "settings_save_failed",
-                "Unable to create settings directory.",
-                error.to_string(),
-            )
-        })?;
-    }
-
-    let content = serde_json::to_string_pretty(&settings).map_err(|error| {
-        to_error_string_with_details(
-            "settings_save_failed",
-            "Unable to encode settings.",
-            error.to_string(),
-        )
-    })?;
-    fs::write(&path, content).map_err(|error| {
-        to_error_string_with_details(
-            "settings_save_failed",
-            "Unable to write settings file.",
-            error.to_string(),
-        )
-    })?;
-    Ok(settings)
 }
 
 /// Checks whether the configured hledger executable can be invoked.
@@ -1144,8 +1065,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_app_settings,
-            update_app_settings,
+            settings::get_app_settings,
+            settings::update_app_settings,
             check_hledger,
             updates::check_for_updates,
             get_autocomplete_suggestions,
@@ -1162,38 +1083,6 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-/// Builds the settings file path.
-fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_config_dir()
-        .map_err(|error| error.to_string())?
-        .join("settings.json"))
-}
-
-/// Reads settings, returning defaults if no settings file exists yet.
-fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
-    let path = settings_path(app)?;
-    if !path.exists() {
-        return Ok(AppSettings::default());
-    }
-
-    let content = fs::read_to_string(&path).map_err(|error| {
-        to_error_string_with_details(
-            "settings_read_failed",
-            "Unable to read settings file.",
-            error.to_string(),
-        )
-    })?;
-    serde_json::from_str(&content).map_err(|error| {
-        to_error_string_with_details(
-            "settings_read_failed",
-            "Settings file is corrupted.",
-            error.to_string(),
-        )
-    })
 }
 
 /// Resolves the hledger executable from settings or common macOS/user-shell locations.
@@ -3275,7 +3164,7 @@ mod tests {
         AppSettings {
             journal_path: path.to_string_lossy().to_string(),
             hledger_path: "true".to_string(),
-            theme: default_theme(),
+            theme: "system".to_string(),
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
@@ -3759,7 +3648,7 @@ mod tests {
         let settings = AppSettings {
             journal_path: String::new(),
             hledger_path: "/custom/bin/hledger".to_string(),
-            theme: default_theme(),
+            theme: "system".to_string(),
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
