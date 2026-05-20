@@ -43,7 +43,7 @@ function PostingRow({
       <Form.Item
         label={t("transactions.commodity")}
         name={[field.name, "commodity"]}
-        rules={[{ required: true, message: t("transactions.commodityRequired") }]}
+        rules={[{ required: true, message: t("transactions.commodity_required") }]}
       >
         <AutoComplete options={commodityOptions} placeholder="EUR" filterOption />
       </Form.Item>
@@ -52,7 +52,7 @@ function PostingRow({
           <Form.Item label={t("transactions.quantity")} name={[field.name, "amount"]}>
             <Input placeholder="10" />
           </Form.Item>
-          <Form.Item label={t("transactions.unitPrice")} name={[field.name, "unitPrice"]}>
+          <Form.Item label={t("transactions.unit_price")} name={[field.name, "unitPrice"]}>
             <Input placeholder="150 EUR" />
           </Form.Item>
         </>
@@ -64,12 +64,12 @@ function PostingRow({
       <Button
         danger
         className={styles.postingDeleteButton}
-        aria-label={t("transactions.removePosting")}
+        aria-label={t("transactions.remove_posting")}
         icon={<DeleteOutlined />}
         onClick={onRemove}
       />
       <Form.Item className={styles.postingCommentField} name={[field.name, "comment"]}>
-        <Input placeholder={t("transactions.commentPlaceholder")} />
+        <Input placeholder={t("transactions.comment_placeholder")} />
       </Form.Item>
     </div>
   );
@@ -114,10 +114,10 @@ export function TransactionModal({
 
   return (
     <Modal
-      title={editingTransaction ? t("transactions.editTransaction") : t("transactions.newTransaction")}
+      title={editingTransaction ? t("transactions.edit_transaction") : t("transactions.new_transaction")}
       open={open}
       width={isInvestmentMode ? 780 : 620}
-      okText={editingTransaction ? t("common.save") : t("transactions.createTransaction")}
+      okText={editingTransaction ? t("common.save") : t("transactions.create_transaction")}
       confirmLoading={isSaving}
       onCancel={onClose}
       onOk={() => transactionForm.submit()}
@@ -153,12 +153,12 @@ export function TransactionModal({
               value ? value.format(journalDateFormat) : ""
             }
             rules={[
-              { required: true, message: t("transactions.enterTransactionDate") },
+              { required: true, message: t("transactions.enter_transaction_date") },
               {
                 validator: (_, value: string) =>
                   !value || isValidJournalDate(value)
                     ? Promise.resolve()
-                    : Promise.reject(new Error(t("transactions.invalidDate"))),
+                    : Promise.reject(new Error(t("transactions.invalid_date"))),
               },
             ]}
           >
@@ -168,10 +168,10 @@ export function TransactionModal({
             <Select
               allowClear
               className={styles.fullWidthControl}
-              placeholder={t("transactions.statusPlaceholder")}
+              placeholder={t("transactions.status_placeholder")}
               options={[
-                { value: "*", label: t("transactions.statusCleared") },
-                { value: "!", label: t("transactions.statusPending") },
+                { value: "*", label: t("transactions.status_cleared") },
+                { value: "!", label: t("transactions.status_pending") },
               ]}
             />
           </Form.Item>
@@ -196,7 +196,7 @@ export function TransactionModal({
                 />
               ))}
               <Button icon={<PlusOutlined />} onClick={() => add({ account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" })}>
-                {t("transactions.addPosting")}
+                {t("transactions.add_posting")}
               </Button>
             </Space>
           )}

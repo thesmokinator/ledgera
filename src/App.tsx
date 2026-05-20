@@ -12,7 +12,6 @@ import {
   FileTextOutlined,
   HomeOutlined,
   PieChartOutlined,
-  PlusOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
@@ -149,7 +148,7 @@ function App() {
     mutationFn: (input: TransactionInput) =>
       callCommand<JournalSummary, { input: TransactionInput }>("create_transaction", { input }),
     onSuccess: async () => {
-      messageApi.success(t("transactions.transactionCreated"));
+      messageApi.success(t("transactions.transaction_created"));
       setTransactionModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
@@ -164,7 +163,7 @@ function App() {
         input,
       }),
     onSuccess: async () => {
-      messageApi.success(t("transactions.transactionUpdated"));
+      messageApi.success(t("transactions.transaction_updated"));
       setTransactionModalOpen(false);
       setEditingTransaction(null);
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -177,7 +176,7 @@ function App() {
     mutationFn: (id: string) =>
       callCommand<JournalSummary, { id: string }>("delete_transaction", { id }),
     onSuccess: async () => {
-      messageApi.success(t("transactions.transactionDeleted"));
+      messageApi.success(t("transactions.transaction_deleted"));
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
@@ -218,9 +217,9 @@ function App() {
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
   const journalLoadError = transactionsQuery.isError ? String(transactionsQuery.error) : "";
   const courtesyReasons = [
-    !hasConfiguredJournal ? t("settings.noJournalConfigured") : null,
-    journalLoadError ? t("settings.journalReadFailed") : null,
-    hledgerUnavailable ? t("settings.hledgerNotFound") : null,
+    !hasConfiguredJournal ? t("settings.no_journal_configured") : null,
+    journalLoadError ? t("settings.journal_read_failed") : null,
+    hledgerUnavailable ? t("settings.hledger_not_found") : null,
   ].filter((reason): reason is string => Boolean(reason));
   const shouldShowCourtesy = courtesyReasons.length > 0;
 
@@ -261,7 +260,7 @@ function App() {
   }
 
   const paletteCommands = useMemo<CommandPaletteCommand[]>(() => [
-    { id: "new-transaction", label: t("transactions.newTransaction"), shortcut: newTransactionShortcut(), keywords: ["create", "add"] },
+    { id: "new-transaction", label: t("transactions.new_transaction"), shortcut: newTransactionShortcut(), keywords: ["create", "add"] },
     { id: "go-transactions", label: t("common.transactions"), shortcut: navShortcut(1), keywords: ["journal"] },
     { id: "go-accounts", label: t("common.accounts"), shortcut: navShortcut(2) },
     { id: "go-balances", label: t("common.balances"), shortcut: navShortcut(3) },
@@ -381,8 +380,8 @@ function App() {
               >
                 {spotlightShortcut()}
               </span>
-              <Button type="primary" icon={<PlusOutlined />} disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
-                {t("transactions.newTransaction")} ({newTransactionShortcut()})
+              <Button type="primary" disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
+                {t("transactions.new_transaction")} ({newTransactionShortcut()})
               </Button>
             </div>
           </Layout.Header>
