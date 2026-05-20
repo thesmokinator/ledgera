@@ -26,16 +26,20 @@
     "scheduledTransactionsTab": "Scheduled transactions"
   },
   "accounts": {
-    "title": "All accounts",
-    "transactionsCount": "Transactions",
+    "title": "Chart of accounts and activity",
+    "transactionsCount": "Activity",
+    "currentBalance": "Balance",
     "currentMonth": "Current month",
     "lastDays": "Last {{count}} days",
     "accountActivity": "{{count}} transactions for {{account}}",
+    "searchPlaceholder": "Search accounts",
+    "empty": "No accounts detected.",
+    "noSearchResults": "No accounts match your search.",
     "groups": {
       "assets": "Assets",
       "liabilities": "Liabilities",
       "equity": "Equity",
-      "income": "Income",
+      "income": "Income / Revenues",
       "expenses": "Expenses",
       "other": "Other"
     }
@@ -63,6 +67,8 @@
     "pickJournalFile": "Choose journal file",
     "pickHledgerExecutable": "Choose hledger executable",
     "advancedMode": "Advanced mode",
+    "prefillPostings": "Pre-fill posting accounts",
+    "prefillPostingsHelp": "When creating a transaction, automatically fill the posting accounts based on the selected transaction type (expense, income, etc.).",
     "advancedModeHelp": "Show raw journal entries, source lines, and diagnostic details.",
     "statsTransactions": "Transactions",
     "statsAccounts": "Accounts",

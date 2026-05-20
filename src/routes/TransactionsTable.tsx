@@ -2,6 +2,7 @@ import { DeleteOutlined, EditOutlined, ArrowRightOutlined, SwapOutlined } from "
 import { Button, Modal, Popover, Space, Table, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction } from "./types";
+import { Amount } from "../components/Amount";
 import styles from "./TransactionsTable.module.css";
 
 function flowIcon(kind: string) {
@@ -106,9 +107,11 @@ export function TransactionsTable({
             width: 160,
             align: "right",
             render: (_, transaction) => (
-              <span className={`${styles.amount} ${styles[`amount${transaction.display.kind.charAt(0).toUpperCase() + transaction.display.kind.slice(1)}`]}`}>
-                {transaction.display.formatted || transaction.display.amount}
-              </span>
+              <Amount
+                formatted={transaction.display.formatted || transaction.display.amount}
+                tint={transaction.display.tint}
+                className={styles.amount}
+              />
             ),
           },
           ...(powerUser

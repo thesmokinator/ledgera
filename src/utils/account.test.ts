@@ -26,7 +26,7 @@ function makeTx(id: string, postings: { account: string; amount: string; commodi
       comment: p.comment ?? "",
       raw: "",
     })),
-    display: { account: "", amount: "", kind: "" },
+    display: { account: "", amount: "", formatted: "", kind: "", flow: { from: [], to: [] } },
     raw: "",
     startLine: 1,
     endLine: 1,

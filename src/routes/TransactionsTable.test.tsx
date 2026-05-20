@@ -21,6 +21,7 @@ function transactionWithFlow(
       amount: "5.20",
       formatted: "5,20",
       kind,
+      tint: kind === "income" ? "positive" : kind === "expense" ? "negative" : "neutral",
       flow: { from, to },
     },
     raw: "",

@@ -231,7 +231,9 @@ function App() {
     setTransactionType(type);
     transactionForm.setFieldValue(
       "postings",
-      transactionTemplatePostings(type, autocompleteSuggestions, defaultCommodity),
+      activeSettings.prefillPostings
+        ? transactionTemplatePostings(type, autocompleteSuggestions, defaultCommodity)
+        : emptyTransaction.postings,
     );
   }
 
@@ -241,7 +243,9 @@ function App() {
     transactionForm.setFieldsValue({
       ...emptyTransaction,
       date: todayJournalDate(),
-      postings: transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity),
+      postings: activeSettings.prefillPostings
+        ? transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity)
+        : emptyTransaction.postings,
     });
     setTransactionModalOpen(true);
   }

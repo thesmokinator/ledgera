@@ -2,22 +2,6 @@
     font-weight: 500;
 }
 
-.amountExpense {
-    color: #ef4444;
-}
-
-.amountIncome {
-    color: #22c55e;
-}
-
-.amountTransfer {
-    color: #3b82f6;
-}
-
-.amountUnknown {
-    color: #a3a3a3;
-}
-
 .accountFlow {
     display: inline-flex;
     align-items: center;
