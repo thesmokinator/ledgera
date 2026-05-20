@@ -2,7 +2,7 @@
     font-weight: 500;
 }
 
-.accountFlow {
+.account_flow {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -10,34 +10,34 @@
     line-height: 1.35;
 }
 
-.accountFlowSide {
+.account_flow_side {
     display: inline-flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.flowIcon {
+.flow_icon {
     font-size: 12px;
     flex-shrink: 0;
 }
 
-.flowIconExpense {
+.flow_icon_expense {
     color: #ef4444;
 }
 
-.flowIconIncome {
+.flow_icon_income {
     color: #22c55e;
 }
 
-.flowIconTransfer {
+.flow_icon_transfer {
     color: #3b82f6;
 }
 
-.flowIconInvestment {
+.flow_icon_investment {
     color: #a855f7;
 }
 
-.flowIconUnknown {
+.flow_icon_unknown {
     color: #737373;
 }
 

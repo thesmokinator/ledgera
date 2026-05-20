@@ -162,7 +162,7 @@ fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
     }
     let content = fs::read_to_string(&path).map_err(|error| {
         to_error_string_with_details(
-            "LOG_READ_FAILED",
+            "log_read_failed",
             "Unable to read log file.",
             error.to_string(),
         )
@@ -177,7 +177,7 @@ fn clear_logs(app: AppHandle) -> Result<(), String> {
     let path = log_path(&app)?;
     fs::write(&path, "").map_err(|error| {
         to_error_string_with_details(
-            "LOG_WRITE_FAILED",
+            "log_write_failed",
             "Unable to clear log file.",
             error.to_string(),
         )
@@ -193,7 +193,6 @@ struct PriceInfo {
     currency: String,
     formatted: String,
 }
-
 
 async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
     let settings = read_settings(&app)?;
@@ -223,7 +222,7 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
             .await
             .map_err(|error| {
                 to_error_string_with_details(
-                    "HLEDGER_BALANCE_FAILED",
+                    "hledger_balance_failed",
                     "Unable to run hledger balance for investments.",
                     error.to_string(),
                 )
@@ -317,7 +316,7 @@ fn parse_balance_output(
 ) -> Result<Vec<Balance>, String> {
     let raw: Vec<serde_json::Value> = serde_json::from_str(stdout).map_err(|error| {
         to_error_string_with_details(
-            "HLEDGER_BALANCE_PARSE_FAILED",
+            "hledger_balance_parse_failed",
             "Unable to parse hledger balance output.",
             error.to_string(),
         )
@@ -325,7 +324,7 @@ fn parse_balance_output(
 
     let rows = raw.first().and_then(|v| v.as_array()).ok_or_else(|| {
         to_error_string(
-            "HLEDGER_BALANCE_PARSE_FAILED",
+            "hledger_balance_parse_failed",
             "Unexpected hledger balance JSON structure.",
         )
     })?;
@@ -408,7 +407,7 @@ async fn fetch_prices(
 
     if !settings.fetch_prices {
         return Err(to_error_string(
-            "PRICES_DISABLED",
+            "prices_disabled",
             "Market price fetching is disabled in Settings.",
         ));
     }
@@ -478,7 +477,7 @@ async fn fetch_prices(
                 log_event_with_details(
                     &app,
                     "error",
-                    "PRICE_FETCH_FAILED",
+                    "price_fetch_failed",
                     &format!("HTTP request failed for {}", symbol),
                     Some(error.to_string()),
                 );
@@ -641,7 +640,6 @@ fn format_hledger_display_amount(amount: f64, commodity: &str, bal: &serde_json:
     AmountStyle::from_hledger_json(bal).format_amount(amount, commodity)
 }
 
-
 fn load_balances_for_settings(
     app: &AppHandle,
     settings: &AppSettings,
@@ -659,7 +657,7 @@ fn load_balances_for_settings(
         .output()
         .map_err(|error| {
             to_error_string_with_details(
-                "HLEDGER_BALANCE_FAILED",
+                "hledger_balance_failed",
                 "Unable to run hledger balance.",
                 error.to_string(),
             )
@@ -670,12 +668,12 @@ fn load_balances_for_settings(
         log_event_with_details(
             app,
             "error",
-            "BALANCE_FAILED",
+            "balance_failed",
             "hledger balance failed",
             Some(stderr.clone()),
         );
         return Err(to_error_string_with_details(
-            "HLEDGER_BALANCE_FAILED",
+            "hledger_balance_failed",
             "hledger balance command failed.",
             stderr,
         ));
@@ -697,7 +695,7 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     .await
     .map_err(|error| {
         to_error_string_with_details(
-            "HLEDGER_BALANCE_FAILED",
+            "hledger_balance_failed",
             "Unable to run hledger balance.",
             error.to_string(),
         )
@@ -721,7 +719,7 @@ async fn get_accounts_overview(
     .await
     .map_err(|error| {
         to_error_string_with_details(
-            "HLEDGER_BALANCE_FAILED",
+            "hledger_balance_failed",
             "Unable to run hledger balance for accounts overview.",
             error.to_string(),
         )
@@ -817,6 +815,35 @@ struct JournalTransaction {
     raw: String,
     start_line: usize,
     end_line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JournalSearchResult {
+    transaction: JournalTransaction,
+    matches: Vec<JournalSearchMatch>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JournalSearchMatch {
+    field: String,
+    value: String,
+    ranges: Vec<SearchMatchRange>,
+    posting_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchMatchRange {
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone)]
+struct ScoredJournalSearchResult {
+    score: i32,
+    result: JournalSearchResult,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -932,7 +959,7 @@ fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetti
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             to_error_string_with_details(
-                "SETTINGS_SAVE_FAILED",
+                "settings_save_failed",
                 "Unable to create settings directory.",
                 error.to_string(),
             )
@@ -941,14 +968,14 @@ fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetti
 
     let content = serde_json::to_string_pretty(&settings).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_SAVE_FAILED",
+            "settings_save_failed",
             "Unable to encode settings.",
             error.to_string(),
         )
     })?;
     fs::write(&path, content).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_SAVE_FAILED",
+            "settings_save_failed",
             "Unable to write settings file.",
             error.to_string(),
         )
@@ -1044,6 +1071,46 @@ fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
     read_journal_summary(&journal_path)
 }
 
+/// Searches the configured journal and returns matching transactions.
+#[tauri::command]
+fn search_journal(
+    app: AppHandle,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<JournalSearchResult>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let normalized_query = normalize_search_query(&query);
+    if normalized_query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let files = load_journal_files(&journal_path)?;
+    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let mut scored = transactions
+        .into_iter()
+        .filter_map(|transaction| search_journal_transaction(transaction, &normalized_query))
+        .collect::<Vec<_>>();
+
+    scored.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| b.result.transaction.date.cmp(&a.result.transaction.date))
+            .then_with(|| {
+                b.result
+                    .transaction
+                    .start_line
+                    .cmp(&a.result.transaction.start_line)
+            })
+    });
+
+    Ok(scored
+        .into_iter()
+        .take(limit.unwrap_or(12))
+        .map(|scored_result| scored_result.result)
+        .collect())
+}
+
 /// Appends a new transaction using the existing journal style where possible.
 #[tauri::command]
 fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<JournalSummary, String> {
@@ -1053,7 +1120,7 @@ fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<Journal
         log_event_with_details(
             &app,
             "error",
-            "TRANSACTION_CREATE_FAILED",
+            "transaction_create_failed",
             "Failed to create transaction",
             Some(e.clone()),
         );
@@ -1074,7 +1141,7 @@ fn update_transaction(
         log_event_with_details(
             &app,
             "error",
-            "TRANSACTION_UPDATE_FAILED",
+            "transaction_update_failed",
             "Failed to update transaction",
             Some(e.clone()),
         );
@@ -1091,7 +1158,7 @@ fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, Stri
         log_event_with_details(
             &app,
             "error",
-            "TRANSACTION_DELETE_FAILED",
+            "transaction_delete_failed",
             "Failed to delete transaction",
             Some(e.clone()),
         );
@@ -1127,6 +1194,7 @@ pub fn run() {
             check_hledger,
             get_autocomplete_suggestions,
             list_transactions,
+            search_journal,
             create_transaction,
             update_transaction,
             delete_transaction,
@@ -1158,14 +1226,14 @@ fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
 
     let content = fs::read_to_string(&path).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_READ_FAILED",
+            "settings_read_failed",
             "Unable to read settings file.",
             error.to_string(),
         )
     })?;
     serde_json::from_str(&content).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_READ_FAILED",
+            "settings_read_failed",
             "Settings file is corrupted.",
             error.to_string(),
         )
@@ -1225,7 +1293,7 @@ fn is_executable_file(path: &Path) -> bool {
 }
 
 fn login_shell_path_dirs() -> Vec<PathBuf> {
-    let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = env::var("shell").unwrap_or_else(|_| "/bin/zsh".to_string());
     [["-li", "-c", "echo $PATH"], ["-l", "-c", "echo $PATH"]]
         .into_iter()
         .find_map(|args| {
@@ -1251,7 +1319,7 @@ fn login_shell_path_dirs() -> Vec<PathBuf> {
 fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     if settings.journal_path.trim().is_empty() {
         return Err(to_error_string(
-            "JOURNAL_NOT_CONFIGURED",
+            "journal_not_configured",
             "Configure a journal path in Settings before loading transactions.",
         ));
     }
@@ -1259,7 +1327,7 @@ fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     let path = PathBuf::from(settings.journal_path.trim());
     if !path.exists() {
         return Err(to_error_string_with_details(
-            "JOURNAL_NOT_FOUND",
+            "journal_not_found",
             "Journal file does not exist.",
             format!("Expected at: {}", path.display()),
         ));
@@ -1409,6 +1477,159 @@ fn load_transactions_from_journal_via_files(
     Ok(transactions)
 }
 
+fn normalize_search_query(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn score_search_match(haystack: &str, needle: &str) -> i32 {
+    let normalized_haystack = normalize_search_query(haystack);
+    let normalized_needle = normalize_search_query(needle);
+    if normalized_needle.is_empty() || normalized_haystack.is_empty() {
+        return 0;
+    }
+
+    if normalized_haystack == normalized_needle {
+        return 100;
+    }
+
+    if normalized_haystack.starts_with(&normalized_needle) {
+        return 80;
+    }
+
+    for word in normalized_haystack.split(|character: char| {
+        character.is_whitespace() || matches!(character, '-' | '_' | ':' | '/')
+    }) {
+        if !word.is_empty() && word.starts_with(&normalized_needle) {
+            return 60;
+        }
+    }
+
+    if normalized_haystack.contains(&normalized_needle) {
+        return 40;
+    }
+
+    let terms = normalized_needle.split_whitespace().collect::<Vec<_>>();
+    if terms.len() > 1 && terms.iter().all(|term| normalized_haystack.contains(term)) {
+        return 30;
+    }
+
+    0
+}
+
+fn search_journal_transaction(
+    transaction: JournalTransaction,
+    needle: &str,
+) -> Option<ScoredJournalSearchResult> {
+    let mut score = 0;
+    let mut matches = Vec::new();
+
+    add_search_match(
+        &mut matches,
+        &mut score,
+        "description",
+        &transaction.description,
+        None,
+        needle,
+    );
+
+    for (posting_index, posting) in transaction.postings.iter().enumerate() {
+        add_search_match(
+            &mut matches,
+            &mut score,
+            "account",
+            &posting.account,
+            Some(posting_index),
+            needle,
+        );
+        add_search_match(
+            &mut matches,
+            &mut score,
+            "comment",
+            &posting.comment,
+            Some(posting_index),
+            needle,
+        );
+    }
+
+    if score == 0 {
+        return None;
+    }
+
+    Some(ScoredJournalSearchResult {
+        score,
+        result: JournalSearchResult {
+            transaction,
+            matches,
+        },
+    })
+}
+
+fn add_search_match(
+    matches: &mut Vec<JournalSearchMatch>,
+    score: &mut i32,
+    field: &str,
+    value: &str,
+    posting_index: Option<usize>,
+    needle: &str,
+) {
+    let match_score = score_search_match(value, needle);
+    if match_score == 0 {
+        return;
+    }
+
+    *score = (*score).max(match_score);
+    matches.push(JournalSearchMatch {
+        field: field.to_string(),
+        value: value.to_string(),
+        ranges: search_match_ranges(value, needle),
+        posting_index,
+    });
+}
+
+fn search_match_ranges(value: &str, needle: &str) -> Vec<SearchMatchRange> {
+    let normalized_value = value.to_lowercase();
+    let normalized_needle = normalize_search_query(needle);
+    if normalized_value.is_empty() || normalized_needle.is_empty() {
+        return Vec::new();
+    }
+
+    let terms = if normalized_needle.contains(' ') {
+        normalized_needle.split_whitespace().collect::<Vec<_>>()
+    } else {
+        vec![normalized_needle.as_str()]
+    };
+
+    let mut ranges = Vec::new();
+    for term in terms {
+        let mut search_start = 0usize;
+        while search_start < normalized_value.len() {
+            let Some(relative_start) = normalized_value[search_start..].find(term) else {
+                break;
+            };
+            let byte_start = search_start + relative_start;
+            let byte_end = byte_start + term.len();
+            ranges.push(SearchMatchRange {
+                start: byte_to_char_index(value, byte_start),
+                end: byte_to_char_index(value, byte_end),
+            });
+            search_start = byte_end;
+        }
+    }
+
+    ranges.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| a.end.cmp(&b.end)));
+    ranges.dedup_by(|a, b| a.start == b.start && a.end == b.end);
+    ranges
+}
+
+fn byte_to_char_index(value: &str, byte_index: usize) -> usize {
+    value[..byte_index].chars().count()
+}
+
 fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {
     let mut files = Vec::new();
     let mut visited = HashSet::new();
@@ -1429,7 +1650,7 @@ fn load_journal_file_recursive(
 
     let content = fs::read_to_string(&canonical_path).map_err(|error| {
         to_error_string_with_details(
-            "JOURNAL_READ_FAILED",
+            "journal_read_failed",
             "Unable to read journal file.",
             format!("{}: {}", canonical_path.display(), error),
         )
@@ -1488,7 +1709,7 @@ fn resolve_include_paths(journal_path: &Path, include: &str) -> Result<Vec<PathB
             Ok(vec![absolute_pattern])
         } else {
             Err(to_error_string_with_details(
-                "JOURNAL_INCLUDE_MISSING",
+                "journal_include_missing",
                 "Included journal file does not exist.",
                 format!("Expected at: {}", absolute_pattern.display()),
             ))
@@ -1620,7 +1841,7 @@ where
 {
     let original = fs::read_to_string(source_path).map_err(|error| {
         to_error_string_with_details(
-            "JOURNAL_READ_FAILED",
+            "journal_read_failed",
             "Unable to read source journal file.",
             format!("{}: {}", source_path.display(), error),
         )
@@ -1629,7 +1850,7 @@ where
 
     fs::write(source_path, &updated).map_err(|error| {
         to_error_string_with_details(
-            "JOURNAL_WRITE_FAILED",
+            "journal_write_failed",
             "Unable to write journal file.",
             error.to_string(),
         )
@@ -1637,7 +1858,7 @@ where
     if let Err(error) = validate_journal(settings, main_journal) {
         fs::write(source_path, original).map_err(|rollback_error| {
             to_error_string_with_details(
-                "JOURNAL_WRITE_FAILED",
+                "journal_write_failed",
                 "Journal file may be corrupted - rollback failed.",
                 rollback_error.to_string(),
             )
@@ -1993,12 +2214,12 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
     match output {
         Ok(output) if output.status.success() => Ok(()),
         Ok(output) => Err(to_error_string_with_details(
-            "HLEDGER_CHECK_FAILED",
+            "hledger_check_failed",
             "hledger check failed. The journal may contain syntax errors.",
             String::from_utf8_lossy(&output.stderr).trim().to_string(),
         )),
         Err(error) => Err(to_error_string_with_details(
-            "HLEDGER_CHECK_FAILED",
+            "hledger_check_failed",
             "Unable to run hledger check.",
             error.to_string(),
         )),
@@ -2210,7 +2431,7 @@ fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlock, String>
         .map(|transaction| TransactionBlock { transaction })
         .ok_or_else(|| {
             to_error_string_with_details(
-                "TRANSACTION_NOT_FOUND",
+                "transaction_not_found",
                 "Transaction not found. It may have been deleted or moved.",
                 format!("Transaction id: {}", id),
             )

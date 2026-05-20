@@ -3,7 +3,6 @@ import {
   ConfigProvider,
   Form,
   Layout,
-  Space,
   Typography,
   message,
   theme,
@@ -13,8 +12,7 @@ import {
   FileTextOutlined,
   HomeOutlined,
   PieChartOutlined,
-  PlusOutlined,
-  ReloadOutlined,
+  SearchOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
@@ -23,11 +21,13 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  CommandPalette,
   CourtesyState,
   NavigationGroup,
   TransactionModal,
 } from "./components";
 import { useSystemTheme } from "./hooks/useSystemTheme";
+import { useHotkeys } from "./hooks/useHotkeys";
 import {
   AccountsRoute,
   BalancesRoute,
@@ -56,8 +56,10 @@ import {
   emptyTransaction,
   toTransactionInput,
   autoCalculateBalancingAmounts,
+  withDefaultCommodity,
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
+import { navShortcut, newTransactionShortcut, spotlightShortcut } from "./utils/shortcut";
 import "./App.css";
 
 /** Invokes a typed Tauri command. */
@@ -74,6 +76,7 @@ function App() {
   const [transactionType, setTransactionType] = useState<TransactionType>("expense");
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [transactionForm] = Form.useForm<TransactionInput>();
   const [settingsForm] = Form.useForm<AppSettings>();
   const queryClient = useQueryClient();
@@ -146,7 +149,7 @@ function App() {
     mutationFn: (input: TransactionInput) =>
       callCommand<JournalSummary, { input: TransactionInput }>("create_transaction", { input }),
     onSuccess: async () => {
-      messageApi.success(t("transactions.transactionCreated"));
+      messageApi.success(t("transactions.transaction_created"));
       setTransactionModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
@@ -161,7 +164,7 @@ function App() {
         input,
       }),
     onSuccess: async () => {
-      messageApi.success(t("transactions.transactionUpdated"));
+      messageApi.success(t("transactions.transaction_updated"));
       setTransactionModalOpen(false);
       setEditingTransaction(null);
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -174,7 +177,7 @@ function App() {
     mutationFn: (id: string) =>
       callCommand<JournalSummary, { id: string }>("delete_transaction", { id }),
     onSuccess: async () => {
-      messageApi.success(t("transactions.transactionDeleted"));
+      messageApi.success(t("transactions.transaction_deleted"));
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
@@ -215,9 +218,9 @@ function App() {
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
   const journalLoadError = transactionsQuery.isError ? String(transactionsQuery.error) : "";
   const courtesyReasons = [
-    !hasConfiguredJournal ? t("settings.noJournalConfigured") : null,
-    journalLoadError ? t("settings.journalReadFailed") : null,
-    hledgerUnavailable ? t("settings.hledgerNotFound") : null,
+    !hasConfiguredJournal ? t("settings.no_journal_configured") : null,
+    journalLoadError ? t("settings.journal_read_failed") : null,
+    hledgerUnavailable ? t("settings.hledger_not_found") : null,
   ].filter((reason): reason is string => Boolean(reason));
   const shouldShowCourtesy = courtesyReasons.length > 0;
 
@@ -233,7 +236,7 @@ function App() {
       "postings",
       activeSettings.prefillPostings
         ? transactionTemplatePostings(type, autocompleteSuggestions, defaultCommodity)
-        : emptyTransaction.postings,
+        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
     );
   }
 
@@ -245,7 +248,7 @@ function App() {
       date: todayJournalDate(),
       postings: activeSettings.prefillPostings
         ? transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity)
-        : emptyTransaction.postings,
+        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
     });
     setTransactionModalOpen(true);
   }
@@ -253,9 +256,28 @@ function App() {
   function openEditTransaction(transaction: JournalTransaction) {
     setEditingTransaction(transaction);
     setTransactionType("custom");
-    transactionForm.setFieldsValue(toTransactionInput(transaction));
+    transactionForm.setFieldsValue(toTransactionInput(transaction, defaultCommodity));
     setTransactionModalOpen(true);
   }
+
+
+
+  const shortcuts = useMemo(() => {
+    const hasJournal = Boolean(activeSettings.journalPath.trim());
+    return [
+      { keys: "command+n, ctrl+n", action: () => { if (!shouldShowCourtesy) openCreateTransaction(); } },
+      { keys: "command+1, ctrl+1", action: () => setActiveView("transactions"), disabled: !hasJournal },
+      { keys: "command+2, ctrl+2", action: () => setActiveView("accounts"), disabled: !hasJournal },
+      { keys: "command+3, ctrl+3", action: () => setActiveView("balances"), disabled: !hasJournal },
+      { keys: "command+4, ctrl+4", action: () => setActiveView("settings") },
+      { keys: "command+5, ctrl+5", action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
+      { keys: "command+,, ctrl+,", action: () => setActiveView("settings") },
+      { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true) },
+      { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) setTransactionModalOpen(false); } },
+    ];
+  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen]);
+
+  useHotkeys(shortcuts);
 
   function submitTransaction(values: TransactionInput) {
     const rawPostings = (values.postings ?? [])
@@ -263,7 +285,9 @@ function App() {
       .map((posting) => ({
         account: posting.account,
         amount: posting.amount ?? "",
-        commodity: posting.amount?.trim() ? (posting.commodity ?? defaultCommodity) : (posting.commodity ?? ""),
+        commodity: posting.amount?.trim()
+          ? (posting.commodity?.trim() || defaultCommodity)
+          : (posting.commodity?.trim() || ""),
         unitPrice: posting.unitPrice ?? "",
         comment: posting.comment ?? "",
       }));
@@ -297,17 +321,27 @@ function App() {
     () => {
       const hasJournal = Boolean(activeSettings.journalPath.trim());
       return [
-        { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal },
-        { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal },
-        { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal },
-        { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
+        { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal, shortcut: navShortcut(1) },
+        { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
+        { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
+        { key: "settings", label: "common.settings", icon: <SettingOutlined />, shortcut: navShortcut(4) },
         ...(activeSettings.powerUser
-          ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined /> }]
+          ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(5) }]
           : []),
       ];
     },
     [activeSettings.powerUser, activeSettings.journalPath],
   );
+
+  // Show a loading spinner while the initial settings are being fetched
+  if (settingsQuery.isPending) {
+    return (
+      <div className={`app-loader-react ${systemPrefersDark ? "theme-dark" : "theme-light"}`}>
+        <div className="app-loader-spinner" />
+        <span className="app-loader-label">ledgera</span>
+      </div>
+    );
+  }
 
   return (
     <ConfigProvider
@@ -334,14 +368,22 @@ function App() {
             <div className="titlebar-drag" data-tauri-drag-region>
               <Typography.Title level={3}>{activeTitle}</Typography.Title>
             </div>
-            <Space>
-              <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()}>
-                {t("common.refresh")}
+            <div className="header-actions">
+              <button
+                type="button"
+                className="search_trigger"
+                onClick={() => setSpotlightOpen(true)}
+                title={t("common.search")}
+                aria-label={t("common.search")}
+              >
+                <SearchOutlined className="search_trigger_icon" />
+                <span className="search_trigger_label">Search journal…</span>
+                <span className="search_trigger_shortcut">{spotlightShortcut()}</span>
+              </button>
+              <Button type="primary" disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
+                {t("transactions.new_transaction")} ({newTransactionShortcut()})
               </Button>
-              <Button type="primary" icon={<PlusOutlined />} disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
-                {t("transactions.newTransaction")}
-              </Button>
-            </Space>
+            </div>
           </Layout.Header>
 
           <Layout.Content className="app-content">
@@ -386,6 +428,14 @@ function App() {
             )}
           </Layout.Content>
         </Layout>
+
+        <CommandPalette
+          open={spotlightOpen}
+          onClose={() => setSpotlightOpen(false)}
+          onTransaction={(transaction) => {
+            openEditTransaction(transaction);
+          }}
+        />
 
         <TransactionModal
           open={isTransactionModalOpen}

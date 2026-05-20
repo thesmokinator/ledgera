@@ -5,10 +5,52 @@
         <link rel="icon" type="image/svg+xml" href="/vite.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>ledgera</title>
+        <style>
+            #app-loader {
+                position: fixed;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                background: #090909;
+                z-index: 9999;
+                font-family:
+                    Inter,
+                    ui-sans-serif,
+                    system-ui,
+                    -apple-system,
+                    sans-serif;
+            }
+            .loader-spinner {
+                width: 36px;
+                height: 36px;
+                border: 3px solid #2a2a2a;
+                border-top-color: #10b981;
+                border-radius: 50%;
+                animation: loader-spin 0.7s linear infinite;
+            }
+            .loader-text {
+                color: #6b7280;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            @keyframes loader-spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
     </head>
 
     <body>
-        <div id="root"></div>
+        <div id="root">
+            <div id="app-loader">
+                <div class="loader-spinner"></div>
+                <span class="loader-text">ledgera</span>
+            </div>
+        </div>
         <script type="module" src="/src/main.tsx"></script>
     </body>
 </html>

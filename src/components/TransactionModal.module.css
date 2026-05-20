@@ -1,46 +1,54 @@
-.postingRow {
+.posting_row {
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(0, 0.9fr) auto;
+    grid-template-columns:
+        minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(0, 0.9fr)
+        auto;
     column-gap: 8px;
     width: 100%;
 }
 
-.postingRowInvestment {
-    grid-template-columns: minmax(0, 1.3fr) minmax(90px, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.75fr) auto;
+.posting_row_investment {
+    grid-template-columns:
+        minmax(0, 1.3fr) minmax(112px, 0.45fr) minmax(0, 0.55fr)
+        minmax(0, 0.75fr) auto;
 }
 
-.postingRow :global(.ant-form-item) {
+.posting_row :global(.ant-form-item) {
     margin-bottom: 12px;
 }
 
-.postingCommentField {
+.transaction_form :global(.ant-form-item-explain) {
+    display: none;
+}
+
+.posting_comment_field {
     grid-column: 1 / -1;
     margin-top: -6px;
 }
 
-.postingDeleteButton {
+.posting_delete_button {
     align-self: start;
     margin-top: 30px;
 }
 
-.transactionTypeSelector {
+.transaction_type_selector {
     width: 100%;
     margin-bottom: 18px;
 }
 
-.formRow {
+.form_row {
     display: grid;
     grid-template-columns: 2fr 1fr 1.5fr;
     width: 100%;
 }
 
-.formRow :global(.ant-form-item) {
+.form_row :global(.ant-form-item) {
     margin-bottom: 12px;
 }
 
-.fullWidthControl,
-.formRow :global(.ant-picker),
-.formRow :global(.ant-select),
-.formRow :global(.ant-input) {
+.full_width_control,
+.form_row :global(.ant-picker),
+.form_row :global(.ant-select),
+.form_row :global(.ant-input) {
     width: 100%;
 }

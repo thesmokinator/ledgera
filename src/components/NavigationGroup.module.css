@@ -1,11 +1,11 @@
-.navGroup {
+.nav_group {
     display: flex;
     flex-direction: column;
     gap: 4px;
     margin: 0;
 }
 
-.navItem {
+.nav_item {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -21,47 +21,57 @@
     outline: none;
     font-size: 14px;
     font-weight: 475;
-    transition: background 120ms, color 120ms;
+    transition:
+        background 120ms,
+        color 120ms;
 }
 
-.navItem:hover:not(:disabled),
-.navItem.isActive {
+.nav_item:hover:not(:disabled),
+.nav_item.is_active {
     color: #052e16;
     background: #d1fae5;
 }
 
-.navItem:disabled {
+.nav_item:disabled {
     cursor: default;
     opacity: 0.82;
 }
 
-.navItem.isDisabled {
+.nav_item.is_disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.navItem.isDisabled:hover {
+.nav_item.is_disabled:hover {
     color: #f1f1f1;
     background: transparent;
 }
 
-.navItemLock {
+.nav_item_lock {
     margin-left: auto;
     font-size: 11px;
     opacity: 0.7;
 }
 
-:global(.theme-light) .navItem {
+.nav_shortcut {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.55;
+    letter-spacing: 0.02em;
+}
+
+:global(.theme-light) .nav_item {
     color: #374151;
 }
 
-:global(.theme-light) .navItem:hover:not(:disabled),
-:global(.theme-light) .navItem.isActive {
+:global(.theme-light) .nav_item:hover:not(:disabled),
+:global(.theme-light) .nav_item.is_active {
     color: #064e3b;
     background: #d1fae5;
 }
 
-:global(.theme-light) .navItem.isDisabled:hover {
+:global(.theme-light) .nav_item.is_disabled:hover {
     color: #374151;
     background: transparent;
 }

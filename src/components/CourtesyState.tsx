@@ -18,15 +18,15 @@ export function CourtesyState({
         <FolderOpenOutlined />
       </div>
       <Typography.Title level={4} className={styles.title}>
-        {t("settings.configureJournalTitle")}
+        {t("settings.configure_journal_title")}
       </Typography.Title>
       <Typography.Text type="secondary" className={styles.description}>
-        {t("settings.configureJournalDescription")}
+        {t("settings.configure_journal_description")}
       </Typography.Text>
       {reasons.length > 0 ? (
         <div className={styles.reasons}>
           {reasons.map((reason) => (
-            <div key={reason} className={styles.reasonItem}>{reason}</div>
+            <div key={reason} className={styles.reason_item}>{reason}</div>
           ))}
         </div>
       ) : null}

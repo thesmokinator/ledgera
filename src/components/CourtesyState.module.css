@@ -50,7 +50,7 @@
     padding: 0;
 }
 
-.reasonItem {
+.reason_item {
     padding: 6px 14px;
     color: #d4d4d4;
     font-size: 13px;
@@ -59,7 +59,7 @@
     border-radius: 6px;
 }
 
-:global(.theme-light) .reasonItem {
+:global(.theme-light) .reason_item {
     color: #374151;
     background: #f3f4f6;
     border-color: #e5e7eb;

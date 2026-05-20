@@ -2,15 +2,15 @@
     font-weight: 500;
 }
 
-.amountNegative {
+.amount_negative {
     color: #ef4444;
 }
 
-.amountPositive {
+.amount_positive {
     /* No special color — sober hledger-style.
        The backend already adds a + prefix for income. */
 }
 
-.amountNeutral {
+.amount_neutral {
     /* Default text color, used for transfers and zero amounts. */
 }
