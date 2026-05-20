@@ -1,9 +1,7 @@
 import {
-  Button,
   ConfigProvider,
   Form,
   Layout,
-  Typography,
   message,
   theme,
 } from "antd";
@@ -12,7 +10,6 @@ import {
   FileTextOutlined,
   HomeOutlined,
   PieChartOutlined,
-  SearchOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
@@ -21,6 +18,8 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AppHeader,
+  AppLoader,
   CommandPalette,
   CourtesyState,
   NavigationGroup,
@@ -60,7 +59,7 @@ import {
   withDefaultCommodity,
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
-import { navShortcut, newTransactionShortcut, spotlightShortcut } from "./utils/shortcut";
+import { navShortcut } from "./utils/shortcut";
 import "./App.css";
 
 /** Invokes a typed Tauri command. */
@@ -359,12 +358,7 @@ function App() {
 
   // Show a loading spinner while the initial settings are being fetched
   if (settingsQuery.isPending) {
-    return (
-      <div className={`app-loader-react ${systemPrefersDark ? "theme-dark" : "theme-light"}`}>
-        <div className="app-loader-spinner" />
-        <span className="app-loader-label">ledgera</span>
-      </div>
-    );
+    return <AppLoader systemPrefersDark={systemPrefersDark} />;
   }
 
   return (
@@ -388,27 +382,12 @@ function App() {
         </Layout.Sider>
 
         <Layout className="app-main">
-          <Layout.Header className="app-header">
-            <div className="titlebar-drag" data-tauri-drag-region>
-              <Typography.Title level={3}>{activeTitle}</Typography.Title>
-            </div>
-            <div className="header-actions">
-              <button
-                type="button"
-                className="search_trigger"
-                onClick={() => setSpotlightOpen(true)}
-                title={t("common.search")}
-                aria-label={t("common.search")}
-              >
-                <SearchOutlined className="search_trigger_icon" />
-                <span className="search_trigger_label">Search journal…</span>
-                <span className="search_trigger_shortcut">{spotlightShortcut()}</span>
-              </button>
-              <Button type="primary" disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
-                {t("transactions.new_transaction")} ({newTransactionShortcut()})
-              </Button>
-            </div>
-          </Layout.Header>
+          <AppHeader
+            title={activeTitle}
+            disableCreateTransaction={shouldShowCourtesy}
+            onCreateTransaction={openCreateTransaction}
+            onOpenSearch={() => setSpotlightOpen(true)}
+          />
 
           <Layout.Content className="app-content">
             {activeView === "settings" ? (
