@@ -26,7 +26,7 @@ export function CourtesyState({
       {reasons.length > 0 ? (
         <div className={styles.reasons}>
           {reasons.map((reason) => (
-            <div key={reason} className={styles.reasonItem}>{reason}</div>
+            <div key={reason} className={styles.reason_item}>{reason}</div>
           ))}
         </div>
       ) : null}

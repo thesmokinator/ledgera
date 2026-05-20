@@ -1,9 +1,9 @@
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { Input, Typography } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
-import type { JournalTransaction } from "../types";
+import type { JournalSearchMatch, JournalSearchResult, JournalTransaction, SearchMatchRange } from "../types";
 import styles from "./CommandPalette.module.css";
 
 export function CommandPalette({
@@ -33,7 +33,7 @@ export function CommandPalette({
 
   const resultsQuery = useQuery({
     queryKey: ["journal-search", debouncedQuery],
-    queryFn: () => invoke<JournalTransaction[]>("search_journal", { query: debouncedQuery, limit: 12 }),
+    queryFn: () => invoke<JournalSearchResult[]>("search_journal", { query: debouncedQuery, limit: 12 }),
     enabled: open && debouncedQuery.trim().length > 0,
     retry: false,
     placeholderData: (previous) => previous,
@@ -47,9 +47,9 @@ export function CommandPalette({
 
   if (!open) return null;
 
-  function execute(result: JournalTransaction | undefined) {
+  function execute(result: JournalSearchResult | undefined) {
     if (!result) return;
-    onTransaction(result);
+    onTransaction(result.transaction);
     onClose();
   }
 
@@ -78,7 +78,7 @@ export function CommandPalette({
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
       <div className={styles.panel} onMouseDown={(event) => event.stopPropagation()}>
-        <div className={styles.inputWrap}>
+        <div className={styles.input_wrap}>
           <Input
             autoFocus
             size="large"
@@ -105,16 +105,23 @@ export function CommandPalette({
           ) : (
             results.map((result, index) => (
               <button
-                key={result.id}
+                key={result.transaction.id}
                 type="button"
-                className={`${styles.result} ${index === selectedIndex ? styles.resultSelected : ""}`}
+                className={`${styles.result} ${index === selectedIndex ? styles.result_selected : ""}`}
                 onMouseEnter={() => setSelectedIndex(index)}
                 onClick={() => execute(result)}
               >
                 <span className={styles.icon}><FileTextOutlined /></span>
                 <span>
-                  <span className={styles.primary}>{result.description || result.display.formatted}</span>
-                  <span className={styles.secondary}>{resultSubtitle(result)}</span>
+                  <span className={styles.primary}>
+                    {renderHighlightedTitle(result)}
+                  </span>
+                  <span className={styles.secondary}>{resultSubtitle(result.transaction)}</span>
+                  {bestSecondaryMatch(result.matches) ? (
+                    <span className={styles.match_context}>
+                      {matchLabel(bestSecondaryMatch(result.matches)!)}: {renderHighlightedText(bestSecondaryMatch(result.matches)!.value, bestSecondaryMatch(result.matches)!.ranges)}
+                    </span>
+                  ) : null}
                 </span>
               </button>
             ))
@@ -128,6 +135,54 @@ export function CommandPalette({
       </div>
     </div>
   );
+}
+
+function renderHighlightedTitle(result: JournalSearchResult): ReactNode {
+  const tx = result.transaction;
+  const title = tx.description || tx.display.formatted;
+  const descriptionMatch = result.matches.find((match) => match.field === "description");
+  return renderHighlightedText(title, descriptionMatch?.ranges ?? []);
+}
+
+function bestSecondaryMatch(matches: JournalSearchMatch[]): JournalSearchMatch | undefined {
+  return matches.find((match) => match.field === "comment")
+    ?? matches.find((match) => match.field === "account");
+}
+
+function matchLabel(match: JournalSearchMatch): string {
+  if (match.field === "comment") return "Comment";
+  if (match.field === "account") return "Account";
+  return "Description";
+}
+
+function renderHighlightedText(value: string, ranges: SearchMatchRange[]): ReactNode {
+  if (ranges.length === 0) return value;
+
+  const characters = Array.from(value);
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+
+  for (const range of ranges) {
+    const start = Math.max(0, Math.min(range.start, characters.length));
+    const end = Math.max(start, Math.min(range.end, characters.length));
+    if (start > cursor) {
+      parts.push(characters.slice(cursor, start).join(""));
+    }
+    if (end > start) {
+      parts.push(
+        <mark className={styles.highlight} key={`${start}:${end}`}>
+          {characters.slice(start, end).join("")}
+        </mark>,
+      );
+    }
+    cursor = end;
+  }
+
+  if (cursor < characters.length) {
+    parts.push(characters.slice(cursor).join(""));
+  }
+
+  return parts;
 }
 
 function resultSubtitle(tx: JournalTransaction): string {

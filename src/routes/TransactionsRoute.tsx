@@ -96,7 +96,7 @@ export function TransactionsRoute({
   const activeMonthLabel = activeMonth.format("MMMM YYYY");
 
   return (
-    <div className={`${styles.contentStack} content-stack`}>
+    <div className={`${styles.content_stack} content-stack`}>
       <div className="metric-grid">
         <Card className="metric-card">
           <span>{t("dashboard.monthly_transactions")}</span>
@@ -115,34 +115,34 @@ export function TransactionsRoute({
         </Card>
       </div>
 
-      <div className={styles.monthToolbar}>
-        <div className={styles.monthNavGroup}>
+      <div className={styles.month_toolbar}>
+        <div className={styles.month_nav_group}>
           <Button
-            className={styles.monthArrow}
+            className={styles.month_arrow}
             icon={<LeftOutlined />}
             aria-label={t("common.previous")}
             onClick={goToPreviousMonth}
           />
-          <Typography.Title level={4} className={styles.monthTitle}>
+          <Typography.Title level={4} className={styles.month_title}>
             {activeMonthLabel}
           </Typography.Title>
           <Button
-            className={styles.monthArrow}
+            className={styles.month_arrow}
             icon={<RightOutlined />}
             aria-label={t("common.next")}
             onClick={goToNextMonth}
           />
         </div>
         <Button
-          className={styles.currentMonthButton}
+          className={styles.current_month_button}
           onClick={goToCurrentMonth}
         >
-          {t("common.current_month")}&nbsp;<span className={styles.shortcutBadge}>{currentMonthShortcut()}</span>
+          {t("common.current_month")}&nbsp;<span className={styles.shortcut_badge}>{currentMonthShortcut()}</span>
         </Button>
       </div>
 
       <Tabs
-        className={styles.documentTabs}
+        className={styles.document_tabs}
         items={[
           {
             key: "executed",

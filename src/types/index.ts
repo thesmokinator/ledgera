@@ -70,6 +70,23 @@ export type JournalTransaction = {
   endLine: number;
 };
 
+export type SearchMatchRange = {
+  start: number;
+  end: number;
+};
+
+export type JournalSearchMatch = {
+  field: "description" | "account" | "comment";
+  value: string;
+  ranges: SearchMatchRange[];
+  postingIndex: number | null;
+};
+
+export type JournalSearchResult = {
+  transaction: JournalTransaction;
+  matches: JournalSearchMatch[];
+};
+
 export type DashboardSummary = {
   monthlyTransactions: JournalTransaction[];
   scheduledTransactions: JournalTransaction[];

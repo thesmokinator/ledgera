@@ -18,12 +18,12 @@
     box-shadow: 0 20px 80px rgba(0, 0, 0, 0.45);
 }
 
-.inputWrap {
+.input_wrap {
     padding: 14px;
     border-bottom: 1px solid #252525;
 }
 
-.inputWrap :global(.ant-input-affix-wrapper) {
+.input_wrap :global(.ant-input-affix-wrapper) {
     background: #0f0f0f;
     border-color: #2c2c2c;
     box-shadow: none !important;
@@ -40,7 +40,7 @@
     text-align: center;
 }
 
-.groupTitle {
+.group_title {
     padding: 8px 10px 4px;
     color: #8f8f8f;
     font-size: 11px;
@@ -65,7 +65,7 @@
     border-radius: 10px;
 }
 
-.resultSelected,
+.result_selected,
 .result:hover {
     background: #d1fae5;
     color: #052e16;
@@ -92,9 +92,34 @@
     line-height: 1.25;
 }
 
-.resultSelected .secondary,
-.result:hover .secondary {
+.match_context {
+    display: block;
+    margin-top: 4px;
+    color: #a3a3a3;
+    font-size: 12px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.highlight {
+    padding: 0 2px;
+    color: inherit;
+    background: rgba(245, 158, 11, 0.32);
+    border-radius: 4px;
+}
+
+.result_selected .secondary,
+.result:hover .secondary,
+.result_selected .match_context,
+.result:hover .match_context {
     color: #064e3b;
+}
+
+.result_selected .highlight,
+.result:hover .highlight {
+    background: rgba(146, 64, 14, 0.18);
 }
 
 .shortcut {
@@ -103,7 +128,7 @@
     font-weight: 600;
 }
 
-.resultSelected .shortcut,
+.result_selected .shortcut,
 .result:hover .shortcut {
     color: #064e3b;
 }
@@ -122,11 +147,11 @@
     border-color: #e5e7eb;
 }
 
-:global(.theme-light) .inputWrap {
+:global(.theme-light) .input_wrap {
     border-bottom-color: #e5e7eb;
 }
 
-:global(.theme-light) .inputWrap :global(.ant-input-affix-wrapper) {
+:global(.theme-light) .input_wrap :global(.ant-input-affix-wrapper) {
     background: #f9fafb;
     border-color: #e5e7eb;
 }

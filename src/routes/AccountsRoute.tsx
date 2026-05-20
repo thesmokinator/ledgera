@@ -86,13 +86,13 @@ export function AccountsRoute({
         className={styles.card}
         title={t("accounts.title")}
         extra={(
-          <Space className={styles.rangeControl} wrap>
+          <Space className={styles.range_control} wrap>
             <Input.Search
               allowClear
               value={search}
               placeholder={t("accounts.search_placeholder")}
               onChange={(event) => setSearch(event.target.value)}
-              className={styles.searchInput}
+              className={styles.search_input}
             />
             <Select<AccountActivityRange>
               value={activityRange}
@@ -120,9 +120,9 @@ export function AccountsRoute({
           <Empty description={t(search ? "accounts.noSearchResults" : "accounts.empty")} />
         ) : grouped.map(({ group, accounts }) => (
           <div key={group} className={styles.group}>
-            <Typography.Title level={5} className={styles.groupTitle}>
+            <Typography.Title level={5} className={styles.group_title}>
               {t(`accounts.groups.${group}`)}
-              <Typography.Text type="secondary" className={styles.groupCount}>
+              <Typography.Text type="secondary" className={styles.group_count}>
                 {formatCount(accounts.length)}
               </Typography.Text>
             </Typography.Title>
@@ -134,8 +134,8 @@ export function AccountsRoute({
               scroll={{ x: 680 }}
               expandable={{
                 expandedRowRender: (account) => (
-                  <div className={styles.transactionsPanel}>
-                    <Typography.Text className={styles.transactionsTitle}>
+                  <div className={styles.transactions_panel}>
+                    <Typography.Text className={styles.transactions_title}>
                       {t("accounts.account_activity", {
                         account: account.account,
                         count: account.activityCount,

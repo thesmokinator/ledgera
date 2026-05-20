@@ -12,14 +12,14 @@
     border-color: #e5e7eb;
 }
 
-.rangeControl {
+.range_control {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 12px;
 }
 
-.searchInput {
+.search_input {
     width: 260px;
 }
 
@@ -31,7 +31,7 @@
     margin-bottom: 0;
 }
 
-.groupTitle {
+.group_title {
     display: flex;
     align-items: baseline;
     gap: 8px;
@@ -40,39 +40,39 @@
     border-bottom: 1px solid #2c2c2c;
 }
 
-:global(.theme-light) .groupTitle {
+:global(.theme-light) .group_title {
     border-bottom-color: #e5e7eb;
 }
 
-.groupCount {
+.group_count {
     font-size: 13px;
     font-weight: 400;
 }
 
-.transactionsPanel {
+.transactions_panel {
     display: grid;
     gap: 12px;
     padding: 8px 0 4px;
 }
 
-.transactionsTitle {
+.transactions_title {
     color: #d4d4d4;
 }
 
-:global(.theme-light) .transactionsTitle {
+:global(.theme-light) .transactions_title {
     color: #374151;
 }
 
-.transactionsPanel :global(.ant-table-wrapper) {
+.transactions_panel :global(.ant-table-wrapper) {
     overflow: hidden;
     border: 1px solid #2c2c2c;
     border-radius: 10px;
 }
 
-:global(.theme-light) .transactionsPanel :global(.ant-table-wrapper) {
+:global(.theme-light) .transactions_panel :global(.ant-table-wrapper) {
     border-color: #e5e7eb;
 }
 
-.transactionsPanel :global(.ant-table-pagination) {
+.transactions_panel :global(.ant-table-pagination) {
     margin-right: 12px !important;
 }

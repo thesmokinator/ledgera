@@ -6,13 +6,13 @@ import { Amount } from "../components/Amount";
 import styles from "./TransactionsTable.module.css";
 
 function flowIcon(kind: string) {
-  if (kind === "transfer") return <SwapOutlined className={`${styles.flowIcon} ${styles.flowIconTransfer}`} />;
-  return <ArrowRightOutlined className={`${styles.flowIcon} ${styles[`flowIcon${kind.charAt(0).toUpperCase() + kind.slice(1)}`]}`} />;
+  if (kind === "transfer") return <SwapOutlined className={`${styles.flow_icon} ${styles.flow_icon_transfer}`} />;
+  return <ArrowRightOutlined className={`${styles.flow_icon} ${styles[`flowIcon${kind.charAt(0).toUpperCase() + kind.slice(1)}`]}`} />;
 }
 
 function AccountList({ accounts }: { accounts: string[] }) {
   return (
-    <span className={styles.accountFlowSide}>
+    <span className={styles.account_flow_side}>
       {accounts.map((account) => (
         <span key={account}>{account}</span>
       ))}
@@ -27,7 +27,7 @@ export function accountFlow(transaction: JournalTransaction) {
   if (to.length === 0) return <AccountList accounts={from} />;
 
   return (
-    <span className={styles.accountFlow}>
+    <span className={styles.account_flow}>
       <AccountList accounts={from} />
       {flowIcon(transaction.display.kind)}
       <AccountList accounts={to} />

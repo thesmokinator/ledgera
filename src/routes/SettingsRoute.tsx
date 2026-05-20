@@ -31,7 +31,7 @@ const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
 
 function CardTitle({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <Space className={styles.sectionTitle}>
+    <Space className={styles.section_title}>
       {icon}
       <span>{label}</span>
     </Space>
@@ -63,13 +63,13 @@ function PathInput({
   }
 
   return (
-    <Space.Compact block className={styles.pathInputGroup}>
+    <Space.Compact block className={styles.path_input_group}>
       <Input
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
         placeholder={placeholder}
       />
-      {statusAddon ? <div className={styles.pathInputAddon}>{statusAddon}</div> : null}
+      {statusAddon ? <div className={styles.path_input_addon}>{statusAddon}</div> : null}
       <Tooltip title={pickerTitle}>
         <Button icon={<UploadOutlined />} onClick={selectFile} />
       </Tooltip>
@@ -146,34 +146,34 @@ export function SettingsRoute({
               {parseError(journalError, t)}
             </Typography.Text>
           ) : stats ? (
-            <div className={styles.statsGrid}>
-              <div className={styles.statsItem}>
-                <span className={styles.statsLabel}>{t("settings.stats_transactions")}</span>
-                <span className={styles.statsValue}>{formatCount(stats.transactions)}</span>
+            <div className={styles.stats_grid}>
+              <div className={styles.stats_item}>
+                <span className={styles.stats_label}>{t("settings.stats_transactions")}</span>
+                <span className={styles.stats_value}>{formatCount(stats.transactions)}</span>
               </div>
-              <div className={styles.statsItem}>
-                <span className={styles.statsLabel}>{t("settings.stats_accounts")}</span>
-                <span className={styles.statsValue}>{formatCount(stats.accounts)}</span>
+              <div className={styles.stats_item}>
+                <span className={styles.stats_label}>{t("settings.stats_accounts")}</span>
+                <span className={styles.stats_value}>{formatCount(stats.accounts)}</span>
               </div>
-              <div className={styles.statsItem}>
-                <span className={styles.statsLabel}>{t("settings.stats_commodities")}</span>
-                <span className={styles.statsValue}>{formatCount(stats.commodities)}</span>
+              <div className={styles.stats_item}>
+                <span className={styles.stats_label}>{t("settings.stats_commodities")}</span>
+                <span className={styles.stats_value}>{formatCount(stats.commodities)}</span>
               </div>
-              <div className={styles.statsItem}>
-                <span className={styles.statsLabel}>{t("settings.stats_date_range")}</span>
-                <span className={styles.statsValue}>
+              <div className={styles.stats_item}>
+                <span className={styles.stats_label}>{t("settings.stats_date_range")}</span>
+                <span className={styles.stats_value}>
                   {stats.dateMin && stats.dateMax
                     ? `${stats.dateMin} → ${stats.dateMax}`
                     : "-"}
                 </span>
               </div>
-              <div className={styles.statsItem}>
-                <span className={styles.statsLabel}>{t("settings.stats_files")}</span>
-                <span className={styles.statsValue}>{formatCount(stats.fileCount)}</span>
+              <div className={styles.stats_item}>
+                <span className={styles.stats_label}>{t("settings.stats_files")}</span>
+                <span className={styles.stats_value}>{formatCount(stats.fileCount)}</span>
               </div>
-              <div className={styles.statsItem}>
-                <span className={styles.statsLabel}>{t("settings.stats_file_size")}</span>
-                <span className={styles.statsValue}>{formatFileSize(stats.fileSize)}</span>
+              <div className={styles.stats_item}>
+                <span className={styles.stats_label}>{t("settings.stats_file_size")}</span>
+                <span className={styles.stats_value}>{formatFileSize(stats.fileSize)}</span>
               </div>
             </div>
           ) : (
@@ -217,7 +217,7 @@ export function SettingsRoute({
           className={styles.card}
           title={<CardTitle icon={<SettingOutlined />} label={t("settings.preferences")} />}
         >
-          <div className={styles.preferencesStack}>
+          <div className={styles.preferences_stack}>
             <Form.Item label={t("settings.default_commodity")} name="defaultCommodity">
               <AutoComplete
                 options={commodityOptions}
@@ -234,7 +234,7 @@ export function SettingsRoute({
                 ]}
               />
             </Form.Item>
-            <div className={styles.developerSettings}>
+            <div className={styles.developer_settings}>
               <div>
                 <Typography.Text strong>{t("settings.prefill_postings")}</Typography.Text>
                 <Typography.Paragraph type="secondary">
@@ -245,7 +245,7 @@ export function SettingsRoute({
                 <Switch />
               </Form.Item>
             </div>
-            <div className={styles.developerSettings}>
+            <div className={styles.developer_settings}>
               <div>
                 <Typography.Text strong>{t("settings.fetch_prices")}</Typography.Text>
                 <Typography.Paragraph type="secondary">
@@ -260,7 +260,7 @@ export function SettingsRoute({
               {({ getFieldValue }) =>
                 getFieldValue("fetchPrices") ? (
                   <Form.Item
-                    className={styles.textAreaSetting}
+                    className={styles.text_area_setting}
                     label={t("settings.commodity_symbols")}
                     name="commoditySymbols"
                     help={t("settings.commodity_symbols_help")}
@@ -275,7 +275,7 @@ export function SettingsRoute({
               }
             </Form.Item>
             <Form.Item
-              className={styles.textAreaSetting}
+              className={styles.text_area_setting}
               label={t("settings.exclude_balances")}
               name="excludeBalances"
               help={t("settings.exclude_balances_help")}
@@ -287,7 +287,7 @@ export function SettingsRoute({
               />
             </Form.Item>
             <Form.Item
-              className={styles.textAreaSetting}
+              className={styles.text_area_setting}
               label={t("settings.include_investments")}
               name="includeInvestments"
               help={t("settings.include_investments_help")}
@@ -298,7 +298,7 @@ export function SettingsRoute({
                 style={{ fontFamily: "monospace", fontSize: 13 }}
               />
             </Form.Item>
-            <div className={styles.developerSettings}>
+            <div className={styles.developer_settings}>
               <div>
                 <Typography.Text strong>{t("settings.developer_options")}</Typography.Text>
                 <Typography.Paragraph type="secondary">

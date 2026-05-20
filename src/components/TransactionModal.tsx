@@ -39,12 +39,11 @@ function PostingRow({
   const { t } = useTranslation();
 
   return (
-    <div className={`${styles.postingRow}${isInvestmentMode ? ` ${styles.postingRowInvestment}` : ""}`}>
+    <div className={`${styles.posting_row}${isInvestmentMode ? ` ${styles.posting_row_investment}` : ""}`}>
       <Form.Item label={t("transactions.account")} name={[field.name, "account"]}>
         <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
       </Form.Item>
       <Form.Item
-        className={styles.commodityField}
         label={t("transactions.commodity")}
         name={[field.name, "commodity"]}
         rules={[{ required: true, message: t("transactions.commodity_required") }]}
@@ -67,12 +66,12 @@ function PostingRow({
       )}
       <Button
         danger
-        className={styles.postingDeleteButton}
+        className={styles.posting_delete_button}
         aria-label={t("transactions.remove_posting")}
         icon={<DeleteOutlined />}
         onClick={onRemove}
       />
-      <Form.Item className={styles.postingCommentField} name={[field.name, "comment"]}>
+      <Form.Item className={styles.posting_comment_field} name={[field.name, "comment"]}>
         <Input placeholder={t("transactions.comment_placeholder")} />
       </Form.Item>
     </div>
@@ -146,7 +145,7 @@ export function TransactionModal({
       onOk={() => transactionForm.submit()}
     >
       <Form<TransactionInput>
-        className={styles.transactionForm}
+        className={styles.transaction_form}
         form={transactionForm}
         layout="vertical"
         onValuesChange={validateFormSilently}
@@ -154,7 +153,7 @@ export function TransactionModal({
       >
         {!editingTransaction ? (
           <Segmented<TransactionType>
-            className={styles.transactionTypeSelector}
+            className={styles.transaction_type_selector}
             block
             value={transactionType}
             onChange={onTransactionTypeChange}
@@ -167,7 +166,7 @@ export function TransactionModal({
             ]}
           />
         ) : null}
-        <Space className={styles.formRow} size="middle">
+        <Space className={styles.form_row} size="middle">
           <Form.Item
             label={t("transactions.date")}
             name="date"
@@ -187,12 +186,12 @@ export function TransactionModal({
               },
             ]}
           >
-            <DatePicker format={journalDateFormat} className={styles.fullWidthControl} />
+            <DatePicker format={journalDateFormat} className={styles.full_width_control} />
           </Form.Item>
           <Form.Item label={t("transactions.status")} name="status">
             <Select
               allowClear
-              className={styles.fullWidthControl}
+              className={styles.full_width_control}
               placeholder={t("transactions.status_placeholder")}
               options={[
                 { value: "*", label: t("transactions.status_cleared") },
