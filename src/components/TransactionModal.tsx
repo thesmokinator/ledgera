@@ -40,7 +40,11 @@ function PostingRow({
       <Form.Item label={t("transactions.account")} name={[field.name, "account"]}>
         <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
       </Form.Item>
-      <Form.Item label={t("transactions.commodity")} name={[field.name, "commodity"]}>
+      <Form.Item
+        label={t("transactions.commodity")}
+        name={[field.name, "commodity"]}
+        rules={[{ required: true, message: t("transactions.commodityRequired") }]}
+      >
         <AutoComplete options={commodityOptions} placeholder="EUR" filterOption />
       </Form.Item>
       {isInvestmentMode ? (

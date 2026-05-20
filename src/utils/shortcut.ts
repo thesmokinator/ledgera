@@ -62,6 +62,16 @@ export function newTransactionShortcut(): string {
   return formatShortcut("command+n, ctrl+n");
 }
 
+/** Returns the shortcut label for the "Current month" action. */
+export function currentMonthShortcut(): string {
+  return formatShortcut("command+t, ctrl+t");
+}
+
+/** Returns the shortcut label for the spotlight / command palette action. */
+export function spotlightShortcut(): string {
+  return formatShortcut("command+k, ctrl+k");
+}
+
 /** Returns the shortcut label for a navigation item by its index (1-based). */
 export function navShortcut(index: number): string {
   return formatShortcut(`command+${index}, ctrl+${index}`);

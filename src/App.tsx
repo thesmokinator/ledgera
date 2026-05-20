@@ -21,6 +21,7 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  CommandPalette,
   CourtesyState,
   NavigationGroup,
   TransactionModal,
@@ -57,7 +58,8 @@ import {
   autoCalculateBalancingAmounts,
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
-import { navShortcut, newTransactionShortcut } from "./utils/shortcut";
+import { navShortcut, newTransactionShortcut, spotlightShortcut } from "./utils/shortcut";
+import type { CommandPaletteCommand } from "./utils/search";
 import "./App.css";
 
 /** Invokes a typed Tauri command. */
@@ -74,6 +76,7 @@ function App() {
   const [transactionType, setTransactionType] = useState<TransactionType>("expense");
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [transactionForm] = Form.useForm<TransactionInput>();
   const [settingsForm] = Form.useForm<AppSettings>();
   const queryClient = useQueryClient();
@@ -257,6 +260,15 @@ function App() {
     setTransactionModalOpen(true);
   }
 
+  const paletteCommands = useMemo<CommandPaletteCommand[]>(() => [
+    { id: "new-transaction", label: t("transactions.newTransaction"), shortcut: newTransactionShortcut(), keywords: ["create", "add"] },
+    { id: "go-transactions", label: t("common.transactions"), shortcut: navShortcut(1), keywords: ["journal"] },
+    { id: "go-accounts", label: t("common.accounts"), shortcut: navShortcut(2) },
+    { id: "go-balances", label: t("common.balances"), shortcut: navShortcut(3) },
+    { id: "go-settings", label: t("common.settings"), shortcut: navShortcut(4), keywords: ["preferences"] },
+    ...(activeSettings.powerUser ? [{ id: "go-logs", label: t("logs.title"), shortcut: navShortcut(5) }] : []),
+  ], [activeSettings.powerUser, t]);
+
   const shortcuts = useMemo(() => {
     const hasJournal = Boolean(activeSettings.journalPath.trim());
     return [
@@ -267,9 +279,10 @@ function App() {
       { keys: "command+4, ctrl+4", action: () => setActiveView("settings") },
       { keys: "command+5, ctrl+5", action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
       { keys: "command+,, ctrl+,", action: () => setActiveView("settings") },
-      { keys: "escape", action: () => { if (isTransactionModalOpen) setTransactionModalOpen(false); } },
+      { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true) },
+      { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) setTransactionModalOpen(false); } },
     ];
-  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen]);
+  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen]);
 
   useHotkeys(shortcuts);
 
@@ -325,6 +338,16 @@ function App() {
     [activeSettings.powerUser, activeSettings.journalPath],
   );
 
+  // Show a loading spinner while the initial settings are being fetched
+  if (settingsQuery.isPending) {
+    return (
+      <div className={`app-loader-react ${systemPrefersDark ? "theme-dark" : "theme-light"}`}>
+        <div className="app-loader-spinner" />
+        <span className="app-loader-label">ledgera</span>
+      </div>
+    );
+  }
+
   return (
     <ConfigProvider
       theme={{
@@ -350,9 +373,18 @@ function App() {
             <div className="titlebar-drag" data-tauri-drag-region>
               <Typography.Title level={3}>{activeTitle}</Typography.Title>
             </div>
-            <Button type="primary" icon={<PlusOutlined />} disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
-              {t("transactions.newTransaction")} ({newTransactionShortcut()})
-            </Button>
+            <div className="header-actions">
+              <span
+                className="spotlight-hint"
+                onClick={() => setSpotlightOpen(true)}
+                title={t("common.search")}
+              >
+                {spotlightShortcut()}
+              </span>
+              <Button type="primary" icon={<PlusOutlined />} disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
+                {t("transactions.newTransaction")} ({newTransactionShortcut()})
+              </Button>
+            </div>
           </Layout.Header>
 
           <Layout.Content className="app-content">
@@ -397,6 +429,28 @@ function App() {
             )}
           </Layout.Content>
         </Layout>
+
+        <CommandPalette
+          open={spotlightOpen}
+          commands={paletteCommands}
+          accounts={autocompleteSuggestions.accounts}
+          transactions={transactionsQuery.data?.transactions ?? []}
+          onClose={() => setSpotlightOpen(false)}
+          onCommand={(id) => {
+            if (id === "new-transaction") openCreateTransaction();
+            else if (id === "go-transactions") setActiveView("transactions");
+            else if (id === "go-accounts") setActiveView("accounts");
+            else if (id === "go-balances") setActiveView("balances");
+            else if (id === "go-settings") setActiveView("settings");
+            else if (id === "go-logs") setActiveView("logs");
+          }}
+          onAccount={(_account) => {
+            setActiveView("transactions");
+          }}
+          onTransaction={(transaction) => {
+            openEditTransaction(transaction);
+          }}
+        />
 
         <TransactionModal
           open={isTransactionModalOpen}

@@ -4,6 +4,84 @@ html {
     background: #090909;
 }
 
+/* ── Startup loader ───────────────────────────────────────────────── */
+
+#app-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    height: 100vh;
+    width: 100vw;
+    background: #050505;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+}
+
+.loader-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #242424;
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: loader-spin 0.8s linear infinite;
+}
+
+@keyframes loader-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loader-text {
+    color: #525252;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+}
+
+/* ── React-level loader (while settings are being fetched) ────────── */
+
+.app-loader-react {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    height: 100vh;
+    width: 100vw;
+    background: #050505;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+}
+
+.app-loader-react.theme-light {
+    background: #f9fafb;
+}
+
+.app-loader-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #242424;
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: loader-spin 0.8s linear infinite;
+}
+
+.app-loader-label {
+    color: #525252;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+}
+
 :root {
     font-family:
         Inter,
@@ -87,6 +165,48 @@ button {
     background: transparent !important;
     border-bottom: 1px solid #242424;
     height: 56px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.spotlight-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 28px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #a3a3a3;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: all 150ms;
+}
+
+.spotlight-hint:hover {
+    color: #f5f5f5;
+    background: #2a2a2a;
+    border-color: #525252;
+}
+
+:global(.theme-light) .spotlight-hint {
+    color: #6b7280;
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+:global(.theme-light) .spotlight-hint:hover {
+    color: #111827;
+    background: #e5e7eb;
+    border-color: #9ca3af;
 }
 
 .app-main {
