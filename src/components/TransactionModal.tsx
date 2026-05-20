@@ -15,10 +15,13 @@ import {
 } from "@ant-design/icons";
 import type { FormInstance } from "antd";
 import dayjs from "dayjs";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction, TransactionInput, TransactionType } from "../types";
 import { isValidJournalDate, journalDateFormat } from "../utils/date";
 import styles from "./TransactionModal.module.css";
+
+
 
 function PostingRow({
   field,
@@ -41,6 +44,7 @@ function PostingRow({
         <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
       </Form.Item>
       <Form.Item
+        className={styles.commodityField}
         label={t("transactions.commodity")}
         name={[field.name, "commodity"]}
         rules={[{ required: true, message: t("transactions.commodity_required") }]}
@@ -105,6 +109,24 @@ export function TransactionModal({
   onTransactionTypeChange: (type: TransactionType) => void;
 }) {
   const { t } = useTranslation();
+  const [isFormValid, setFormValid] = useState(false);
+
+  function validateFormSilently() {
+    transactionForm
+      .validateFields()
+      .then(() => setFormValid(true))
+      .catch(() => setFormValid(false));
+  }
+
+  useEffect(() => {
+    if (!open) {
+      setFormValid(false);
+      return;
+    }
+
+    const timer = window.setTimeout(validateFormSilently, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, transactionForm, transactionType, defaultCommodity]);
 
   const isInvestmentMode =
     transactionType === "investment" ||
@@ -119,12 +141,15 @@ export function TransactionModal({
       width={isInvestmentMode ? 780 : 620}
       okText={editingTransaction ? t("common.save") : t("transactions.create_transaction")}
       confirmLoading={isSaving}
+      okButtonProps={{ disabled: !isFormValid || isSaving }}
       onCancel={onClose}
       onOk={() => transactionForm.submit()}
     >
       <Form<TransactionInput>
+        className={styles.transactionForm}
         form={transactionForm}
         layout="vertical"
+        onValuesChange={validateFormSilently}
         onFinish={onSubmit}
       >
         {!editingTransaction ? (
@@ -195,7 +220,13 @@ export function TransactionModal({
                   onRemove={() => remove(field.name)}
                 />
               ))}
-              <Button icon={<PlusOutlined />} onClick={() => add({ account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" })}>
+              <Button
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  add({ account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" });
+                  window.setTimeout(validateFormSilently, 0);
+                }}
+              >
                 {t("transactions.add_posting")}
               </Button>
             </Space>

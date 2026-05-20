@@ -194,7 +194,6 @@ struct PriceInfo {
     formatted: String,
 }
 
-
 async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
@@ -641,7 +640,6 @@ fn format_hledger_display_amount(amount: f64, commodity: &str, bal: &serde_json:
     AmountStyle::from_hledger_json(bal).format_amount(amount, commodity)
 }
 
-
 fn load_balances_for_settings(
     app: &AppHandle,
     settings: &AppSettings,
@@ -1044,6 +1042,44 @@ fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
     read_journal_summary(&journal_path)
 }
 
+/// Searches the configured journal and returns matching transactions.
+#[tauri::command]
+fn search_journal(
+    app: AppHandle,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<JournalTransaction>, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let normalized_query = normalize_search_query(&query);
+    if normalized_query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let files = load_journal_files(&journal_path)?;
+    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let mut scored = transactions
+        .into_iter()
+        .filter_map(|transaction| {
+            let score = score_journal_transaction(&transaction, &normalized_query);
+            (score > 0).then_some((score, transaction))
+        })
+        .collect::<Vec<_>>();
+
+    scored.sort_by(|(score_a, transaction_a), (score_b, transaction_b)| {
+        score_b
+            .cmp(score_a)
+            .then_with(|| transaction_b.date.cmp(&transaction_a.date))
+            .then_with(|| transaction_b.start_line.cmp(&transaction_a.start_line))
+    });
+
+    Ok(scored
+        .into_iter()
+        .take(limit.unwrap_or(12))
+        .map(|(_, transaction)| transaction)
+        .collect())
+}
+
 /// Appends a new transaction using the existing journal style where possible.
 #[tauri::command]
 fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<JournalSummary, String> {
@@ -1127,6 +1163,7 @@ pub fn run() {
             check_hledger,
             get_autocomplete_suggestions,
             list_transactions,
+            search_journal,
             create_transaction,
             update_transaction,
             delete_transaction,
@@ -1407,6 +1444,71 @@ fn load_transactions_from_journal_via_files(
     transactions.reverse();
     transactions.sort_by(|a, b| b.date.cmp(&a.date));
     Ok(transactions)
+}
+
+fn normalize_search_query(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn score_search_match(haystack: &str, needle: &str) -> i32 {
+    let normalized_haystack = normalize_search_query(haystack);
+    let normalized_needle = normalize_search_query(needle);
+    if normalized_needle.is_empty() {
+        return 0;
+    }
+
+    if normalized_haystack == normalized_needle {
+        return 100;
+    }
+
+    if normalized_haystack.starts_with(&normalized_needle) {
+        return 80;
+    }
+
+    for word in normalized_haystack.split(|character: char| {
+        character.is_whitespace() || matches!(character, '-' | '_' | ':' | '/')
+    }) {
+        if !word.is_empty() && word.starts_with(&normalized_needle) {
+            return 60;
+        }
+    }
+
+    if normalized_haystack.contains(&normalized_needle) {
+        return 40;
+    }
+
+    let mut haystack_index = 0usize;
+    for character in normalized_needle.chars() {
+        let Some(relative_index) = normalized_haystack[haystack_index..].find(character) else {
+            return 0;
+        };
+        haystack_index += relative_index + character.len_utf8();
+    }
+
+    20
+}
+
+fn score_journal_transaction(transaction: &JournalTransaction, needle: &str) -> i32 {
+    let mut best_score = score_search_match(&transaction.description, needle);
+    best_score = best_score.max(score_search_match(&transaction.source_file, needle));
+    best_score = best_score.max(score_search_match(&transaction.code, needle));
+    best_score = best_score.max(score_search_match(&transaction.date, needle));
+    best_score = best_score.max(score_search_match(&transaction.display.formatted, needle));
+    best_score = best_score.max(score_search_match(&transaction.raw, needle) / 2);
+
+    for posting in &transaction.postings {
+        best_score = best_score.max(score_search_match(&posting.account, needle));
+        best_score = best_score.max(score_search_match(&posting.comment, needle));
+        best_score = best_score.max(score_search_match(&posting.amount, needle));
+        best_score = best_score.max(score_search_match(&posting.commodity, needle));
+    }
+
+    best_score
 }
 
 fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {

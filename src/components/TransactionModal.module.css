@@ -1,16 +1,24 @@
 .postingRow {
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(0, 0.9fr) auto;
+    grid-template-columns:
+        minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(0, 0.9fr)
+        auto;
     column-gap: 8px;
     width: 100%;
 }
 
 .postingRowInvestment {
-    grid-template-columns: minmax(0, 1.3fr) minmax(90px, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.75fr) auto;
+    grid-template-columns:
+        minmax(0, 1.3fr) minmax(112px, 0.45fr) minmax(0, 0.55fr)
+        minmax(0, 0.75fr) auto;
 }
 
 .postingRow :global(.ant-form-item) {
     margin-bottom: 12px;
+}
+
+.transactionForm :global(.ant-form-item-explain) {
+    display: none;
 }
 
 .postingCommentField {

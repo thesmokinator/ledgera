@@ -1,56 +1,55 @@
-import { FileTextOutlined, FolderOutlined, PlusOutlined, SearchOutlined, SettingOutlined } from "@ant-design/icons";
+import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { Input, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import type { CommandPaletteCommand, CommandPaletteResult } from "../utils/search";
-import { searchCommandPalette } from "../utils/search";
+import { invoke } from "@tauri-apps/api/core";
+import { useQuery } from "@tanstack/react-query";
 import type { JournalTransaction } from "../types";
 import styles from "./CommandPalette.module.css";
 
 export function CommandPalette({
   open,
-  commands,
-  accounts,
-  transactions,
   onClose,
-  onCommand,
-  onAccount,
   onTransaction,
 }: {
   open: boolean;
-  commands: CommandPaletteCommand[];
-  accounts: string[];
-  transactions: JournalTransaction[];
   onClose: () => void;
-  onCommand: (commandId: string) => void;
-  onAccount: (account: string) => void;
   onTransaction: (transaction: JournalTransaction) => void;
 }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-
-  const results = useMemo(
-    () => searchCommandPalette({ query, commands, accounts, transactions, limit: 12 }),
-    [query, commands, accounts, transactions],
-  );
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setSelectedIndex(0);
-    }
+    if (!open) return;
+    setQuery("");
+    setDebouncedQuery("");
+    setSelectedIndex(0);
   }, [open]);
 
   useEffect(() => {
-    setSelectedIndex(0);
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 180);
+    return () => window.clearTimeout(timer);
   }, [query]);
+
+  const resultsQuery = useQuery({
+    queryKey: ["journal-search", debouncedQuery],
+    queryFn: () => invoke<JournalTransaction[]>("search_journal", { query: debouncedQuery, limit: 12 }),
+    enabled: open && debouncedQuery.trim().length > 0,
+    retry: false,
+    placeholderData: (previous) => previous,
+  });
+
+  const results = useMemo(() => resultsQuery.data ?? [], [resultsQuery.data]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [debouncedQuery]);
 
   if (!open) return null;
 
-  function execute(result: CommandPaletteResult | undefined) {
+  function execute(result: JournalTransaction | undefined) {
     if (!result) return;
-    if (result.type === "command") onCommand(result.id);
-    if (result.type === "account") onAccount(result.account);
-    if (result.type === "transaction") onTransaction(result.transaction);
+    onTransaction(result);
     onClose();
   }
 
@@ -76,8 +75,6 @@ export function CommandPalette({
     }
   }
 
-  const grouped = groupResults(results);
-
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
       <div className={styles.panel} onMouseDown={(event) => event.stopPropagation()}>
@@ -89,40 +86,39 @@ export function CommandPalette({
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
-            placeholder="Search accounts, transactions, commands…"
+            placeholder="Search the journal…"
           />
         </div>
         <div className={styles.results}>
-          {results.length === 0 ? (
+          {debouncedQuery.trim().length === 0 ? (
             <Typography.Text type="secondary" className={styles.empty}>
-              No results
+              Start typing to search transactions
             </Typography.Text>
-          ) : grouped.map(({ title, items }) => (
-            <div key={title}>
-              <div className={styles.groupTitle}>{title}</div>
-              {items.map((result) => {
-                const index = results.indexOf(result);
-                return (
-                  <button
-                    key={`${result.type}:${result.id}`}
-                    type="button"
-                    className={`${styles.result} ${index === selectedIndex ? styles.resultSelected : ""}`}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    onClick={() => execute(result)}
-                  >
-                    <span className={styles.icon}>{resultIcon(result)}</span>
-                    <span>
-                      <span className={styles.primary}>{resultTitle(result)}</span>
-                      <span className={styles.secondary}>{resultSubtitle(result)}</span>
-                    </span>
-                    {result.type === "command" && result.shortcut ? (
-                      <span className={styles.shortcut}>{result.shortcut}</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          ) : resultsQuery.isFetching && results.length === 0 ? (
+            <Typography.Text type="secondary" className={styles.empty}>
+              Searching…
+            </Typography.Text>
+          ) : results.length === 0 ? (
+            <Typography.Text type="secondary" className={styles.empty}>
+              No matching transactions
+            </Typography.Text>
+          ) : (
+            results.map((result, index) => (
+              <button
+                key={result.id}
+                type="button"
+                className={`${styles.result} ${index === selectedIndex ? styles.resultSelected : ""}`}
+                onMouseEnter={() => setSelectedIndex(index)}
+                onClick={() => execute(result)}
+              >
+                <span className={styles.icon}><FileTextOutlined /></span>
+                <span>
+                  <span className={styles.primary}>{result.description || result.display.formatted}</span>
+                  <span className={styles.secondary}>{resultSubtitle(result)}</span>
+                </span>
+              </button>
+            ))
+          )}
         </div>
         <div className={styles.help}>
           <span>↑↓ Navigate</span>
@@ -134,39 +130,7 @@ export function CommandPalette({
   );
 }
 
-function groupResults(results: CommandPaletteResult[]): { title: string; items: CommandPaletteResult[] }[] {
-  const groups = [
-    { title: "Commands", type: "command" as const },
-    { title: "Accounts", type: "account" as const },
-    { title: "Transactions", type: "transaction" as const },
-  ];
-
-  return groups
-    .map((group) => ({
-      title: group.title,
-      items: results.filter((result) => result.type === group.type),
-    }))
-    .filter((group) => group.items.length > 0);
-}
-
-function resultIcon(result: CommandPaletteResult) {
-  if (result.type === "command") {
-    return result.id === "new-transaction" ? <PlusOutlined /> : <SettingOutlined />;
-  }
-  if (result.type === "account") return <FolderOutlined />;
-  return <FileTextOutlined />;
-}
-
-function resultTitle(result: CommandPaletteResult): string {
-  if (result.type === "command") return result.label;
-  if (result.type === "account") return result.account;
-  return result.transaction.description || result.transaction.display.formatted;
-}
-
-function resultSubtitle(result: CommandPaletteResult): string {
-  if (result.type === "command") return "Command";
-  if (result.type === "account") return "Account";
-  const tx = result.transaction;
+function resultSubtitle(tx: JournalTransaction): string {
   const flow = [...tx.display.flow.from, ...tx.display.flow.to].join(" → ");
   return [tx.date, tx.display.formatted, flow].filter(Boolean).join(" · ");
 }

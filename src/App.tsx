@@ -58,7 +58,6 @@ import {
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
 import { navShortcut, newTransactionShortcut, spotlightShortcut } from "./utils/shortcut";
-import type { CommandPaletteCommand } from "./utils/search";
 import "./App.css";
 
 /** Invokes a typed Tauri command. */
@@ -259,14 +258,7 @@ function App() {
     setTransactionModalOpen(true);
   }
 
-  const paletteCommands = useMemo<CommandPaletteCommand[]>(() => [
-    { id: "new-transaction", label: t("transactions.new_transaction"), shortcut: newTransactionShortcut(), keywords: ["create", "add"] },
-    { id: "go-transactions", label: t("common.transactions"), shortcut: navShortcut(1), keywords: ["journal"] },
-    { id: "go-accounts", label: t("common.accounts"), shortcut: navShortcut(2) },
-    { id: "go-balances", label: t("common.balances"), shortcut: navShortcut(3) },
-    { id: "go-settings", label: t("common.settings"), shortcut: navShortcut(4), keywords: ["preferences"] },
-    ...(activeSettings.powerUser ? [{ id: "go-logs", label: t("logs.title"), shortcut: navShortcut(5) }] : []),
-  ], [activeSettings.powerUser, t]);
+
 
   const shortcuts = useMemo(() => {
     const hasJournal = Boolean(activeSettings.journalPath.trim());
@@ -431,21 +423,7 @@ function App() {
 
         <CommandPalette
           open={spotlightOpen}
-          commands={paletteCommands}
-          accounts={autocompleteSuggestions.accounts}
-          transactions={transactionsQuery.data?.transactions ?? []}
           onClose={() => setSpotlightOpen(false)}
-          onCommand={(id) => {
-            if (id === "new-transaction") openCreateTransaction();
-            else if (id === "go-transactions") setActiveView("transactions");
-            else if (id === "go-accounts") setActiveView("accounts");
-            else if (id === "go-balances") setActiveView("balances");
-            else if (id === "go-settings") setActiveView("settings");
-            else if (id === "go-logs") setActiveView("logs");
-          }}
-          onAccount={(_account) => {
-            setActiveView("transactions");
-          }}
           onTransaction={(transaction) => {
             openEditTransaction(transaction);
           }}
