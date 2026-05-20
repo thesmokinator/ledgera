@@ -36,7 +36,6 @@ import {
 } from "./routes";
 import type {
   AppSettings,
-  AutocompleteSuggestions,
   HledgerStatus,
   JournalSummary,
   JournalTransaction,
@@ -48,7 +47,7 @@ import {
   journalDateFormat,
   todayJournalDate,
 } from "./utils/date";
-import { toAutocompleteOptions } from "./utils/format";
+
 import { transactionTemplatePostings } from "./utils/account";
 import { normalizeSettings } from "./utils/settings";
 import {
@@ -61,6 +60,7 @@ import { parseError } from "./utils/error";
 import { navShortcut } from "./utils/shortcut";
 import { callCommand } from "./utils/command";
 import { useUpdateStatus } from "./hooks/useUpdateStatus";
+import { useJournalData } from "./hooks/useJournalData";
 import "./App.css";
 
 /** Renders the Ledgera desktop application. */
@@ -98,20 +98,18 @@ function App() {
     checkForUpdates,
   } = useUpdateStatus({ messageApi, t });
 
-  const transactionsQuery = useQuery({
-    queryKey: ["transactions"],
-    queryFn: () => callCommand<JournalSummary>("list_transactions"),
-    enabled: Boolean(settingsQuery.data?.journalPath),
-    retry: false,
-    refetchOnMount: true,
-  });
+  const {
+    transactionsQuery,
+    autocompleteSuggestions,
+    codeOptions,
+    descriptionOptions,
+    accountOptions,
+    commodityOptions,
+    defaultCommodity,
+    hasConfiguredJournal,
+    journalLoadError,
+  } = useJournalData(activeSettings);
 
-  const autocompleteQuery = useQuery({
-    queryKey: ["autocomplete-suggestions"],
-    queryFn: () => callCommand<AutocompleteSuggestions>("get_autocomplete_suggestions"),
-    enabled: Boolean(settingsQuery.data?.journalPath),
-    retry: false,
-  });
 
   const updateSettingsMutation = useMutation({
     mutationFn: (settings: AppSettings) =>
@@ -183,39 +181,7 @@ function App() {
     onError: (error) => messageApi.error(parseError(error, t)),
   });
 
-  const autocompleteSuggestions = autocompleteQuery.data ?? {
-    codes: [],
-    descriptions: [],
-    accounts: [],
-    commodities: [],
-    defaultCommodity: "",
-    defaultCashAccount: "",
-    defaultExpenseAccount: "",
-    defaultIncomeAccount: "",
-    defaultTransferAccount: "",
-    defaultInvestmentAccount: "",
-    defaultInvestmentCommodity: "",
-  };
-  const codeOptions = useMemo(
-    () => toAutocompleteOptions(autocompleteSuggestions.codes),
-    [autocompleteSuggestions.codes],
-  );
-  const descriptionOptions = useMemo(
-    () => toAutocompleteOptions(autocompleteSuggestions.descriptions),
-    [autocompleteSuggestions.descriptions],
-  );
-  const accountOptions = useMemo(
-    () => toAutocompleteOptions(autocompleteSuggestions.accounts),
-    [autocompleteSuggestions.accounts],
-  );
-  const commodityOptions = useMemo(
-    () => toAutocompleteOptions(autocompleteSuggestions.commodities),
-    [autocompleteSuggestions.commodities],
-  );
-  const defaultCommodity = autocompleteSuggestions.defaultCommodity || "";
-  const hasConfiguredJournal = activeSettings.journalPath.trim().length > 0;
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
-  const journalLoadError = transactionsQuery.isError ? String(transactionsQuery.error) : "";
   const courtesyReasons = [
     !hasConfiguredJournal ? t("settings.no_journal_configured") : null,
     journalLoadError ? t("settings.journal_read_failed") : null,
