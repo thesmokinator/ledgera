@@ -3,7 +3,6 @@ import {
   ConfigProvider,
   Form,
   Layout,
-  Space,
   Typography,
   message,
   theme,
@@ -14,7 +13,6 @@ import {
   HomeOutlined,
   PieChartOutlined,
   PlusOutlined,
-  ReloadOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
@@ -28,6 +26,7 @@ import {
   TransactionModal,
 } from "./components";
 import { useSystemTheme } from "./hooks/useSystemTheme";
+import { useHotkeys } from "./hooks/useHotkeys";
 import {
   AccountsRoute,
   BalancesRoute,
@@ -58,6 +57,7 @@ import {
   autoCalculateBalancingAmounts,
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
+import { navShortcut, newTransactionShortcut } from "./utils/shortcut";
 import "./App.css";
 
 /** Invokes a typed Tauri command. */
@@ -257,6 +257,22 @@ function App() {
     setTransactionModalOpen(true);
   }
 
+  const shortcuts = useMemo(() => {
+    const hasJournal = Boolean(activeSettings.journalPath.trim());
+    return [
+      { keys: "command+n, ctrl+n", action: () => { if (!shouldShowCourtesy) openCreateTransaction(); } },
+      { keys: "command+1, ctrl+1", action: () => setActiveView("transactions"), disabled: !hasJournal },
+      { keys: "command+2, ctrl+2", action: () => setActiveView("accounts"), disabled: !hasJournal },
+      { keys: "command+3, ctrl+3", action: () => setActiveView("balances"), disabled: !hasJournal },
+      { keys: "command+4, ctrl+4", action: () => setActiveView("settings") },
+      { keys: "command+5, ctrl+5", action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
+      { keys: "command+,, ctrl+,", action: () => setActiveView("settings") },
+      { keys: "escape", action: () => { if (isTransactionModalOpen) setTransactionModalOpen(false); } },
+    ];
+  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen]);
+
+  useHotkeys(shortcuts);
+
   function submitTransaction(values: TransactionInput) {
     const rawPostings = (values.postings ?? [])
       .filter((posting) => posting.account.trim().length > 0)
@@ -297,12 +313,12 @@ function App() {
     () => {
       const hasJournal = Boolean(activeSettings.journalPath.trim());
       return [
-        { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal },
-        { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal },
-        { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal },
-        { key: "settings", label: "common.settings", icon: <SettingOutlined /> },
+        { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal, shortcut: navShortcut(1) },
+        { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
+        { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
+        { key: "settings", label: "common.settings", icon: <SettingOutlined />, shortcut: navShortcut(4) },
         ...(activeSettings.powerUser
-          ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined /> }]
+          ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(5) }]
           : []),
       ];
     },
@@ -334,14 +350,9 @@ function App() {
             <div className="titlebar-drag" data-tauri-drag-region>
               <Typography.Title level={3}>{activeTitle}</Typography.Title>
             </div>
-            <Space>
-              <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()}>
-                {t("common.refresh")}
-              </Button>
-              <Button type="primary" icon={<PlusOutlined />} disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
-                {t("transactions.newTransaction")}
-              </Button>
-            </Space>
+            <Button type="primary" icon={<PlusOutlined />} disabled={shouldShowCourtesy} onClick={openCreateTransaction}>
+              {t("transactions.newTransaction")} ({newTransactionShortcut()})
+            </Button>
           </Layout.Header>
 
           <Layout.Content className="app-content">

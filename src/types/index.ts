@@ -183,4 +183,5 @@ export type NavigationItem = {
   label: string;
   icon: React.ReactNode;
   disabled?: boolean;
+  shortcut?: string;
 };
