@@ -12,7 +12,7 @@ import {
   PieChartOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
-import { invoke } from "@tauri-apps/api/core";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
@@ -43,7 +43,6 @@ import type {
   NavigationItem,
   TransactionInput,
   TransactionType,
-  UpdateStatus,
 } from "./types";
 import {
   journalDateFormat,
@@ -60,15 +59,9 @@ import {
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
 import { navShortcut } from "./utils/shortcut";
+import { callCommand } from "./utils/command";
+import { useUpdateStatus } from "./hooks/useUpdateStatus";
 import "./App.css";
-
-/** Invokes a typed Tauri command. */
-function callCommand<TResponse, TPayload extends Record<string, unknown> = Record<string, never>>(
-  command: string,
-  payload?: TPayload,
-): Promise<TResponse> {
-  return invoke<TResponse>(command, payload);
-}
 
 /** Renders the Ledgera desktop application. */
 function App() {
@@ -99,28 +92,11 @@ function App() {
     queryFn: () => callCommand<HledgerStatus>("check_hledger"),
   });
 
-  const updateStatusQuery = useQuery({
-    queryKey: ["update-status"],
-    queryFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: false }),
-    retry: false,
-  });
-
-  const checkForUpdatesMutation = useMutation({
-    mutationFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: true }),
-    onSuccess: (status) => {
-      queryClient.setQueryData(["update-status"], status);
-      if (status.available) {
-        messageApi.success(t("settings.update_available", { version: status.latestVersion }));
-      } else if (status.error) {
-        messageApi.error(t("settings.update_check_failed"));
-      } else {
-        messageApi.success(t("settings.up_to_date"));
-      }
-    },
-    onError: () => messageApi.error(t("settings.update_check_failed")),
-  });
-
-  const updateStatus = checkForUpdatesMutation.data ?? updateStatusQuery.data;
+  const {
+    updateStatus,
+    isCheckingForUpdates,
+    checkForUpdates,
+  } = useUpdateStatus({ messageApi, t });
 
   const transactionsQuery = useQuery({
     queryKey: ["transactions"],
@@ -399,8 +375,8 @@ function App() {
                 journalSummary={transactionsQuery.data}
                 journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
                 updateStatus={updateStatus}
-                isCheckingForUpdates={updateStatusQuery.isFetching || checkForUpdatesMutation.isPending}
-                onCheckForUpdates={() => checkForUpdatesMutation.mutate()}
+                isCheckingForUpdates={isCheckingForUpdates}
+                onCheckForUpdates={checkForUpdates}
                 onValuesChange={updateSettingsOnChange}
               />
             ) : activeView === "logs" ? (
