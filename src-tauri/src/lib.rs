@@ -188,92 +188,13 @@ fn clear_logs(app: AppHandle) -> Result<(), String> {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Holding {
-    commodity: String,
-    quantity: f64,
-    account: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct PriceInfo {
     price: f64,
     currency: String,
     formatted: String,
 }
 
-#[tauri::command]
-fn get_holdings(app: AppHandle) -> Result<Vec<Holding>, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let files = load_journal_files(&journal_path)?;
-    let transactions = load_transactions_from_journal_via_files(&files)?;
 
-    let default_commodity = settings.default_commodity.trim().to_lowercase();
-    let mut quantities: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-    let mut accounts: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let mut original_commodity: std::collections::HashMap<String, String> =
-        std::collections::HashMap::new();
-
-    for tx in &transactions {
-        for posting in &tx.postings {
-            let commodity_raw = posting.commodity.trim();
-            // Strip @ price notation (e.g. "XEON @ €148.70" → "XEON")
-            let commodity_clean = if let Some(at_pos) = commodity_raw.find(" @ ") {
-                commodity_raw[..at_pos].trim()
-            } else {
-                commodity_raw
-            };
-            let commodity_lower = commodity_clean.to_lowercase();
-            if commodity_lower.is_empty() || commodity_lower == default_commodity {
-                continue;
-            }
-            let amount = posting.amount.trim().replace(',', ".");
-            if let Ok(qty) = amount.parse::<f64>() {
-                *quantities.entry(commodity_lower.clone()).or_default() += qty;
-                accounts
-                    .entry(commodity_lower.clone())
-                    .or_insert_with(|| posting.account.trim().to_string());
-                original_commodity
-                    .entry(commodity_lower.clone())
-                    .or_insert_with(|| commodity_clean.to_string());
-            }
-        }
-    }
-
-    let include_set: std::collections::HashSet<String> = settings
-        .include_investments
-        .lines()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect();
-
-    let mut result: Vec<Holding> = Vec::new();
-    for (commodity_lower, quantity) in quantities {
-        if quantity.abs() <= 0.0001 {
-            continue;
-        }
-        if !include_set.is_empty() {
-            let acct = accounts.get(&commodity_lower);
-            if acct.map_or(true, |a| !include_set.contains(a.as_str())) {
-                continue;
-            }
-        }
-        let account = accounts.remove(&commodity_lower).unwrap_or_default();
-        let commodity = original_commodity
-            .remove(&commodity_lower)
-            .unwrap_or(commodity_lower);
-        result.push(Holding {
-            account,
-            commodity,
-            quantity,
-        });
-    }
-    result.sort_by(|a, b| a.commodity.cmp(&b.commodity));
-    Ok(result)
-}
-
-#[tauri::command]
 async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
@@ -479,7 +400,6 @@ fn parse_balance_output(
 }
 
 /// Fetches current prices from Yahoo Finance for a list of symbols.
-#[tauri::command]
 async fn fetch_prices(
     app: AppHandle,
     symbols: Vec<String>,
@@ -721,15 +641,6 @@ fn format_hledger_display_amount(amount: f64, commodity: &str, bal: &serde_json:
     AmountStyle::from_hledger_json(bal).format_amount(amount, commodity)
 }
 
-/// Formats a number using the journal's display style.
-#[tauri::command]
-fn format_number(value: f64) -> String {
-    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
-        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
-        DEFAULT.get_or_init(AmountStyle::default)
-    });
-    style.format(value)
-}
 
 fn load_balances_for_settings(
     app: &AppHandle,
@@ -1221,13 +1132,9 @@ pub fn run() {
             delete_transaction,
             get_logs,
             clear_logs,
-            get_holdings,
-            get_investments,
             get_investments_overview,
-            fetch_prices,
             get_balances,
             get_accounts_overview,
-            format_number,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

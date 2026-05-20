@@ -132,18 +132,6 @@ export type LogEntry = {
   details?: string;
 };
 
-export type Holding = {
-  commodity: string;
-  quantity: number;
-  account: string;
-};
-
-export type PriceInfo = {
-  price: number;
-  currency: string;
-  formatted: string;
-};
-
 export type Balance = {
   account: string;
   amount: number;
