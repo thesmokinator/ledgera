@@ -162,7 +162,7 @@ fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
     }
     let content = fs::read_to_string(&path).map_err(|error| {
         to_error_string_with_details(
-            "LOG_READ_FAILED",
+            "log_read_failed",
             "Unable to read log file.",
             error.to_string(),
         )
@@ -177,7 +177,7 @@ fn clear_logs(app: AppHandle) -> Result<(), String> {
     let path = log_path(&app)?;
     fs::write(&path, "").map_err(|error| {
         to_error_string_with_details(
-            "LOG_WRITE_FAILED",
+            "log_write_failed",
             "Unable to clear log file.",
             error.to_string(),
         )
@@ -223,7 +223,7 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
             .await
             .map_err(|error| {
                 to_error_string_with_details(
-                    "HLEDGER_BALANCE_FAILED",
+                    "hledger_balance_failed",
                     "Unable to run hledger balance for investments.",
                     error.to_string(),
                 )
@@ -317,7 +317,7 @@ fn parse_balance_output(
 ) -> Result<Vec<Balance>, String> {
     let raw: Vec<serde_json::Value> = serde_json::from_str(stdout).map_err(|error| {
         to_error_string_with_details(
-            "HLEDGER_BALANCE_PARSE_FAILED",
+            "hledger_balance_parse_failed",
             "Unable to parse hledger balance output.",
             error.to_string(),
         )
@@ -325,7 +325,7 @@ fn parse_balance_output(
 
     let rows = raw.first().and_then(|v| v.as_array()).ok_or_else(|| {
         to_error_string(
-            "HLEDGER_BALANCE_PARSE_FAILED",
+            "hledger_balance_parse_failed",
             "Unexpected hledger balance JSON structure.",
         )
     })?;
@@ -408,7 +408,7 @@ async fn fetch_prices(
 
     if !settings.fetch_prices {
         return Err(to_error_string(
-            "PRICES_DISABLED",
+            "prices_disabled",
             "Market price fetching is disabled in Settings.",
         ));
     }
@@ -478,7 +478,7 @@ async fn fetch_prices(
                 log_event_with_details(
                     &app,
                     "error",
-                    "PRICE_FETCH_FAILED",
+                    "price_fetch_failed",
                     &format!("HTTP request failed for {}", symbol),
                     Some(error.to_string()),
                 );
@@ -659,7 +659,7 @@ fn load_balances_for_settings(
         .output()
         .map_err(|error| {
             to_error_string_with_details(
-                "HLEDGER_BALANCE_FAILED",
+                "hledger_balance_failed",
                 "Unable to run hledger balance.",
                 error.to_string(),
             )
@@ -670,12 +670,12 @@ fn load_balances_for_settings(
         log_event_with_details(
             app,
             "error",
-            "BALANCE_FAILED",
+            "balance_failed",
             "hledger balance failed",
             Some(stderr.clone()),
         );
         return Err(to_error_string_with_details(
-            "HLEDGER_BALANCE_FAILED",
+            "hledger_balance_failed",
             "hledger balance command failed.",
             stderr,
         ));
@@ -697,7 +697,7 @@ async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     .await
     .map_err(|error| {
         to_error_string_with_details(
-            "HLEDGER_BALANCE_FAILED",
+            "hledger_balance_failed",
             "Unable to run hledger balance.",
             error.to_string(),
         )
@@ -721,7 +721,7 @@ async fn get_accounts_overview(
     .await
     .map_err(|error| {
         to_error_string_with_details(
-            "HLEDGER_BALANCE_FAILED",
+            "hledger_balance_failed",
             "Unable to run hledger balance for accounts overview.",
             error.to_string(),
         )
@@ -932,7 +932,7 @@ fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetti
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             to_error_string_with_details(
-                "SETTINGS_SAVE_FAILED",
+                "settings_save_failed",
                 "Unable to create settings directory.",
                 error.to_string(),
             )
@@ -941,14 +941,14 @@ fn update_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetti
 
     let content = serde_json::to_string_pretty(&settings).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_SAVE_FAILED",
+            "settings_save_failed",
             "Unable to encode settings.",
             error.to_string(),
         )
     })?;
     fs::write(&path, content).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_SAVE_FAILED",
+            "settings_save_failed",
             "Unable to write settings file.",
             error.to_string(),
         )
@@ -1053,7 +1053,7 @@ fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<Journal
         log_event_with_details(
             &app,
             "error",
-            "TRANSACTION_CREATE_FAILED",
+            "transaction_create_failed",
             "Failed to create transaction",
             Some(e.clone()),
         );
@@ -1074,7 +1074,7 @@ fn update_transaction(
         log_event_with_details(
             &app,
             "error",
-            "TRANSACTION_UPDATE_FAILED",
+            "transaction_update_failed",
             "Failed to update transaction",
             Some(e.clone()),
         );
@@ -1091,7 +1091,7 @@ fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, Stri
         log_event_with_details(
             &app,
             "error",
-            "TRANSACTION_DELETE_FAILED",
+            "transaction_delete_failed",
             "Failed to delete transaction",
             Some(e.clone()),
         );
@@ -1158,14 +1158,14 @@ fn read_settings(app: &AppHandle) -> Result<AppSettings, String> {
 
     let content = fs::read_to_string(&path).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_READ_FAILED",
+            "settings_read_failed",
             "Unable to read settings file.",
             error.to_string(),
         )
     })?;
     serde_json::from_str(&content).map_err(|error| {
         to_error_string_with_details(
-            "SETTINGS_READ_FAILED",
+            "settings_read_failed",
             "Settings file is corrupted.",
             error.to_string(),
         )
@@ -1225,7 +1225,7 @@ fn is_executable_file(path: &Path) -> bool {
 }
 
 fn login_shell_path_dirs() -> Vec<PathBuf> {
-    let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = env::var("shell").unwrap_or_else(|_| "/bin/zsh".to_string());
     [["-li", "-c", "echo $PATH"], ["-l", "-c", "echo $PATH"]]
         .into_iter()
         .find_map(|args| {
@@ -1251,7 +1251,7 @@ fn login_shell_path_dirs() -> Vec<PathBuf> {
 fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     if settings.journal_path.trim().is_empty() {
         return Err(to_error_string(
-            "JOURNAL_NOT_CONFIGURED",
+            "journal_not_configured",
             "Configure a journal path in Settings before loading transactions.",
         ));
     }
@@ -1259,7 +1259,7 @@ fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     let path = PathBuf::from(settings.journal_path.trim());
     if !path.exists() {
         return Err(to_error_string_with_details(
-            "JOURNAL_NOT_FOUND",
+            "journal_not_found",
             "Journal file does not exist.",
             format!("Expected at: {}", path.display()),
         ));
@@ -1429,7 +1429,7 @@ fn load_journal_file_recursive(
 
     let content = fs::read_to_string(&canonical_path).map_err(|error| {
         to_error_string_with_details(
-            "JOURNAL_READ_FAILED",
+            "journal_read_failed",
             "Unable to read journal file.",
             format!("{}: {}", canonical_path.display(), error),
         )
@@ -1488,7 +1488,7 @@ fn resolve_include_paths(journal_path: &Path, include: &str) -> Result<Vec<PathB
             Ok(vec![absolute_pattern])
         } else {
             Err(to_error_string_with_details(
-                "JOURNAL_INCLUDE_MISSING",
+                "journal_include_missing",
                 "Included journal file does not exist.",
                 format!("Expected at: {}", absolute_pattern.display()),
             ))
@@ -1620,7 +1620,7 @@ where
 {
     let original = fs::read_to_string(source_path).map_err(|error| {
         to_error_string_with_details(
-            "JOURNAL_READ_FAILED",
+            "journal_read_failed",
             "Unable to read source journal file.",
             format!("{}: {}", source_path.display(), error),
         )
@@ -1629,7 +1629,7 @@ where
 
     fs::write(source_path, &updated).map_err(|error| {
         to_error_string_with_details(
-            "JOURNAL_WRITE_FAILED",
+            "journal_write_failed",
             "Unable to write journal file.",
             error.to_string(),
         )
@@ -1637,7 +1637,7 @@ where
     if let Err(error) = validate_journal(settings, main_journal) {
         fs::write(source_path, original).map_err(|rollback_error| {
             to_error_string_with_details(
-                "JOURNAL_WRITE_FAILED",
+                "journal_write_failed",
                 "Journal file may be corrupted - rollback failed.",
                 rollback_error.to_string(),
             )
@@ -1993,12 +1993,12 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
     match output {
         Ok(output) if output.status.success() => Ok(()),
         Ok(output) => Err(to_error_string_with_details(
-            "HLEDGER_CHECK_FAILED",
+            "hledger_check_failed",
             "hledger check failed. The journal may contain syntax errors.",
             String::from_utf8_lossy(&output.stderr).trim().to_string(),
         )),
         Err(error) => Err(to_error_string_with_details(
-            "HLEDGER_CHECK_FAILED",
+            "hledger_check_failed",
             "Unable to run hledger check.",
             error.to_string(),
         )),
@@ -2210,7 +2210,7 @@ fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlock, String>
         .map(|transaction| TransactionBlock { transaction })
         .ok_or_else(|| {
             to_error_string_with_details(
-                "TRANSACTION_NOT_FOUND",
+                "transaction_not_found",
                 "Transaction not found. It may have been deleted or moved.",
                 format!("Transaction id: {}", id),
             )
