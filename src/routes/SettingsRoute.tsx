@@ -14,7 +14,9 @@ import {
 import type { FormInstance } from "antd";
 import {
   CodeOutlined,
+  DownloadOutlined,
   FolderOutlined,
+  InfoCircleOutlined,
   SettingOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
@@ -24,7 +26,7 @@ import { useTranslation } from "react-i18next";
 import packageJson from "../../package.json";
 import { formatCount, formatFileSize } from "../utils/format";
 import { parseError } from "../utils/error";
-import type { AppSettings, HledgerStatus, JournalSummary } from "./types";
+import type { AppSettings, HledgerStatus, JournalSummary, UpdateStatus } from "./types";
 import styles from "./SettingsRoute.module.css";
 
 const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
@@ -84,6 +86,9 @@ export function SettingsRoute({
   hledgerStatus,
   journalSummary,
   journalError,
+  updateStatus,
+  isCheckingForUpdates,
+  onCheckForUpdates,
   onValuesChange,
 }: {
   form: FormInstance<AppSettings>;
@@ -92,6 +97,9 @@ export function SettingsRoute({
   hledgerStatus: HledgerStatus | undefined;
   journalSummary: JournalSummary | undefined;
   journalError: string | null;
+  updateStatus: UpdateStatus | undefined;
+  isCheckingForUpdates: boolean;
+  onCheckForUpdates: () => void;
   onValuesChange: (changed: Partial<AppSettings>, values: AppSettings) => void;
 }) {
   const { t } = useTranslation();
@@ -312,11 +320,53 @@ export function SettingsRoute({
           </div>
         </Card>
 
+        {/* ── App ──────────────────────────────────── */}
+        <Card
+          className={styles.card}
+          title={<CardTitle icon={<InfoCircleOutlined />} label={t("settings.app")} />}
+          extra={updateStatus?.available ? <Tag color="warning">{t("settings.update_available_short")}</Tag> : null}
+        >
+          <div className={styles.app_update_panel}>
+            <div>
+              <Typography.Text strong>{t("settings.version_label")}</Typography.Text>
+              <Typography.Paragraph type="secondary">
+                {updateStatus?.currentVersion ?? packageJson.version}
+              </Typography.Paragraph>
+            </div>
+            <div>
+              <Typography.Text strong>{t("settings.updates")}</Typography.Text>
+              <Typography.Paragraph type={updateStatus?.error ? "danger" : "secondary"}>
+                {updateStatus?.error
+                  ? t("settings.update_check_failed")
+                  : updateStatus?.available
+                    ? t("settings.update_available", { version: updateStatus.latestVersion })
+                    : t("settings.up_to_date")}
+              </Typography.Paragraph>
+              {updateStatus?.checkedAt ? (
+                <Typography.Text type="secondary" className={styles.update_checked_at}>
+                  {t("settings.last_checked", { date: new Date(updateStatus.checkedAt).toLocaleString() })}
+                </Typography.Text>
+              ) : null}
+            </div>
+            <Space wrap>
+              <Button
+                icon={<DownloadOutlined />}
+                loading={isCheckingForUpdates}
+                onClick={onCheckForUpdates}
+              >
+                {t("settings.check_for_updates")}
+              </Button>
+              {updateStatus?.releaseUrl ? (
+                <Button href={updateStatus.releaseUrl} target="_blank">
+                  {t("settings.view_release")}
+                </Button>
+              ) : null}
+            </Space>
+          </div>
+        </Card>
+
         {/* ── Footer ───────────────────────────────── */}
         <div className={styles.footer}>
-          <Typography.Text type="secondary">
-            {t("settings.version", { version: packageJson.version })}
-          </Typography.Text>
           <Space wrap>
             <Button size="small" href={projectRepositoryUrl} target="_blank">
               {t("settings.repository")}

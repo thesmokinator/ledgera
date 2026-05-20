@@ -53,12 +53,29 @@
     opacity: 0.7;
 }
 
+.nav_badge {
+    margin-left: auto;
+    padding: 2px 6px;
+    color: #451a03;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: #fbbf24;
+    border-radius: 999px;
+}
+
 .nav_shortcut {
     margin-left: auto;
     font-size: 11px;
     font-weight: 500;
     opacity: 0.55;
     letter-spacing: 0.02em;
+}
+
+.nav_badge + .nav_shortcut {
+    margin-left: 0;
 }
 
 :global(.theme-light) .nav_item {
