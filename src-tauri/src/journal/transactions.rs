@@ -4,9 +4,9 @@ use crate::{
     journal::{
         files::{parse_include_directive, require_journal_path},
         parser::{find_block, format_transaction, replace_line_range, split_lines},
+        summary::read_journal_summary,
         types::{JournalSummary, RoutingStrategy, TransactionInput},
     },
-    read_journal_summary,
     settings::AppSettings,
 };
 use std::{
@@ -459,4 +459,3 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
         )),
     }
 }
-

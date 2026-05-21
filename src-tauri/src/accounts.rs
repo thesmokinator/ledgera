@@ -1,7 +1,45 @@
-use crate::{journal::types::JournalTransaction, Balance};
+use crate::{
+    app_error::to_error_string_with_details,
+    balances::{load_balances_for_settings, Balance},
+    journal::{
+        files::require_journal_path, summary::read_journal_summary, types::JournalTransaction,
+    },
+    settings::read_settings,
+};
 use chrono::{Datelike, Local, NaiveDate};
 use serde::Serialize;
 use std::collections::HashMap;
+use tauri::AppHandle;
+
+#[tauri::command]
+pub(crate) async fn get_accounts_overview(
+    app: AppHandle,
+    activity_range: String,
+) -> Result<AccountsOverview, String> {
+    let settings = read_settings(&app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let summary = read_journal_summary(&journal_path)?;
+    let app_for_task = app.clone();
+    let settings_for_task = settings.clone();
+
+    let balances = tauri::async_runtime::spawn_blocking(move || {
+        load_balances_for_settings(&app_for_task, &settings_for_task, true)
+    })
+    .await
+    .map_err(|error| {
+        to_error_string_with_details(
+            "hledger_balance_failed",
+            "Unable to run hledger balance for accounts overview.",
+            error.to_string(),
+        )
+    })??;
+
+    Ok(build_accounts_overview(
+        &summary.transactions,
+        balances,
+        &activity_range,
+    ))
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

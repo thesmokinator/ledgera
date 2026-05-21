@@ -1,4 +1,4 @@
-use crate::AmountStyle;
+use crate::amount_style::AmountStyle;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]

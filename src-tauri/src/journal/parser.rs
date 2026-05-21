@@ -1,4 +1,5 @@
 use crate::{
+    amount_style::AmountStyle,
     app_error::to_error_string_with_details,
     journal::{
         files::{load_journal_files, JournalFile},
@@ -7,7 +8,7 @@ use crate::{
             TransactionFlow, TransactionInput,
         },
     },
-    AmountStyle, AMOUNT_STYLE,
+    AMOUNT_STYLE,
 };
 use std::{path::Path, sync::OnceLock};
 
