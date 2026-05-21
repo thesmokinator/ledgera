@@ -5,6 +5,7 @@
 
 mod amount_format;
 mod app_error;
+mod hledger;
 mod logs;
 mod settings;
 mod updates;
@@ -12,6 +13,7 @@ mod updates;
 use amount_format::{AmountFormatConfig, CommodityPosition};
 use app_error::{to_error_string, to_error_string_with_details};
 use chrono::{Datelike, Local, NaiveDate};
+use hledger::hledger_executable;
 use serde::{Deserialize, Serialize};
 use settings::{read_settings, AppSettings};
 use std::{
@@ -575,16 +577,6 @@ async fn get_accounts_overview(
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct HledgerStatus {
-    available: bool,
-    version: String,
-    message: String,
-    resolved_path: String,
-    source: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct JournalSummary {
     path: String,
     transactions: Vec<JournalTransaction>,
@@ -741,41 +733,6 @@ struct JournalProfile {
     default_transfer_account: String,
     default_investment_account: String,
     default_investment_commodity: String,
-}
-
-/// Checks whether the configured hledger executable can be invoked.
-#[tauri::command]
-fn check_hledger(app: AppHandle) -> Result<HledgerStatus, String> {
-    let settings = read_settings(&app)?;
-    let (executable, source) = hledger_executable_with_source(&settings);
-    let output = Command::new(&executable).arg("--version").output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            Ok(HledgerStatus {
-                available: true,
-                version: version.clone(),
-                message: version,
-                resolved_path: executable,
-                source,
-            })
-        }
-        Ok(output) => Ok(HledgerStatus {
-            available: false,
-            version: String::new(),
-            message: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-            resolved_path: executable,
-            source,
-        }),
-        Err(error) => Ok(HledgerStatus {
-            available: false,
-            version: String::new(),
-            message: error.to_string(),
-            resolved_path: executable,
-            source,
-        }),
-    }
 }
 
 /// Reads distinct values that can be reused while editing transactions.
@@ -951,7 +908,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::get_app_settings,
             settings::update_app_settings,
-            check_hledger,
+            hledger::check_hledger,
             updates::check_for_updates,
             get_autocomplete_suggestions,
             list_transactions,
@@ -967,81 +924,6 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-/// Resolves the hledger executable from settings or common macOS/user-shell locations.
-fn hledger_executable(settings: &AppSettings) -> String {
-    hledger_executable_with_source(settings).0
-}
-
-fn hledger_executable_with_source(settings: &AppSettings) -> (String, String) {
-    let configured = settings.hledger_path.trim();
-    if !configured.is_empty() {
-        return (configured.to_string(), "configured".to_string());
-    }
-
-    if let Some(detected) = find_hledger_executable() {
-        return (detected, "detected".to_string());
-    }
-
-    ("hledger".to_string(), "fallback".to_string())
-}
-
-/// Finds hledger in common installation folders and in the user's login shell PATH.
-fn find_hledger_executable() -> Option<String> {
-    let mut candidates = vec![
-        PathBuf::from("/opt/homebrew/bin/hledger"),
-        PathBuf::from("/usr/local/bin/hledger"),
-        PathBuf::from("/usr/bin/hledger"),
-    ];
-
-    if let Some(home) = env::var_os("HOME") {
-        let home = PathBuf::from(home);
-        candidates.push(home.join(".local/bin/hledger"));
-        candidates.push(home.join(".cabal/bin/hledger"));
-    }
-
-    candidates
-        .into_iter()
-        .chain(
-            login_shell_path_dirs()
-                .into_iter()
-                .map(|path| path.join("hledger")),
-        )
-        .find(|path| is_executable_file(path))
-        .map(|path| path.to_string_lossy().to_string())
-}
-
-fn is_executable_file(path: &Path) -> bool {
-    path.is_file()
-        && Command::new(path)
-            .arg("--version")
-            .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false)
-}
-
-fn login_shell_path_dirs() -> Vec<PathBuf> {
-    let shell = env::var("shell").unwrap_or_else(|_| "/bin/zsh".to_string());
-    [["-li", "-c", "echo $PATH"], ["-l", "-c", "echo $PATH"]]
-        .into_iter()
-        .find_map(|args| {
-            Command::new(&shell)
-                .args(args)
-                .output()
-                .ok()
-                .filter(|output| output.status.success())
-                .and_then(|output| String::from_utf8(output.stdout).ok())
-        })
-        .and_then(|output| {
-            output
-                .lines()
-                .rev()
-                .map(str::trim)
-                .find(|line| line.contains('/') && !line.is_empty())
-                .map(|line| line.split(':').map(PathBuf::from).collect())
-        })
-        .unwrap_or_default()
 }
 
 /// Resolves the configured journal path.
@@ -3525,24 +3407,6 @@ mod tests {
             "assets:investments:xeon"
         );
         assert_eq!(profile.default_investment_commodity, "XEON");
-    }
-
-    #[test]
-    fn configured_hledger_path_overrides_detection() {
-        let settings = AppSettings {
-            journal_path: String::new(),
-            hledger_path: "/custom/bin/hledger".to_string(),
-            theme: "system".to_string(),
-            power_user: false,
-            default_commodity: String::new(),
-            fetch_prices: false,
-            commodity_symbols: String::new(),
-            exclude_balances: String::new(),
-            include_investments: String::new(),
-            prefill_postings: false,
-        };
-
-        assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");
     }
 
     #[test]
