@@ -2,6 +2,8 @@ import type { Dayjs } from "dayjs";
 
 export type ThemePreference = "system" | "dark" | "light";
 
+export type AppView = "transactions" | "accounts" | "balances" | "settings" | "logs";
+
 export type AppSettings = {
   journalPath: string;
   hledgerPath: string;
@@ -208,7 +210,7 @@ export type InvestmentOverview = {
 export type MonthSetter = (updater: (month: Dayjs) => Dayjs) => void;
 
 export type NavigationItem = {
-  key: string;
+  key: AppView;
   label: string;
   icon: React.ReactNode;
   disabled?: boolean;

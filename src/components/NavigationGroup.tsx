@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { NavigationItem } from "../types";
+import type { AppView, NavigationItem } from "../types";
 import styles from "./NavigationGroup.module.css";
 
 export function NavigationGroup({
@@ -8,8 +8,8 @@ export function NavigationGroup({
   onSelect,
 }: {
   items: NavigationItem[];
-  activeKey: string;
-  onSelect: (key: string) => void;
+  activeKey: AppView;
+  onSelect: (key: AppView) => void;
 }) {
   const { t } = useTranslation();
 
