@@ -5,12 +5,13 @@
 
 mod amount_format;
 mod app_error;
+mod logs;
 mod settings;
 mod updates;
 
 use amount_format::{AmountFormatConfig, CommodityPosition};
 use app_error::{to_error_string, to_error_string_with_details};
-use chrono::{Datelike, Local, NaiveDate, Utc};
+use chrono::{Datelike, Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use settings::{read_settings, AppSettings};
 use std::{
@@ -20,126 +21,9 @@ use std::{
     process::Command,
     sync::OnceLock,
 };
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 static AMOUNT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
-
-// ── Logging ──────────────────────────────────────────────────────────────
-
-const LOG_RETENTION_DAYS: i64 = 90;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct LogEntry {
-    ts: String,
-    level: String,
-    code: String,
-    message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    details: Option<String>,
-}
-
-fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_config_dir()
-        .map_err(|error| error.to_string())?
-        .join("ledgera.log.jsonl"))
-}
-
-fn should_log(level: &str) -> bool {
-    level == "error"
-}
-
-fn log_event_with_details(
-    app: &AppHandle,
-    level: &str,
-    code: &str,
-    message: &str,
-    details: Option<String>,
-) {
-    if !should_log(level) {
-        return;
-    }
-    let path = match log_path(app) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let entry = LogEntry {
-        ts: Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
-        level: level.to_string(),
-        code: code.to_string(),
-        message: message.to_string(),
-        details,
-    };
-    if let Ok(json) = serde_json::to_string(&entry) {
-        let mut line = json;
-        line.push('\n');
-        let _ = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .and_then(|mut file| std::io::Write::write_all(&mut file, line.as_bytes()));
-    }
-}
-
-fn cleanup_old_logs(app: &AppHandle) {
-    let path = match log_path(app) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let content = match fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-    let cutoff = Utc::now() - chrono::Duration::days(LOG_RETENTION_DAYS);
-    let cutoff_str = cutoff.format("%Y-%m-%dT").to_string();
-    let kept: Vec<&str> = content
-        .lines()
-        .filter(|line| line.trim() >= cutoff_str.as_str())
-        .collect();
-    if kept.len() != content.lines().count() {
-        let _ = fs::write(&path, kept.join("\n") + "\n");
-    }
-}
-
-fn filter_log_entries(content: &str) -> Vec<LogEntry> {
-    content
-        .lines()
-        .filter_map(|line| serde_json::from_str::<LogEntry>(line).ok())
-        .filter(|entry| entry.level == "error")
-        .collect()
-}
-
-#[tauri::command]
-fn get_logs(app: AppHandle) -> Result<Vec<LogEntry>, String> {
-    let path = log_path(&app)?;
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    let content = fs::read_to_string(&path).map_err(|error| {
-        to_error_string_with_details(
-            "log_read_failed",
-            "Unable to read log file.",
-            error.to_string(),
-        )
-    })?;
-    let mut entries = filter_log_entries(&content);
-    entries.reverse();
-    Ok(entries)
-}
-
-#[tauri::command]
-fn clear_logs(app: AppHandle) -> Result<(), String> {
-    let path = log_path(&app)?;
-    fs::write(&path, "").map_err(|error| {
-        to_error_string_with_details(
-            "log_write_failed",
-            "Unable to clear log file.",
-            error.to_string(),
-        )
-    })
-}
 
 // ── Holdings & Prices ────────────────────────────────────────────────────
 
@@ -431,7 +315,7 @@ async fn fetch_prices(
                 }
             }
             Err(error) => {
-                log_event_with_details(
+                logs::log_event_with_details(
                     &app,
                     "error",
                     "price_fetch_failed",
@@ -622,7 +506,7 @@ fn load_balances_for_settings(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        log_event_with_details(
+        logs::log_event_with_details(
             app,
             "error",
             "balance_failed",
@@ -993,7 +877,7 @@ fn create_transaction(app: AppHandle, input: TransactionInput) -> Result<Journal
     let settings = read_settings(&app)?;
     let result = create_transaction_for_settings(&settings, &input);
     if let Err(e) = &result {
-        log_event_with_details(
+        logs::log_event_with_details(
             &app,
             "error",
             "transaction_create_failed",
@@ -1014,7 +898,7 @@ fn update_transaction(
     let settings = read_settings(&app)?;
     let result = update_transaction_for_settings(&settings, &id, &input);
     if let Err(e) = &result {
-        log_event_with_details(
+        logs::log_event_with_details(
             &app,
             "error",
             "transaction_update_failed",
@@ -1031,7 +915,7 @@ fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, Stri
     let settings = read_settings(&app)?;
     let result = delete_transaction_for_settings(&settings, &id);
     if let Err(e) = &result {
-        log_event_with_details(
+        logs::log_event_with_details(
             &app,
             "error",
             "transaction_delete_failed",
@@ -1049,7 +933,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            cleanup_old_logs(&app.handle());
+            logs::cleanup_old_logs(&app.handle());
 
             let win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
@@ -1075,8 +959,8 @@ pub fn run() {
             create_transaction,
             update_transaction,
             delete_transaction,
-            get_logs,
-            clear_logs,
+            logs::get_logs,
+            logs::clear_logs,
             get_investments_overview,
             get_balances,
             get_accounts_overview,
@@ -3800,53 +3684,5 @@ mod tests {
         let result = format_posting(&posting);
         assert!(result.contains("@ 45000 USD"));
         assert!(result.contains("; limit order"));
-    }
-
-    #[test]
-    fn should_log_returns_true_only_for_error() {
-        assert!(should_log("error"));
-        assert!(!should_log("info"));
-        assert!(!should_log("warn"));
-        assert!(!should_log("notice"));
-        assert!(!should_log("debug"));
-        assert!(!should_log(""));
-    }
-
-    #[test]
-    fn filter_log_entries_returns_only_error_entries() {
-        let content = r#"
-{"ts":"2025-01-01T00:00:00.000Z","level":"info","code":"TEST","message":"info msg"}
-{"ts":"2025-01-01T00:00:01.000Z","level":"warn","code":"TEST","message":"warn msg"}
-{"ts":"2025-01-01T00:00:02.000Z","level":"error","code":"TEST","message":"error msg"}
-{"ts":"2025-01-01T00:00:03.000Z","level":"error","code":"ERR2","message":"another error"}
-"#;
-
-        let entries = filter_log_entries(content);
-
-        assert_eq!(entries.len(), 2, "should return only error entries");
-        assert_eq!(entries[0].level, "error");
-        assert_eq!(entries[0].message, "error msg");
-        assert_eq!(entries[1].level, "error");
-        assert_eq!(entries[1].message, "another error");
-    }
-
-    #[test]
-    fn filter_log_entries_returns_empty_when_no_errors() {
-        let content = r#"
-{"ts":"2025-01-01T00:00:00.000Z","level":"info","code":"TEST","message":"info msg"}
-{"ts":"2025-01-01T00:00:01.000Z","level":"warn","code":"TEST","message":"warn msg"}
-"#;
-
-        let entries = filter_log_entries(content);
-        assert!(entries.is_empty(), "should be empty when no errors");
-    }
-
-    #[test]
-    fn filter_log_entries_ignores_malformed_lines() {
-        let content =
-            "not json\n{\"level\":\"error\",\"code\":\"OK\",\"message\":\"good\",\"ts\":\"0\"}\n";
-        let entries = filter_log_entries(content);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].message, "good");
     }
 }
