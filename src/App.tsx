@@ -49,7 +49,7 @@ import {
 } from "./utils/date";
 
 import { transactionTemplatePostings } from "./utils/account";
-import { normalizeSettings } from "./utils/settings";
+
 import {
   emptyTransaction,
   toTransactionInput,
@@ -61,6 +61,7 @@ import { navShortcut } from "./utils/shortcut";
 import { callCommand } from "./utils/command";
 import { useUpdateStatus } from "./hooks/useUpdateStatus";
 import { useJournalData } from "./hooks/useJournalData";
+import { useAppSettings } from "./hooks/useAppSettings";
 import "./App.css";
 
 /** Renders the Ledgera desktop application. */
@@ -78,12 +79,11 @@ function App() {
   const systemPrefersDark = useSystemTheme();
   const isMacOs = navigator.userAgent.includes("Mac");
 
-  const settingsQuery = useQuery({
-    queryKey: ["settings"],
-    queryFn: async () => normalizeSettings(await callCommand<AppSettings>("get_app_settings")),
-  });
-
-  const activeSettings = normalizeSettings(settingsQuery.data);
+  const {
+    settingsQuery,
+    activeSettings,
+    updateSettingsOnChange,
+  } = useAppSettings({ messageApi, t });
   const isDarkTheme = activeSettings.theme === "system" ? systemPrefersDark : activeSettings.theme === "dark";
   const activeTitle = activeView === "settings" ? t("common.settings") : t(`common.${activeView}`);
 
@@ -111,36 +111,7 @@ function App() {
   } = useJournalData(activeSettings);
 
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: (settings: AppSettings) =>
-      callCommand<AppSettings, { settings: AppSettings }>("update_app_settings", {
-        settings: normalizeSettings(settings),
-      }),
-    onSuccess: async (_, variables) => {
-      const next = normalizeSettings(variables);
-      queryClient.setQueryData(["settings"], next);
 
-      const prev = activeSettings;
-      if (prev.journalPath !== next.journalPath) {
-        queryClient.resetQueries({ queryKey: ["transactions"] });
-        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
-      }
-      if (prev.hledgerPath !== next.hledgerPath) {
-        await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
-      }
-      if (prev.defaultCommodity !== next.defaultCommodity) {
-        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
-      }
-      if (prev.excludeBalances !== next.excludeBalances) {
-        await queryClient.invalidateQueries({ queryKey: ["balances"] });
-      }
-      if (prev.includeInvestments !== next.includeInvestments) {
-        await queryClient.invalidateQueries({ queryKey: ["investments"] });
-      }
-    },
-    onError: (error) => messageApi.error(parseError(error, t)),
-  });
 
   const createTransactionMutation = useMutation({
     mutationFn: (input: TransactionInput) =>
@@ -191,7 +162,7 @@ function App() {
 
   useEffect(() => {
     if (settingsQuery.data) {
-      settingsForm.setFieldsValue(normalizeSettings(settingsQuery.data));
+      settingsForm.setFieldsValue(activeSettings);
     }
   }, [settingsForm, settingsQuery.data]);
 
@@ -275,9 +246,7 @@ function App() {
     createTransactionMutation.mutate(normalizedValues);
   }
 
-  function updateSettingsOnChange(_: Partial<AppSettings>, values: AppSettings) {
-    updateSettingsMutation.mutate(normalizeSettings(values));
-  }
+
 
   const isSavingTransaction =
     createTransactionMutation.isPending || updateTransactionMutation.isPending;
