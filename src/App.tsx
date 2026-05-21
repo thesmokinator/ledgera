@@ -38,23 +38,14 @@ import type {
   AppSettings,
   HledgerStatus,
   JournalSummary,
-  JournalTransaction,
   NavigationItem,
   TransactionInput,
-  TransactionType,
 } from "./types";
 import {
   journalDateFormat,
-  todayJournalDate,
 } from "./utils/date";
-
-import { transactionTemplatePostings } from "./utils/account";
-
 import {
-  emptyTransaction,
-  toTransactionInput,
   autoCalculateBalancingAmounts,
-  withDefaultCommodity,
 } from "./utils/transaction";
 import { parseError } from "./utils/error";
 import { navShortcut } from "./utils/shortcut";
@@ -62,16 +53,13 @@ import { callCommand } from "./utils/command";
 import { useUpdateStatus } from "./hooks/useUpdateStatus";
 import { useJournalData } from "./hooks/useJournalData";
 import { useAppSettings } from "./hooks/useAppSettings";
+import { useTransactionModal } from "./hooks/useTransactionModal";
 import "./App.css";
 
 /** Renders the Ledgera desktop application. */
 function App() {
   const [activeView, setActiveView] = useState("transactions");
-  const [transactionType, setTransactionType] = useState<TransactionType>("expense");
-  const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
-  const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [spotlightOpen, setSpotlightOpen] = useState(false);
-  const [transactionForm] = Form.useForm<TransactionInput>();
   const [settingsForm] = Form.useForm<AppSettings>();
   const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
@@ -110,15 +98,28 @@ function App() {
     journalLoadError,
   } = useJournalData(activeSettings);
 
-
-
+  const {
+    transactionForm,
+    transactionType,
+    editingTransaction,
+    isTransactionModalOpen,
+    applyTransactionType,
+    openCreateTransaction,
+    openEditTransaction,
+    closeTransactionModal,
+    clearEditingTransaction,
+  } = useTransactionModal({
+    activeSettings,
+    autocompleteSuggestions,
+    defaultCommodity,
+  });
 
   const createTransactionMutation = useMutation({
     mutationFn: (input: TransactionInput) =>
       callCommand<JournalSummary, { input: TransactionInput }>("create_transaction", { input }),
     onSuccess: async () => {
       messageApi.success(t("transactions.transaction_created"));
-      setTransactionModalOpen(false);
+      closeTransactionModal();
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
@@ -133,8 +134,8 @@ function App() {
       }),
     onSuccess: async () => {
       messageApi.success(t("transactions.transaction_updated"));
-      setTransactionModalOpen(false);
-      setEditingTransaction(null);
+      closeTransactionModal();
+      clearEditingTransaction();
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
@@ -166,36 +167,6 @@ function App() {
     }
   }, [settingsForm, settingsQuery.data]);
 
-  function applyTransactionType(type: TransactionType) {
-    setTransactionType(type);
-    transactionForm.setFieldValue(
-      "postings",
-      activeSettings.prefillPostings
-        ? transactionTemplatePostings(type, autocompleteSuggestions, defaultCommodity)
-        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
-    );
-  }
-
-  function openCreateTransaction() {
-    setEditingTransaction(null);
-    setTransactionType("expense");
-    transactionForm.setFieldsValue({
-      ...emptyTransaction,
-      date: todayJournalDate(),
-      postings: activeSettings.prefillPostings
-        ? transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity)
-        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
-    });
-    setTransactionModalOpen(true);
-  }
-
-  function openEditTransaction(transaction: JournalTransaction) {
-    setEditingTransaction(transaction);
-    setTransactionType("custom");
-    transactionForm.setFieldsValue(toTransactionInput(transaction, defaultCommodity));
-    setTransactionModalOpen(true);
-  }
-
 
 
   const shortcuts = useMemo(() => {
@@ -209,7 +180,7 @@ function App() {
       { keys: "command+5, ctrl+5", action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
       { keys: "command+,, ctrl+,", action: () => setActiveView("settings") },
       { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true) },
-      { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) setTransactionModalOpen(false); } },
+      { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) closeTransactionModal(); } },
     ];
   }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen]);
 
@@ -365,7 +336,7 @@ function App() {
           accountOptions={accountOptions}
           commodityOptions={commodityOptions}
           defaultCommodity={defaultCommodity}
-          onClose={() => setTransactionModalOpen(false)}
+          onClose={closeTransactionModal}
           onSubmit={submitTransaction}
           onTransactionTypeChange={applyTransactionType}
         />
