@@ -6,6 +6,7 @@
 mod amount_format;
 mod app_error;
 mod hledger;
+mod journal;
 mod logs;
 mod settings;
 mod updates;
@@ -613,47 +614,18 @@ struct AutocompleteSuggestions {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct JournalTransaction {
-    id: String,
-    source_file: String,
-    date: String,
-    status: String,
-    code: String,
-    description: String,
-    postings: Vec<JournalPosting>,
-    display: TransactionDisplay,
-    raw: String,
-    start_line: usize,
-    end_line: usize,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JournalSearchResult {
-    transaction: JournalTransaction,
-    matches: Vec<JournalSearchMatch>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JournalSearchMatch {
-    field: String,
-    value: String,
-    ranges: Vec<SearchMatchRange>,
-    posting_index: Option<usize>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SearchMatchRange {
-    start: usize,
-    end: usize,
-}
-
-#[derive(Debug, Clone)]
-struct ScoredJournalSearchResult {
-    score: i32,
-    result: JournalSearchResult,
+pub(crate) struct JournalTransaction {
+    pub(crate) id: String,
+    pub(crate) source_file: String,
+    pub(crate) date: String,
+    pub(crate) status: String,
+    pub(crate) code: String,
+    pub(crate) description: String,
+    pub(crate) postings: Vec<JournalPosting>,
+    pub(crate) display: TransactionDisplay,
+    pub(crate) raw: String,
+    pub(crate) start_line: usize,
+    pub(crate) end_line: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -677,10 +649,10 @@ struct TransactionFlow {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct JournalPosting {
-    account: String,
+    pub(crate) account: String,
     amount: String,
     commodity: String,
-    comment: String,
+    pub(crate) comment: String,
     raw: String,
 }
 
@@ -713,7 +685,7 @@ struct TransactionBlock {
 }
 
 #[derive(Debug, Clone)]
-struct JournalFile {
+pub(crate) struct JournalFile {
     path: PathBuf,
     content: String,
 }
@@ -786,46 +758,6 @@ fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
     read_journal_summary(&journal_path)
-}
-
-/// Searches the configured journal and returns matching transactions.
-#[tauri::command]
-fn search_journal(
-    app: AppHandle,
-    query: String,
-    limit: Option<usize>,
-) -> Result<Vec<JournalSearchResult>, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let normalized_query = normalize_search_query(&query);
-    if normalized_query.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let files = load_journal_files(&journal_path)?;
-    let transactions = load_transactions_from_journal_via_files(&files)?;
-    let mut scored = transactions
-        .into_iter()
-        .filter_map(|transaction| search_journal_transaction(transaction, &normalized_query))
-        .collect::<Vec<_>>();
-
-    scored.sort_by(|a, b| {
-        b.score
-            .cmp(&a.score)
-            .then_with(|| b.result.transaction.date.cmp(&a.result.transaction.date))
-            .then_with(|| {
-                b.result
-                    .transaction
-                    .start_line
-                    .cmp(&a.result.transaction.start_line)
-            })
-    });
-
-    Ok(scored
-        .into_iter()
-        .take(limit.unwrap_or(12))
-        .map(|scored_result| scored_result.result)
-        .collect())
 }
 
 /// Appends a new transaction using the existing journal style where possible.
@@ -912,7 +844,7 @@ pub fn run() {
             updates::check_for_updates,
             get_autocomplete_suggestions,
             list_transactions,
-            search_journal,
+            journal::search::search_journal,
             create_transaction,
             update_transaction,
             delete_transaction,
@@ -927,7 +859,7 @@ pub fn run() {
 }
 
 /// Resolves the configured journal path.
-fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
+pub(crate) fn require_journal_path(settings: &AppSettings) -> Result<PathBuf, String> {
     if settings.journal_path.trim().is_empty() {
         return Err(to_error_string(
             "journal_not_configured",
@@ -1076,7 +1008,7 @@ fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTran
     load_transactions_from_journal_via_files(&files)
 }
 
-fn load_transactions_from_journal_via_files(
+pub(crate) fn load_transactions_from_journal_via_files(
     files: &[JournalFile],
 ) -> Result<Vec<JournalTransaction>, String> {
     let mut transactions: Vec<JournalTransaction> = files
@@ -1088,160 +1020,7 @@ fn load_transactions_from_journal_via_files(
     Ok(transactions)
 }
 
-fn normalize_search_query(value: &str) -> String {
-    value
-        .trim()
-        .to_lowercase()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn score_search_match(haystack: &str, needle: &str) -> i32 {
-    let normalized_haystack = normalize_search_query(haystack);
-    let normalized_needle = normalize_search_query(needle);
-    if normalized_needle.is_empty() || normalized_haystack.is_empty() {
-        return 0;
-    }
-
-    if normalized_haystack == normalized_needle {
-        return 100;
-    }
-
-    if normalized_haystack.starts_with(&normalized_needle) {
-        return 80;
-    }
-
-    for word in normalized_haystack.split(|character: char| {
-        character.is_whitespace() || matches!(character, '-' | '_' | ':' | '/')
-    }) {
-        if !word.is_empty() && word.starts_with(&normalized_needle) {
-            return 60;
-        }
-    }
-
-    if normalized_haystack.contains(&normalized_needle) {
-        return 40;
-    }
-
-    let terms = normalized_needle.split_whitespace().collect::<Vec<_>>();
-    if terms.len() > 1 && terms.iter().all(|term| normalized_haystack.contains(term)) {
-        return 30;
-    }
-
-    0
-}
-
-fn search_journal_transaction(
-    transaction: JournalTransaction,
-    needle: &str,
-) -> Option<ScoredJournalSearchResult> {
-    let mut score = 0;
-    let mut matches = Vec::new();
-
-    add_search_match(
-        &mut matches,
-        &mut score,
-        "description",
-        &transaction.description,
-        None,
-        needle,
-    );
-
-    for (posting_index, posting) in transaction.postings.iter().enumerate() {
-        add_search_match(
-            &mut matches,
-            &mut score,
-            "account",
-            &posting.account,
-            Some(posting_index),
-            needle,
-        );
-        add_search_match(
-            &mut matches,
-            &mut score,
-            "comment",
-            &posting.comment,
-            Some(posting_index),
-            needle,
-        );
-    }
-
-    if score == 0 {
-        return None;
-    }
-
-    Some(ScoredJournalSearchResult {
-        score,
-        result: JournalSearchResult {
-            transaction,
-            matches,
-        },
-    })
-}
-
-fn add_search_match(
-    matches: &mut Vec<JournalSearchMatch>,
-    score: &mut i32,
-    field: &str,
-    value: &str,
-    posting_index: Option<usize>,
-    needle: &str,
-) {
-    let match_score = score_search_match(value, needle);
-    if match_score == 0 {
-        return;
-    }
-
-    *score = (*score).max(match_score);
-    matches.push(JournalSearchMatch {
-        field: field.to_string(),
-        value: value.to_string(),
-        ranges: search_match_ranges(value, needle),
-        posting_index,
-    });
-}
-
-fn search_match_ranges(value: &str, needle: &str) -> Vec<SearchMatchRange> {
-    let normalized_value = value.to_lowercase();
-    let normalized_needle = normalize_search_query(needle);
-    if normalized_value.is_empty() || normalized_needle.is_empty() {
-        return Vec::new();
-    }
-
-    let terms = if normalized_needle.contains(' ') {
-        normalized_needle.split_whitespace().collect::<Vec<_>>()
-    } else {
-        vec![normalized_needle.as_str()]
-    };
-
-    let mut ranges = Vec::new();
-    for term in terms {
-        let mut search_start = 0usize;
-        while search_start < normalized_value.len() {
-            let Some(relative_start) = normalized_value[search_start..].find(term) else {
-                break;
-            };
-            let byte_start = search_start + relative_start;
-            let byte_end = byte_start + term.len();
-            ranges.push(SearchMatchRange {
-                start: byte_to_char_index(value, byte_start),
-                end: byte_to_char_index(value, byte_end),
-            });
-            search_start = byte_end;
-        }
-    }
-
-    ranges.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| a.end.cmp(&b.end)));
-    ranges.dedup_by(|a, b| a.start == b.start && a.end == b.end);
-    ranges
-}
-
-fn byte_to_char_index(value: &str, byte_index: usize) -> usize {
-    value[..byte_index].chars().count()
-}
-
-fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {
+pub(crate) fn load_journal_files(journal_path: &Path) -> Result<Vec<JournalFile>, String> {
     let mut files = Vec::new();
     let mut visited = HashSet::new();
     load_journal_file_recursive(journal_path, &mut visited, &mut files)?;
