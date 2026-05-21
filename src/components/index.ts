@@ -1,4 +1,5 @@
 export { Amount } from "./Amount";
+export { AppContent } from "./AppContent";
 export { AppHeader } from "./AppHeader";
 export { AppLoader } from "./AppLoader";
 export { CommandPalette } from "./CommandPalette";

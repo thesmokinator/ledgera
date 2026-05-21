@@ -17,24 +17,19 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AppContent,
   AppHeader,
   AppLoader,
   CommandPalette,
-  CourtesyState,
   NavigationGroup,
   TransactionModal,
 } from "./components";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { useHotkeys } from "./hooks/useHotkeys";
-import {
-  AccountsRoute,
-  BalancesRoute,
-  LogsRoute,
-  SettingsRoute,
-  TransactionsRoute,
-} from "./routes";
+
 import type {
   AppSettings,
+  AppView,
   HledgerStatus,
   NavigationItem,
 } from "./types";
@@ -50,7 +45,7 @@ import "./App.css";
 
 /** Renders the Ledgera desktop application. */
 function App() {
-  const [activeView, setActiveView] = useState("transactions");
+  const [activeView, setActiveView] = useState<AppView>("transactions");
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [settingsForm] = Form.useForm<AppSettings>();
   const [messageApi, contextHolder] = message.useMessage();
@@ -159,15 +154,18 @@ function App() {
   const navigationItems = useMemo<NavigationItem[]>(
     () => {
       const hasJournal = Boolean(activeSettings.journalPath.trim());
-      return [
+      const items: NavigationItem[] = [
         { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal, shortcut: navShortcut(1) },
         { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
         { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
         { key: "settings", label: "common.settings", icon: <SettingOutlined />, shortcut: navShortcut(4), badge: updateStatus?.available ? t("settings.update_badge") : undefined },
-        ...(activeSettings.powerUser
-          ? [{ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(5) }]
-          : []),
       ];
+
+      if (activeSettings.powerUser) {
+        items.push({ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(5) });
+      }
+
+      return items;
     },
     [activeSettings.powerUser, activeSettings.journalPath, updateStatus?.available, t],
   );
@@ -205,43 +203,24 @@ function App() {
             onOpenSearch={() => setSpotlightOpen(true)}
           />
 
-          <Layout.Content className="app-content">
-            {activeView === "settings" ? (
-              <SettingsRoute
-                form={settingsForm}
-                initialValues={activeSettings}
-                commodityOptions={commodityOptions}
-                hledgerStatus={hledgerQuery.data}
-                journalSummary={transactionsQuery.data}
-                journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
-                updateStatus={updateStatus}
-                isCheckingForUpdates={isCheckingForUpdates}
-                onCheckForUpdates={checkForUpdates}
-                onValuesChange={updateSettingsOnChange}
-              />
-            ) : activeView === "logs" ? (
-              <LogsRoute />
-            ) : shouldShowCourtesy ? (
-              <CourtesyState
-                reasons={courtesyReasons}
-                details={journalLoadError || hledgerQuery.data?.message}
-              />
-            ) : activeView === "accounts" ? (
-              <AccountsRoute
-                powerUser={activeSettings.powerUser}
-                onEditTransaction={openEditTransaction}
-                onDeleteTransaction={deleteTransaction}
-              />
-            ) : activeView === "balances" ? (
-              <BalancesRoute fetchPrices={activeSettings.fetchPrices} />
-            ) : (
-              <TransactionsRoute
-                powerUser={activeSettings.powerUser}
-                onEditTransaction={openEditTransaction}
-                onDeleteTransaction={deleteTransaction}
-              />
-            )}
-          </Layout.Content>
+          <AppContent
+            activeView={activeView}
+            settingsForm={settingsForm}
+            activeSettings={activeSettings}
+            commodityOptions={commodityOptions}
+            hledgerStatus={hledgerQuery.data}
+            journalSummary={transactionsQuery.data}
+            journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
+            updateStatus={updateStatus}
+            isCheckingForUpdates={isCheckingForUpdates}
+            shouldShowCourtesy={shouldShowCourtesy}
+            courtesyReasons={courtesyReasons}
+            courtesyDetails={journalLoadError || hledgerQuery.data?.message}
+            onCheckForUpdates={checkForUpdates}
+            onSettingsValuesChange={updateSettingsOnChange}
+            onEditTransaction={openEditTransaction}
+            onDeleteTransaction={deleteTransaction}
+          />
         </Layout>
 
         <CommandPalette
