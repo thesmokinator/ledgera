@@ -234,13 +234,6 @@ function App() {
               />
             ) : activeView === "balances" ? (
               <BalancesRoute fetchPrices={activeSettings.fetchPrices} />
-            ) : activeView === "logs" ? (
-              <LogsRoute />
-            ) : shouldShowCourtesy ? (
-              <CourtesyState
-                reasons={courtesyReasons}
-                details={journalLoadError || hledgerQuery.data?.message}
-              />
             ) : (
               <TransactionsRoute
                 powerUser={activeSettings.powerUser}

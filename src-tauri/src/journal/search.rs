@@ -1,6 +1,10 @@
 use crate::{
-    load_journal_files, load_transactions_from_journal_via_files, require_journal_path,
-    settings::read_settings, JournalTransaction,
+    journal::{
+        files::{load_journal_files, require_journal_path},
+        parser::load_transactions_from_journal_via_files,
+        types::JournalTransaction,
+    },
+    settings::read_settings,
 };
 use serde::Serialize;
 use tauri::AppHandle;
