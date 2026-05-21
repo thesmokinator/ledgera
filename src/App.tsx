@@ -13,8 +13,7 @@ import {
   SettingOutlined,
 } from "@ant-design/icons";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -37,23 +36,16 @@ import {
 import type {
   AppSettings,
   HledgerStatus,
-  JournalSummary,
   NavigationItem,
-  TransactionInput,
 } from "./types";
-import {
-  journalDateFormat,
-} from "./utils/date";
-import {
-  autoCalculateBalancingAmounts,
-} from "./utils/transaction";
-import { parseError } from "./utils/error";
+
 import { navShortcut } from "./utils/shortcut";
 import { callCommand } from "./utils/command";
 import { useUpdateStatus } from "./hooks/useUpdateStatus";
 import { useJournalData } from "./hooks/useJournalData";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useTransactionModal } from "./hooks/useTransactionModal";
+import { useTransactionActions } from "./hooks/useTransactionActions";
 import "./App.css";
 
 /** Renders the Ledgera desktop application. */
@@ -61,7 +53,6 @@ function App() {
   const [activeView, setActiveView] = useState("transactions");
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [settingsForm] = Form.useForm<AppSettings>();
-  const queryClient = useQueryClient();
   const [messageApi, contextHolder] = message.useMessage();
   const { t } = useTranslation();
   const systemPrefersDark = useSystemTheme();
@@ -114,44 +105,21 @@ function App() {
     defaultCommodity,
   });
 
-  const createTransactionMutation = useMutation({
-    mutationFn: (input: TransactionInput) =>
-      callCommand<JournalSummary, { input: TransactionInput }>("create_transaction", { input }),
-    onSuccess: async () => {
-      messageApi.success(t("transactions.transaction_created"));
-      closeTransactionModal();
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
-    },
-    onError: (error) => messageApi.error(parseError(error, t)),
-  });
-
-  const updateTransactionMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: TransactionInput }) =>
-      callCommand<JournalSummary, { id: string; input: TransactionInput }>("update_transaction", {
-        id,
-        input,
-      }),
-    onSuccess: async () => {
-      messageApi.success(t("transactions.transaction_updated"));
+  const {
+    deleteTransaction,
+    isSavingTransaction,
+    submitTransaction,
+  } = useTransactionActions({
+    defaultCommodity,
+    editingTransaction,
+    messageApi,
+    t,
+    onSaved: () => {
       closeTransactionModal();
       clearEditingTransaction();
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
     },
-    onError: (error) => messageApi.error(parseError(error, t)),
   });
 
-  const deleteTransactionMutation = useMutation({
-    mutationFn: (id: string) =>
-      callCommand<JournalSummary, { id: string }>("delete_transaction", { id }),
-    onSuccess: async () => {
-      messageApi.success(t("transactions.transaction_deleted"));
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
-    },
-    onError: (error) => messageApi.error(parseError(error, t)),
-  });
 
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
   const courtesyReasons = [
@@ -186,41 +154,7 @@ function App() {
 
   useHotkeys(shortcuts);
 
-  function submitTransaction(values: TransactionInput) {
-    const rawPostings = (values.postings ?? [])
-      .filter((posting) => posting.account.trim().length > 0)
-      .map((posting) => ({
-        account: posting.account,
-        amount: posting.amount ?? "",
-        commodity: posting.amount?.trim()
-          ? (posting.commodity?.trim() || defaultCommodity)
-          : (posting.commodity?.trim() || ""),
-        unitPrice: posting.unitPrice ?? "",
-        comment: posting.comment ?? "",
-      }));
 
-    const balancedPostings = autoCalculateBalancingAmounts(rawPostings, defaultCommodity);
-
-    const normalizedValues: TransactionInput = {
-      date: dayjs.isDayjs(values.date) ? values.date.format(journalDateFormat) : values.date,
-      status: values.status ?? "",
-      code: values.code ?? "",
-      description: values.description,
-      postings: balancedPostings,
-    };
-
-    if (editingTransaction) {
-      updateTransactionMutation.mutate({ id: editingTransaction.id, input: normalizedValues });
-      return;
-    }
-
-    createTransactionMutation.mutate(normalizedValues);
-  }
-
-
-
-  const isSavingTransaction =
-    createTransactionMutation.isPending || updateTransactionMutation.isPending;
 
   const navigationItems = useMemo<NavigationItem[]>(
     () => {
@@ -296,7 +230,7 @@ function App() {
               <AccountsRoute
                 powerUser={activeSettings.powerUser}
                 onEditTransaction={openEditTransaction}
-                onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
+                onDeleteTransaction={deleteTransaction}
               />
             ) : activeView === "balances" ? (
               <BalancesRoute fetchPrices={activeSettings.fetchPrices} />
@@ -311,7 +245,7 @@ function App() {
               <TransactionsRoute
                 powerUser={activeSettings.powerUser}
                 onEditTransaction={openEditTransaction}
-                onDeleteTransaction={(id) => deleteTransactionMutation.mutate(id)}
+                onDeleteTransaction={deleteTransaction}
               />
             )}
           </Layout.Content>
