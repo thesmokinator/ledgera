@@ -2,6 +2,7 @@
   "name": "ledgera",
   "private": true,
   "version": "0.1.0",
+  "author": "Michele Broggi",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -11,6 +12,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -40,6 +40,43 @@ Open the **Settings** tab to configure:
 | Theme | System / Dark / Light |
 | Power user | Show raw journal entries, line numbers, and the Logs section |
 
+## CI/CD and releases
+
+GitHub Actions runs the CI pipeline on every push and pull request:
+
+- ESLint
+- TypeScript type-checking
+- frontend tests with Vitest
+- Rust backend tests with Cargo
+
+A manual **Build verification** workflow is available in GitHub Actions to test distributable builds before publishing a release. It builds macOS and Linux packages on native runners and cross-builds the Windows installer from Linux using `cargo-xwin`.
+
+Release builds are created only from Git tags matching `v*`. The tag version must match `package.json`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow builds and uploads manual download artifacts to GitHub Releases:
+
+- macOS `.app` zip and `.dmg`
+- Linux `.deb` and AppImage
+- Windows NSIS installer, cross-built with `cargo-xwin`
+
+Ledgera does not publish a Tauri updater manifest. Users choose and download the package they want from GitHub Releases.
+
+### macOS unsigned builds
+
+Current macOS artifacts are unsigned and not notarized. macOS Gatekeeper may block them after download. If you trust the artifact source, remove the quarantine attribute before opening the app:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Ledgera.app
+open /Applications/Ledgera.app
+```
+
+If you run the `.app` directly from another folder, replace `/Applications/Ledgera.app` with the actual app path.
+
 ## Sample journals
 
 The `examples/` directory contains ready-to-use journals:
