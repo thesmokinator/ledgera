@@ -180,7 +180,7 @@ jobs:
           cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe release-artifacts/
 
       - name: Upload ${{ matrix.platform }} artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ledgera-${{ matrix.platform }}-${{ github.ref_name }}
           path: release-artifacts/*
@@ -194,7 +194,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: release-artifacts
           merge-multiple: true
