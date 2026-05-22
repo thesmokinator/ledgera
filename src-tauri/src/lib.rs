@@ -228,6 +228,7 @@ mod tests {
 
     fn input(date: &str, description: &str) -> TransactionInput {
         TransactionInput {
+            mode: "movement".to_string(),
             date: date.to_string(),
             status: "*".to_string(),
             code: String::new(),

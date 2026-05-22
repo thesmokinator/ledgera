@@ -2,7 +2,12 @@
 ; Configure Settings > hledger executable to the absolute CLI path,
 ; for example /opt/homebrew/bin/hledger, /usr/local/bin/hledger,
 ; ~/.local/bin/hledger, or ~/.cabal/bin/hledger.
+; The transactions below cover both past-month and current-month edits.
 
-2026-05-02 * Custom executable smoke test
+2026-04-28 * Past month custom executable smoke test
     expenses:software                   19.99 EUR
+    assets:bank:checking
+
+2026-05-22 * Current month custom executable smoke test
+    expenses:software                   24.99 EUR
     assets:bank:checking

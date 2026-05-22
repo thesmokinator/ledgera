@@ -26,7 +26,7 @@ function makeTx(id: string, postings: { account: string; amount: string; commodi
       comment: p.comment ?? "",
       raw: "",
     })),
-    display: { account: "", amount: "", formatted: "", kind: "", flow: { from: [], to: [] } },
+    display: { account: "", amount: "", formatted: "", kind: "", tint: "neutral", flow: { from: [], to: [] } },
     raw: "",
     startLine: 1,
     endLine: 1,
@@ -88,22 +88,10 @@ describe("findAccountByRoot", () => {
 });
 
 describe("transactionTemplatePostings", () => {
-  it("returns expense postings with expense account and cash account", () => {
-    const result = transactionTemplatePostings("expense", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "expenses:food", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
-    expect(result[1]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "", unitPrice: "", comment: "" });
-  });
-
-  it("returns income postings with cash and income account", () => {
-    const result = transactionTemplatePostings("income", defaultSuggestions, "EUR");
+  it("returns movement postings with cash account and a suggested destination account", () => {
+    const result = transactionTemplatePostings("movement", defaultSuggestions, "EUR");
     expect(result[0]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
-    expect(result[1]).toEqual({ account: "income:salary", amount: "", commodity: "", unitPrice: "", comment: "" });
-  });
-
-  it("returns transfer postings with two accounts", () => {
-    const result = transactionTemplatePostings("transfer", defaultSuggestions, "EUR");
-    expect(result[0]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
-    expect(result[1]).toEqual({ account: "assets:cash", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
+    expect(result[1]).toEqual({ account: "expenses:food", amount: "", commodity: "", unitPrice: "", comment: "" });
   });
 
   it("returns investment postings", () => {
@@ -112,8 +100,8 @@ describe("transactionTemplatePostings", () => {
     expect(result[1]).toEqual({ account: "assets:bank:checking", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
   });
 
-  it("returns empty custom postings", () => {
-    const result = transactionTemplatePostings("custom", defaultSuggestions, "EUR");
+  it("returns empty advanced postings", () => {
+    const result = transactionTemplatePostings("advanced", defaultSuggestions, "EUR");
     expect(result[0]).toEqual({ account: "", amount: "", commodity: "EUR", unitPrice: "", comment: "" });
     expect(result[1]).toEqual({ account: "", amount: "", commodity: "", unitPrice: "", comment: "" });
   });
@@ -128,9 +116,9 @@ describe("transactionTemplatePostings", () => {
       defaultInvestmentAccount: "",
       defaultInvestmentCommodity: "",
     };
-    const result = transactionTemplatePostings("expense", emptySuggestions, "EUR");
-    expect(result[0].account).toBe("expenses:food");
-    expect(result[1].account).toBe("assets:bank:checking");
+    const result = transactionTemplatePostings("movement", emptySuggestions, "EUR");
+    expect(result[0].account).toBe("assets:bank:checking");
+    expect(result[1].account).toBe("expenses:food");
   });
 });
 

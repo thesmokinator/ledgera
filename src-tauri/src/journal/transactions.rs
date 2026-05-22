@@ -1,5 +1,5 @@
 use crate::{
-    app_error::to_error_string_with_details,
+    app_error::{to_error_string_with_details, to_validation_error_string, FieldError},
     hledger::hledger_executable,
     journal::{
         files::{parse_include_directive, require_journal_path},
@@ -9,6 +9,7 @@ use crate::{
     },
     settings::AppSettings,
 };
+use chrono::NaiveDate;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -19,6 +20,7 @@ pub(crate) fn create_transaction_for_settings(
     settings: &AppSettings,
     input: &TransactionInput,
 ) -> Result<JournalSummary, String> {
+    validate_transaction_input(input)?;
     let journal_path = require_journal_path(settings)?;
     append_transaction_routed(settings, &journal_path, input)?;
     read_journal_summary(&journal_path)
@@ -29,6 +31,7 @@ pub(crate) fn update_transaction_for_settings(
     id: &str,
     input: &TransactionInput,
 ) -> Result<JournalSummary, String> {
+    validate_transaction_input(input)?;
     let journal_path = require_journal_path(settings)?;
     let block = find_block(&journal_path, id)?;
     let source_path = PathBuf::from(&block.transaction.source_file);
@@ -62,6 +65,212 @@ pub(crate) fn delete_transaction_for_settings(
         ))
     })?;
     read_journal_summary(&journal_path)
+}
+
+fn validate_transaction_input(input: &TransactionInput) -> Result<(), String> {
+    let mut errors = Vec::new();
+    let mode = input.mode.trim();
+    let requires_description = matches!(mode, "movement" | "investment");
+
+    validate_single_line_field(
+        &mut errors,
+        &["mode"],
+        &input.mode,
+        "Mode cannot contain line breaks.",
+    );
+    if !mode.is_empty() && !matches!(mode, "movement" | "investment" | "advanced") {
+        errors.push(FieldError::new(
+            ["mode"],
+            "Mode must be movement, investment, or advanced.",
+        ));
+    }
+
+    validate_single_line_field(
+        &mut errors,
+        &["date"],
+        &input.date,
+        "Date cannot contain line breaks.",
+    );
+    if input.date.trim().is_empty() {
+        errors.push(FieldError::new(["date"], "Date is required."));
+    } else if NaiveDate::parse_from_str(input.date.trim(), "%Y-%m-%d").is_err() {
+        errors.push(FieldError::new(
+            ["date"],
+            "Use a valid date in YYYY-MM-DD format.",
+        ));
+    }
+
+    validate_single_line_field(
+        &mut errors,
+        &["status"],
+        &input.status,
+        "Status cannot contain line breaks.",
+    );
+    let status = input.status.trim();
+    if !status.is_empty() && status != "*" && status != "!" {
+        errors.push(FieldError::new(["status"], "Status must be empty, * or !."));
+    }
+
+    validate_single_line_field(
+        &mut errors,
+        &["code"],
+        &input.code,
+        "Code cannot contain line breaks.",
+    );
+    let code = input.code.trim();
+    if !code.is_empty() && !(code.starts_with('(') && code.ends_with(')') && code.len() > 2) {
+        errors.push(FieldError::new(
+            ["code"],
+            "Code must use hledger parentheses, for example (INV-001).",
+        ));
+    }
+
+    validate_single_line_field(
+        &mut errors,
+        &["description"],
+        &input.description,
+        "Description cannot contain line breaks.",
+    );
+    if requires_description && input.description.trim().is_empty() {
+        errors.push(FieldError::new(["description"], "Description is required."));
+    }
+
+    let mut posting_accounts = 0usize;
+    let mut postings_with_amounts = 0usize;
+
+    for (index, posting) in input.postings.iter().enumerate() {
+        let index = index.to_string();
+        let account = posting.account.trim();
+        let amount = posting.amount.trim();
+        let commodity = posting.commodity.trim();
+        let unit_price = posting.unit_price.trim();
+        let comment = posting.comment.trim();
+        let has_meaningful_input = !account.is_empty()
+            || !amount.is_empty()
+            || !unit_price.is_empty()
+            || !comment.is_empty();
+
+        if !has_meaningful_input {
+            continue;
+        }
+
+        validate_single_line_field(
+            &mut errors,
+            &["postings", index.as_str(), "account"],
+            &posting.account,
+            "Account cannot contain line breaks.",
+        );
+        validate_single_line_field(
+            &mut errors,
+            &["postings", index.as_str(), "amount"],
+            &posting.amount,
+            "Amount cannot contain line breaks.",
+        );
+        validate_single_line_field(
+            &mut errors,
+            &["postings", index.as_str(), "commodity"],
+            &posting.commodity,
+            "Commodity cannot contain line breaks.",
+        );
+        validate_single_line_field(
+            &mut errors,
+            &["postings", index.as_str(), "unitPrice"],
+            &posting.unit_price,
+            "Unit price cannot contain line breaks.",
+        );
+        validate_single_line_field(
+            &mut errors,
+            &["postings", index.as_str(), "comment"],
+            &posting.comment,
+            "Comment cannot contain line breaks.",
+        );
+
+        if account.is_empty() {
+            errors.push(FieldError::new(
+                ["postings", index.as_str(), "account"],
+                "Account is required.",
+            ));
+            continue;
+        }
+        posting_accounts += 1;
+
+        if !amount.is_empty() {
+            postings_with_amounts += 1;
+            if !amount_contains_number(amount) {
+                errors.push(FieldError::new(
+                    ["postings", index.as_str(), "amount"],
+                    "Amount must contain a number.",
+                ));
+            }
+            if commodity.is_empty() && !amount_contains_commodity(amount) {
+                errors.push(FieldError::new(
+                    ["postings", index.as_str(), "commodity"],
+                    "Commodity is required when the amount does not include one.",
+                ));
+            }
+        }
+
+        if !unit_price.is_empty() {
+            if amount.is_empty() {
+                errors.push(FieldError::new(
+                    ["postings", index.as_str(), "unitPrice"],
+                    "Unit price requires a quantity.",
+                ));
+            }
+            if !amount_contains_number(unit_price) {
+                errors.push(FieldError::new(
+                    ["postings", index.as_str(), "unitPrice"],
+                    "Unit price must contain a number.",
+                ));
+            }
+        }
+    }
+
+    if posting_accounts < 2 {
+        errors.push(FieldError::new(
+            ["postings"],
+            "Add at least two posting accounts.",
+        ));
+    }
+    if postings_with_amounts == 0 {
+        errors.push(FieldError::new(
+            ["postings"],
+            "Enter an amount on at least one posting.",
+        ));
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(to_validation_error_string(
+            "transaction_validation_failed",
+            "Transaction validation failed. Check the highlighted fields.",
+            errors,
+        ))
+    }
+}
+
+fn validate_single_line_field(
+    errors: &mut Vec<FieldError>,
+    path: &[&str],
+    value: &str,
+    message: &str,
+) {
+    if value.contains('\n') || value.contains('\r') {
+        errors.push(FieldError::new(path.iter().copied(), message));
+    }
+}
+
+fn amount_contains_number(value: &str) -> bool {
+    value.chars().any(|character| character.is_ascii_digit())
+}
+
+fn amount_contains_commodity(value: &str) -> bool {
+    value.chars().any(|character| {
+        !(character.is_ascii_digit()
+            || character.is_whitespace()
+            || matches!(character, '.' | ',' | '-' | '+'))
+    })
 }
 
 fn mutate_existing_file<F>(
@@ -457,5 +666,121 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
             "Unable to run hledger check.",
             error.to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::journal::types::PostingInput;
+    use serde_json::Value;
+
+    fn posting(account: &str, amount: &str, commodity: &str) -> PostingInput {
+        PostingInput {
+            account: account.to_string(),
+            amount: amount.to_string(),
+            commodity: commodity.to_string(),
+            unit_price: String::new(),
+            comment: String::new(),
+        }
+    }
+
+    fn valid_input() -> TransactionInput {
+        TransactionInput {
+            mode: "movement".to_string(),
+            date: "2026-05-22".to_string(),
+            status: "*".to_string(),
+            code: "(INV-001)".to_string(),
+            description: "Grocery store".to_string(),
+            postings: vec![
+                posting("expenses:food", "25.00", "EUR"),
+                posting("assets:bank", "", ""),
+            ],
+        }
+    }
+
+    fn validation_error(input: TransactionInput) -> Value {
+        let error = validate_transaction_input(&input).expect_err("input should be invalid");
+        serde_json::from_str(&error).expect("validation error should be structured JSON")
+    }
+
+    fn field_error_paths(error: &Value) -> Vec<String> {
+        let Some(field_errors) = error["fieldErrors"].as_array() else {
+            return Vec::new();
+        };
+
+        field_errors
+            .iter()
+            .map(|field_error| {
+                field_error["path"]
+                    .as_array()
+                    .map(|path| {
+                        path.iter()
+                            .filter_map(|part| part.as_str())
+                            .collect::<Vec<_>>()
+                            .join(".")
+                    })
+                    .unwrap_or_default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn accepts_valid_transaction_input() {
+        assert!(validate_transaction_input(&valid_input()).is_ok());
+    }
+
+    #[test]
+    fn rejects_missing_description_for_simple_modes_and_invalid_date() {
+        let mut input = valid_input();
+        input.date = "2026-02-30".to_string();
+        input.description = "".to_string();
+
+        let error = validation_error(input);
+        let paths = field_error_paths(&error);
+
+        assert_eq!(error["code"], "transaction_validation_failed");
+        assert!(paths.contains(&"date".to_string()));
+        assert!(paths.contains(&"description".to_string()));
+    }
+
+    #[test]
+    fn accepts_missing_description_in_advanced_mode() {
+        let mut input = valid_input();
+        input.mode = "advanced".to_string();
+        input.description = "".to_string();
+
+        assert!(validate_transaction_input(&input).is_ok());
+    }
+
+    #[test]
+    fn rejects_hledger_code_without_parentheses() {
+        let mut input = valid_input();
+        input.code = "INV-001".to_string();
+
+        let paths = field_error_paths(&validation_error(input));
+
+        assert!(paths.contains(&"code".to_string()));
+    }
+
+    #[test]
+    fn rejects_transactions_without_two_posting_accounts() {
+        let mut input = valid_input();
+        input.postings = vec![posting("expenses:food", "25.00", "EUR")];
+
+        let paths = field_error_paths(&validation_error(input));
+
+        assert!(paths.contains(&"postings".to_string()));
+    }
+
+    #[test]
+    fn rejects_unit_price_without_quantity() {
+        let mut input = valid_input();
+        input.postings[0].amount = "".to_string();
+        input.postings[0].unit_price = "100 EUR".to_string();
+
+        let paths = field_error_paths(&validation_error(input));
+
+        assert!(paths.contains(&"postings.0.unitPrice".to_string()));
     }
 }

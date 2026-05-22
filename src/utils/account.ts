@@ -21,27 +21,17 @@ export function transactionTemplatePostings(
   const investmentCommodity = suggestions.defaultInvestmentCommodity || "";
 
   switch (type) {
-    case "expense":
-      return [
-        { account: suggestions.defaultExpenseAccount || findAccountByRoot(accounts, ["expenses", "expense"]), amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
-        { account: cashAccount, amount: "", commodity: "", unitPrice: "", comment: "" },
-      ];
-    case "income":
+    case "movement":
       return [
         { account: cashAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
-        { account: suggestions.defaultIncomeAccount || findAccountByRoot(accounts, ["income", "revenue"]), amount: "", commodity: "", unitPrice: "", comment: "" },
-      ];
-    case "transfer":
-      return [
-        { account: cashAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
-        { account: transferAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
+        { account: suggestions.defaultExpenseAccount || findAccountByRoot(accounts, ["expenses", "expense"]) || transferAccount, amount: "", commodity: "", unitPrice: "", comment: "" },
       ];
     case "investment":
       return [
         { account: suggestions.defaultInvestmentAccount, amount: "", commodity: investmentCommodity, unitPrice: "", comment: "" },
         { account: cashAccount, amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
       ];
-    case "custom":
+    case "advanced":
       return [
         { account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
         { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },

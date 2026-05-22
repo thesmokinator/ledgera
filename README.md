@@ -44,10 +44,10 @@ Open the **Settings** tab to configure:
 
 The `examples/` directory contains ready-to-use journals:
 
-- `examples/sample.journal` - single-file journal
-- `examples/split-flat/` - month-based split (`include YYYY-MM.journal`)
-- `examples/split-glob/` - year/month glob split (`include YYYY/*.journal`)
-- `examples/custom-hledger-path/` - custom CLI setup
+- `examples/sample.journal` - single-file journal with past-month and current-month transactions, including an investment example
+- `examples/split-flat/` - month-based split (`include YYYY-MM.journal`) with past-month and current-month files
+- `examples/split-glob/` - year/month glob split (`include YYYY/*.journal`) with past-month and current-month files
+- `examples/custom-hledger-path/` - custom CLI setup with simple past-month and current-month smoke-test entries
 
 ## Project structure
 

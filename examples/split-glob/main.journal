@@ -1,4 +1,5 @@
 ; Glob split journal sample.
 ; Ledgera routes new entries to YYYY/MM.journal files.
+; The 2026 directory includes past-month and current-month entries.
 
 include 2026/*.journal

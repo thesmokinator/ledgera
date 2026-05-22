@@ -2,6 +2,14 @@
     expenses:office                     74.80 EUR
     assets:bank:checking
 
+2026-05-20 * Current month groceries
+    expenses:food                       63.25 EUR
+    assets:bank:checking
+
+2026-05-22 * Current month validation sample
+    expenses:software                   42.00 EUR
+    assets:bank:checking
+
 2026-05-30 * Rent
     expenses:rent                     1200.00 EUR
     assets:bank:checking

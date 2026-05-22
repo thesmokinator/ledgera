@@ -14,7 +14,7 @@ import {
 } from "@ant-design/icons";
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AppContent,
@@ -101,12 +101,16 @@ function App() {
   });
 
   const {
+    clearTransactionError,
     deleteTransaction,
     isSavingTransaction,
     submitTransaction,
+    transactionError,
   } = useTransactionActions({
     defaultCommodity,
     editingTransaction,
+    transactionForm,
+    transactionType,
     messageApi,
     t,
     onSaved: () => {
@@ -115,6 +119,11 @@ function App() {
     },
   });
 
+
+  const closeTransactionModalWithCleanup = useCallback(() => {
+    clearTransactionError();
+    closeTransactionModal();
+  }, [clearTransactionError, closeTransactionModal]);
 
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
   const courtesyReasons = [
@@ -143,9 +152,9 @@ function App() {
       { keys: "command+5, ctrl+5", action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
       { keys: "command+,, ctrl+,", action: () => setActiveView("settings") },
       { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true) },
-      { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) closeTransactionModal(); } },
+      { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) closeTransactionModalWithCleanup(); } },
     ];
-  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen]);
+  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen, closeTransactionModalWithCleanup]);
 
   useHotkeys(shortcuts);
 
@@ -242,7 +251,9 @@ function App() {
           accountOptions={accountOptions}
           commodityOptions={commodityOptions}
           defaultCommodity={defaultCommodity}
-          onClose={closeTransactionModal}
+          saveError={transactionError}
+          onClose={closeTransactionModalWithCleanup}
+          onFormChange={clearTransactionError}
           onSubmit={submitTransaction}
           onTransactionTypeChange={applyTransactionType}
         />

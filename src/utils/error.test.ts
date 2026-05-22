@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseError, formatAppError } from "./error";
+import { parseAppError, parseError, formatAppError } from "./error";
 import type { AppError } from "../types";
 
 function mockT(key: string): string {
@@ -49,6 +49,24 @@ describe("parseError", () => {
     });
     const result = parseError(raw, mockT);
     expect(result).toBe("Nessun journal configurato.");
+  });
+
+  it("parses field errors from a JSON AppError string", () => {
+    const raw = JSON.stringify({
+      code: "transaction_validation_failed",
+      message: "Transaction validation failed.",
+      fieldErrors: [
+        { path: ["postings", "0", "account"], message: "Account is required." },
+        { path: ["description"], message: "Description is required." },
+      ],
+    });
+
+    const result = parseAppError(raw);
+
+    expect(result?.fieldErrors).toEqual([
+      { path: ["postings", "0", "account"], message: "Account is required." },
+      { path: ["description"], message: "Description is required." },
+    ]);
   });
 
   it("falls back to raw string for non-JSON errors", () => {

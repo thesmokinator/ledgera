@@ -21,7 +21,8 @@ describe("emptyTransaction", () => {
     // Since emptyTransaction is a module-level const, we test it structurally
   });
 
-  it("has empty status, code, and description", () => {
+  it("has movement mode with empty status, code, and description", () => {
+    expect(emptyTransaction.mode).toBe("movement");
     expect(emptyTransaction.status).toBe("");
     expect(emptyTransaction.code).toBe("");
     expect(emptyTransaction.description).toBe("");
@@ -79,6 +80,7 @@ describe("toTransactionInput", () => {
       amount: "42.50",
       formatted: "42.50",
       kind: "expense",
+      tint: "negative",
       flow: { from: ["assets:bank"], to: ["expenses:food"] },
     },
     raw: "",
@@ -88,6 +90,7 @@ describe("toTransactionInput", () => {
 
   it("maps transaction fields correctly", () => {
     const result = toTransactionInput(tx);
+    expect(result.mode).toBe("advanced");
     expect(result.date).toBe("2024-06-15");
     expect(result.status).toBe("*");
     expect(result.code).toBe("INV-001");

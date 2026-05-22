@@ -24,13 +24,14 @@ export function useTransactionModal({
   autocompleteSuggestions: AutocompleteSuggestions;
   defaultCommodity: string;
 }) {
-  const [transactionType, setTransactionType] = useState<TransactionType>("expense");
+  const [transactionType, setTransactionType] = useState<TransactionType>("movement");
   const [editingTransaction, setEditingTransaction] = useState<JournalTransaction | null>(null);
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [transactionForm] = Form.useForm<TransactionInput>();
 
   function applyTransactionType(type: TransactionType) {
     setTransactionType(type);
+    transactionForm.setFieldValue("mode", type);
     transactionForm.setFieldValue(
       "postings",
       activeSettings.prefillPostings
@@ -41,12 +42,13 @@ export function useTransactionModal({
 
   function openCreateTransaction() {
     setEditingTransaction(null);
-    setTransactionType("expense");
+    setTransactionType("movement");
     transactionForm.setFieldsValue({
       ...emptyTransaction,
+      mode: "movement",
       date: todayJournalDate(),
       postings: activeSettings.prefillPostings
-        ? transactionTemplatePostings("expense", autocompleteSuggestions, defaultCommodity)
+        ? transactionTemplatePostings("movement", autocompleteSuggestions, defaultCommodity)
         : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
     });
     setTransactionModalOpen(true);
@@ -54,7 +56,7 @@ export function useTransactionModal({
 
   function openEditTransaction(transaction: JournalTransaction) {
     setEditingTransaction(transaction);
-    setTransactionType("custom");
+    setTransactionType("advanced");
     transactionForm.setFieldsValue(toTransactionInput(transaction, defaultCommodity));
     setTransactionModalOpen(true);
   }

@@ -139,7 +139,10 @@ export type PostingInput = {
   comment: string;
 };
 
+export type TransactionType = "movement" | "investment" | "advanced";
+
 export type TransactionInput = {
+  mode: TransactionType;
   date: string;
   status: string;
   code: string;
@@ -147,12 +150,16 @@ export type TransactionInput = {
   postings: PostingInput[];
 };
 
-export type TransactionType = "expense" | "income" | "transfer" | "investment" | "custom";
+export type AppFieldError = {
+  path: string[];
+  message: string;
+};
 
 export type AppError = {
   code: string;
   message: string;
   details?: string;
+  fieldErrors?: AppFieldError[];
 };
 
 export type LogEntry = {

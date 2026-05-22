@@ -5,3 +5,7 @@
 2026-05-15 * Dividends received
     assets:bank:checking               128.40 EUR
     income:investments
+
+2026-05-22 * Current month validation sample
+    expenses:software                   42.00 EUR
+    assets:bank:checking

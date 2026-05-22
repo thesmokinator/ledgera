@@ -1,24 +1,51 @@
-.posting_row {
+.mode_stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mode_hint {
+    color: var(--text-muted, rgba(255, 255, 255, 0.45));
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0 0 12px;
+}
+
+.movement_grid {
     display: grid;
-    grid-template-columns:
-        minmax(0, 1.6fr) minmax(100px, 0.45fr) minmax(0, 0.9fr)
-        auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 10px;
+    width: 100%;
+}
+
+.investment_grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(120px, 0.65fr) minmax(
+            0,
+            0.7fr
+        ) minmax(0, 0.8fr);
     column-gap: 8px;
     width: 100%;
 }
 
-.posting_row_investment {
-    grid-template-columns:
-        minmax(0, 1.3fr) minmax(112px, 0.45fr) minmax(0, 0.55fr)
-        minmax(0, 0.75fr) auto;
+.advanced_posting_row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(112px, 0.5fr) minmax(
+            0,
+            0.65fr
+        ) minmax(0, 0.75fr) auto;
+    column-gap: 8px;
+    width: 100%;
 }
 
-.posting_row :global(.ant-form-item) {
+.movement_grid :global(.ant-form-item),
+.investment_grid :global(.ant-form-item),
+.advanced_posting_row :global(.ant-form-item) {
     margin-bottom: 12px;
 }
 
-.transaction_form :global(.ant-form-item-explain) {
-    display: none;
+.form_error_alert {
+    margin-bottom: 16px;
 }
 
 .posting_comment_field {
@@ -49,6 +76,12 @@
 .full_width_control,
 .form_row :global(.ant-picker),
 .form_row :global(.ant-select),
-.form_row :global(.ant-input) {
+.form_row :global(.ant-input),
+.movement_grid :global(.ant-input),
+.movement_grid :global(.ant-select),
+.investment_grid :global(.ant-input),
+.investment_grid :global(.ant-select),
+.advanced_posting_row :global(.ant-input),
+.advanced_posting_row :global(.ant-select) {
     width: 100%;
 }
