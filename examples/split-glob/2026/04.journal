@@ -1,0 +1,7 @@
+2026-04-11 * Past month train ticket
+    expenses:travel                    32.00 EUR
+    assets:bank:checking
+
+2026-04-30 * Past month invoice payment
+    assets:bank:checking             850.00 EUR
+    income:consulting

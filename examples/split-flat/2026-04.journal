@@ -1,3 +1,7 @@
 2026-04-03 * Opening balance
     assets:bank:checking              1000.00 EUR
     equity:opening-balances
+
+2026-04-18 * Past month client lunch
+    expenses:meals                      48.50 EUR
+    assets:bank:checking

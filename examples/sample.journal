@@ -1,10 +1,12 @@
 ; Ledgera sample journal for local testing.
 ; The file intentionally covers common hledger scenarios: commodities,
 ; statuses, transaction codes, multi-posting entries, balancing postings,
-; and comments attached to transactions/postings.
+; investment lots with unit prices, and posting comments.
+; It includes both past-month entries and current-month entries.
 
 commodity €
 commodity $
+commodity VWCE
 
 2026-01-02 * (INV-2026-001) Client retainer
     assets:bank:checking                         €2,400.00
@@ -48,13 +50,31 @@ commodity $
     expenses:tax:vat                              €990.00
     liabilities:tax:vat                          -€990.00
 
+2026-04-24 * Past month bookkeeping cleanup
+    expenses:professional-services                €180.00
+    assets:bank:checking                        -€180.00
+    ; Example of editing a previous-month transaction.
+
 2026-05-02 ! Office supplies
-    expenses:office                          €74.80
-    assets:cash                              -€74.80
+    expenses:office                                €74.80
+    assets:cash                                   -€74.80
+
+2026-05-08 * Current month coffee meeting
+    expenses:meals                                 €18.60
+    assets:cash                                   -€18.60
+
 2026-05-15 * Dividends received
     assets:brokerage                              €128.40
     income:investments                           -€128.40
 
+2026-05-16 * ETF purchase
+    assets:brokerage:VWCE                          10 VWCE @ €108.50
+    assets:bank:checking                       -€1,085.00
+
+2026-05-22 * Current month form validation example
+    expenses:software                              €42.00
+    assets:bank:checking                          -€42.00
+
 2026-05-29 Grocery store
-    assets:cash                              -€55.00
+    assets:cash                                   -€55.00
     expenses:food:groceries

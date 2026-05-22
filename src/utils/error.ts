@@ -4,7 +4,7 @@ import type { AppError } from "../types";
  * Attempts to parse an error body (string) as a structured AppError JSON.
  * Returns the AppError if successful, otherwise null.
  */
-function tryParseAppError(body: unknown): AppError | null {
+export function parseAppError(body: unknown): AppError | null {
   if (typeof body !== "string") return null;
   try {
     const parsed = JSON.parse(body);
@@ -17,7 +17,22 @@ function tryParseAppError(body: unknown): AppError | null {
       return {
         code: parsed.code,
         message: parsed.message,
-        details: parsed.details ?? undefined,
+        details: typeof parsed.details === "string" ? parsed.details : undefined,
+        fieldErrors: Array.isArray(parsed.fieldErrors)
+          ? parsed.fieldErrors
+            .filter(
+              (fieldError: unknown): fieldError is { path: string[]; message: string } =>
+                typeof fieldError === "object" &&
+                fieldError !== null &&
+                Array.isArray((fieldError as { path?: unknown }).path) &&
+                (fieldError as { path: unknown[] }).path.every((part) => typeof part === "string") &&
+                typeof (fieldError as { message?: unknown }).message === "string",
+            )
+            .map((fieldError: { path: string[]; message: string }) => ({
+              path: fieldError.path,
+              message: fieldError.message,
+            }))
+          : undefined,
       };
     }
   } catch {
@@ -50,7 +65,7 @@ export function formatAppError(error: AppError, t: (key: string) => string): str
  * - Raw string → shown as-is (legacy / unexpected)
  */
 export function parseError(error: unknown, t: (key: string) => string): string {
-  const appError = tryParseAppError(error);
+  const appError = parseAppError(error);
   if (appError) {
     return formatAppError(appError, t);
   }

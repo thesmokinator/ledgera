@@ -68,6 +68,8 @@ pub(crate) struct JournalPosting {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TransactionInput {
+    #[serde(default)]
+    pub(crate) mode: String,
     pub(crate) date: String,
     pub(crate) status: String,
     pub(crate) code: String,

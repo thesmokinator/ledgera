@@ -2,6 +2,7 @@ import type { JournalTransaction, PostingInput, TransactionInput } from "../type
 import { todayJournalDate } from "./date";
 
 export const emptyTransaction: TransactionInput = {
+  mode: "movement",
   date: todayJournalDate(),
   status: "",
   code: "",
@@ -17,6 +18,7 @@ export function toTransactionInput(
   defaultCommodity = "",
 ): TransactionInput {
   return {
+    mode: "advanced",
     date: transaction.date,
     status: transaction.status,
     code: transaction.code,
