@@ -1,16 +1,26 @@
 .amount {
-    font-weight: 500;
+    font-weight: 600;
 }
 
-.amount_negative {
-    color: #ef4444;
+.amount_negative,
+.amount_kind_expense {
+    color: #f87171;
 }
 
-.amount_positive {
-    /* No special color — sober hledger-style.
-       The backend already adds a + prefix for income. */
+.amount_positive,
+.amount_kind_income {
+    color: #34d399;
 }
 
-.amount_neutral {
-    /* Default text color, used for transfers and zero amounts. */
+.amount_kind_transfer {
+    color: #60a5fa;
+}
+
+.amount_kind_investment {
+    color: #c084fc;
+}
+
+.amount_neutral,
+.amount_kind_unknown {
+    color: inherit;
 }

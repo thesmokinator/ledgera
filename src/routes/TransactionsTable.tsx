@@ -110,6 +110,7 @@ export function TransactionsTable({
               <Amount
                 formatted={transaction.display.formatted || transaction.display.amount}
                 tint={transaction.display.tint}
+                kind={transaction.display.kind}
                 className={styles.amount}
               />
             ),
