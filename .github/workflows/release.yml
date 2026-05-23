@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -182,7 +179,7 @@ jobs:
           cp ./*-win-x64-portable.zip release-artifacts/
 
       - name: Upload ${{ matrix.platform }} artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: ledgera-${{ matrix.platform }}-${{ github.ref_name }}
           path: release-artifacts/*
@@ -196,7 +193,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: release-artifacts
           merge-multiple: true
