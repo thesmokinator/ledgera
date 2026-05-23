@@ -94,7 +94,3 @@ The `examples/` directory contains ready-to-use journals:
 | `src-tauri/` | Rust backend - journal parsing, mutation, logging |
 | `examples/` | Sample hledger journal layouts |
 | `screenshots/` | Screenshots |
-
-## License
-
-MIT
