@@ -163,7 +163,7 @@ function InvestmentFields({
           <AutoComplete options={accountOptions} placeholder="assets:broker:VWCE" filterOption />
         </Form.Item>
         <Form.Item
-          label={t("transactions.investment_commodity")}
+          label={t("transactions.commodity")}
           name={["postings", 0, "commodity"]}
           rules={[
             commodityRule({
@@ -196,7 +196,7 @@ function InvestmentFields({
           <AutoComplete options={accountOptions} placeholder="assets:bank" filterOption />
         </Form.Item>
         <Form.Item
-          label={t("transactions.cash_commodity")}
+          label={t("transactions.commodity")}
           name={["postings", 1, "commodity"]}
           rules={[singleLineRule(t("transactions.single_line_field"))]}
         >
@@ -547,14 +547,9 @@ export function TransactionModal({
         <Form.Item
           label={t("transactions.description")}
           name="description"
-          rules={[
-            ...(transactionType === "advanced" || editingTransaction
-              ? []
-              : [{ required: true, whitespace: true, message: t("transactions.description_required") }]),
-            singleLineRule(t("transactions.single_line_field")),
-          ]}
+          rules={[singleLineRule(t("transactions.single_line_field"))]}
         >
-          <AutoComplete options={descriptionOptions} filterOption />
+          <AutoComplete options={descriptionOptions} placeholder={t("transactions.description_placeholder")} filterOption />
         </Form.Item>
 
         {transactionType === "movement" && !editingTransaction ? (

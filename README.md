@@ -49,7 +49,7 @@ GitHub Actions runs the CI pipeline on every push and pull request:
 - frontend tests with Vitest
 - Rust backend tests with Cargo
 
-A manual **Build verification** workflow is available in GitHub Actions to test distributable builds before publishing a release. It builds macOS and Linux packages on native runners and cross-builds the Windows installer from Linux using `cargo-xwin`.
+A manual **Build verification** workflow is available in GitHub Actions to test distributable builds before publishing a release. It builds macOS and Linux packages on native runners and cross-builds the Windows installer and portable zip from Linux using `cargo-xwin`.
 
 Release builds are created only from Git tags matching `v*`. The tag version must match `package.json`:
 
@@ -62,9 +62,9 @@ The release workflow builds and uploads manual download artifacts to GitHub Rele
 
 - macOS `.app` zip and `.dmg`
 - Linux `.deb` and AppImage
-- Windows NSIS installer, cross-built with `cargo-xwin`
+- Windows NSIS installer and portable zip, cross-built with `cargo-xwin`
 
-Ledgera does not publish a Tauri updater manifest. Users choose and download the package they want from GitHub Releases.
+Ledgera does not publish a Tauri updater manifest. Users choose and download the package they want from GitHub Releases. For Windows, use the portable zip to run Ledgera without installing shortcuts or system-wide entries.
 
 ### macOS unsigned builds
 

@@ -19,6 +19,7 @@
     "lint": "eslint src/",
     "build:mac": "scripts/build-mac.sh",
     "build:win": "scripts/build-win.sh",
+    "build:win:zip": "scripts/build-win.sh --portable-only",
     "build:linux": "scripts/build-linux.sh",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

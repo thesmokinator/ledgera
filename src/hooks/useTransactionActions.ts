@@ -128,7 +128,7 @@ export function useTransactionActions({
       date: dayjs.isDayjs(values.date) ? values.date.format(journalDateFormat) : values.date,
       status: values.status ?? "",
       code: values.code ?? "",
-      description: values.description,
+      description: values.description ?? "",
       postings: balancedPostings,
     };
 

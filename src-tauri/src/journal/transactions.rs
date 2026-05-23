@@ -70,7 +70,6 @@ pub(crate) fn delete_transaction_for_settings(
 fn validate_transaction_input(input: &TransactionInput) -> Result<(), String> {
     let mut errors = Vec::new();
     let mode = input.mode.trim();
-    let requires_description = matches!(mode, "movement" | "investment");
 
     validate_single_line_field(
         &mut errors,
@@ -131,9 +130,6 @@ fn validate_transaction_input(input: &TransactionInput) -> Result<(), String> {
         &input.description,
         "Description cannot contain line breaks.",
     );
-    if requires_description && input.description.trim().is_empty() {
-        errors.push(FieldError::new(["description"], "Description is required."));
-    }
 
     let mut posting_accounts = 0usize;
     let mut postings_with_amounts = 0usize;
@@ -731,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_description_for_simple_modes_and_invalid_date() {
+    fn rejects_invalid_date_without_requiring_description() {
         let mut input = valid_input();
         input.date = "2026-02-30".to_string();
         input.description = "".to_string();
@@ -741,16 +737,18 @@ mod tests {
 
         assert_eq!(error["code"], "transaction_validation_failed");
         assert!(paths.contains(&"date".to_string()));
-        assert!(paths.contains(&"description".to_string()));
+        assert!(!paths.contains(&"description".to_string()));
     }
 
     #[test]
-    fn accepts_missing_description_in_advanced_mode() {
-        let mut input = valid_input();
-        input.mode = "advanced".to_string();
-        input.description = "".to_string();
+    fn accepts_missing_description_in_all_modes() {
+        for mode in ["movement", "investment", "advanced"] {
+            let mut input = valid_input();
+            input.mode = mode.to_string();
+            input.description = "".to_string();
 
-        assert!(validate_transaction_input(&input).is_ok());
+            assert!(validate_transaction_input(&input).is_ok());
+        }
     }
 
     #[test]

@@ -72,7 +72,8 @@ jobs:
             llvm \
             nsis \
             pkg-config \
-            libssl-dev
+            libssl-dev \
+            zip
 
       - name: Install cargo-xwin
         if: matrix.platform == 'windows'
@@ -110,15 +111,16 @@ jobs:
           cp src-tauri/target/release/bundle/deb/*.deb build-artifacts/
           cp src-tauri/target/release/bundle/appimage/*.AppImage build-artifacts/
 
-      - name: Build Windows installer with cargo-xwin
+      - name: Build Windows installer and portable zip with cargo-xwin
         if: matrix.platform == 'windows'
-        run: npx tauri build --bundles nsis --target x86_64-pc-windows-msvc --runner cargo-xwin
+        run: npm run build:win
 
       - name: Collect Windows artifacts
         if: matrix.platform == 'windows'
         run: |
           mkdir -p build-artifacts
-          cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe build-artifacts/
+          cp ./*-win-x64-setup.exe build-artifacts/
+          cp ./*-win-x64-portable.zip build-artifacts/
 
       - name: Upload ${{ matrix.platform }} build artifacts
         uses: actions/upload-artifact@v5
