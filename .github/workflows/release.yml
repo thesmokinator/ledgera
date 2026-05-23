@@ -208,6 +208,6 @@ jobs:
           body: |
             Ledgera ${{ github.ref_name }} release artifacts.
 
-            Download the installer/package for your operating system from the assets below. Windows also includes a portable ZIP for running Ledgera without an installer.
+            Download the installer/package for your operating system from the assets below. The Windows installer includes the offline Microsoft Edge WebView2 installer so setup can complete without downloading WebView2 at install time. Windows also includes a portable ZIP for running Ledgera without an installer; the portable ZIP requires WebView2 to already be installed.
             This workflow does not generate or publish a Tauri updater manifest; updates are manual via GitHub Releases.
           files: release-artifacts/*

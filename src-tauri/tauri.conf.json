@@ -29,6 +29,10 @@
       "minimumSystemVersion": "11.0"
     },
     "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
       "nsis": {
         "installMode": "perMachine",
         "languages": ["English", "Italian"]
