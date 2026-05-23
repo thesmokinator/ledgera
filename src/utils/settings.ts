@@ -4,6 +4,7 @@ export const defaultSettings: AppSettings = {
   journalPath: "",
   hledgerPath: "",
   theme: "system",
+  language: "system",
   powerUser: false,
   defaultCommodity: "",
   fetchPrices: false,
@@ -18,6 +19,7 @@ export function normalizeSettings(settings?: Partial<AppSettings>): AppSettings 
     ...defaultSettings,
     ...settings,
     theme: settings?.theme ?? "system",
+    language: settings?.language ?? "system",
     powerUser: settings?.powerUser ?? false,
     fetchPrices: settings?.fetchPrices ?? false,
   };

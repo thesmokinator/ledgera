@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import packageJson from "../../package.json";
 import { formatCount, formatFileSize } from "../utils/format";
 import { parseError } from "../utils/error";
+import { supportedLanguages } from "../utils/language";
 import type { AppSettings, HledgerStatus, JournalSummary, UpdateStatus } from "./types";
 import styles from "./SettingsRoute.module.css";
 
@@ -240,6 +241,14 @@ export function SettingsRoute({
                   { value: "dark", label: t("settings.theme_dark") },
                   { value: "light", label: t("settings.theme_light") },
                 ]}
+              />
+            </Form.Item>
+            <Form.Item label={t("settings.language")} name="language" rules={[{ required: true }]}>
+              <Select
+                options={supportedLanguages.map((language) => ({
+                  value: language.value,
+                  label: t(language.labelKey),
+                }))}
               />
             </Form.Item>
             <div className={styles.developer_settings}>

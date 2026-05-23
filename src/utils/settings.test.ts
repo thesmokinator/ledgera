@@ -8,6 +8,7 @@ describe("defaultSettings", () => {
       journalPath: "",
       hledgerPath: "",
       theme: "system",
+      language: "system",
       powerUser: false,
       defaultCommodity: "",
       fetchPrices: false,
@@ -38,12 +39,18 @@ describe("normalizeSettings", () => {
     expect(result.defaultCommodity).toBe("EUR");
     expect(result.hledgerPath).toBe("");
     expect(result.theme).toBe("system");
+    expect(result.language).toBe("system");
     expect(result.powerUser).toBe(false);
   });
 
   it("forces theme to 'system' when not provided", () => {
     const result = normalizeSettings({ theme: undefined } as Partial<AppSettings>);
     expect(result.theme).toBe("system");
+  });
+
+  it("forces language to 'system' when not provided", () => {
+    const result = normalizeSettings({ language: undefined } as Partial<AppSettings>);
+    expect(result.language).toBe("system");
   });
 
   it("forces powerUser to false when not provided", () => {
@@ -57,6 +64,12 @@ describe("normalizeSettings", () => {
     expect(normalizeSettings({ theme: "system" }).theme).toBe("system");
   });
 
+  it("preserves explicit language value", () => {
+    expect(normalizeSettings({ language: "en" }).language).toBe("en");
+    expect(normalizeSettings({ language: "it" }).language).toBe("it");
+    expect(normalizeSettings({ language: "system" }).language).toBe("system");
+  });
+
   it("preserves explicit powerUser value", () => {
     expect(normalizeSettings({ powerUser: true }).powerUser).toBe(true);
     expect(normalizeSettings({ powerUser: false }).powerUser).toBe(false);
@@ -67,6 +80,7 @@ describe("normalizeSettings", () => {
       journalPath: "/journal.journal",
       hledgerPath: "/usr/local/bin/hledger",
       theme: "dark",
+      language: "it",
       powerUser: true,
       defaultCommodity: "USD",
       fetchPrices: true,

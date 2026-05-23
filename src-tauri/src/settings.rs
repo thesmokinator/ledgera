@@ -10,6 +10,8 @@ pub(crate) struct AppSettings {
     pub(crate) hledger_path: String,
     #[serde(default = "default_theme")]
     pub(crate) theme: String,
+    #[serde(default = "default_language")]
+    pub(crate) language: String,
     #[serde(default)]
     pub(crate) power_user: bool,
     #[serde(default)]
@@ -32,6 +34,7 @@ impl Default for AppSettings {
             journal_path: String::new(),
             hledger_path: String::new(),
             theme: default_theme(),
+            language: default_language(),
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
@@ -44,6 +47,10 @@ impl Default for AppSettings {
 }
 
 fn default_theme() -> String {
+    "system".to_string()
+}
+
+fn default_language() -> String {
     "system".to_string()
 }
 

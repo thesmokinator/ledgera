@@ -1,6 +1,7 @@
 import type { Dayjs } from "dayjs";
 
 export type ThemePreference = "system" | "dark" | "light";
+export type LanguagePreference = "system" | "en" | "it";
 
 export type AppView = "transactions" | "accounts" | "balances" | "settings" | "logs";
 
@@ -8,6 +9,7 @@ export type AppSettings = {
   journalPath: string;
   hledgerPath: string;
   theme: ThemePreference;
+  language: LanguagePreference;
   powerUser: boolean;
   defaultCommodity: string;
   fetchPrices: boolean;

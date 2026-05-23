@@ -111,6 +111,7 @@ mod tests {
             journal_path: path.to_string_lossy().to_string(),
             hledger_path: "true".to_string(),
             theme: "system".to_string(),
+            language: "system".to_string(),
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,

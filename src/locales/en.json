@@ -26,6 +26,15 @@
     "monthly_transactions_tab": "Monthly transactions",
     "scheduled_transactions_tab": "Scheduled transactions"
   },
+  "search": {
+    "placeholder": "Search the journal…",
+    "start_typing": "Start typing to search transactions",
+    "searching": "Searching…",
+    "no_results": "No matching transactions",
+    "navigate_shortcut": "↑↓ Navigate",
+    "open_shortcut": "Enter Open",
+    "close_shortcut": "Esc Close"
+  },
   "accounts": {
     "title": "Chart of accounts and activity",
     "transactions_count": "Activity",
@@ -83,6 +92,10 @@
     "theme_system": "System",
     "theme_dark": "Dark",
     "theme_light": "Light",
+    "language": "Language",
+    "language_system": "System language",
+    "language_english": "English",
+    "language_italian": "Italiano",
     "app": "App",
     "version_label": "Version",
     "updates": "Updates",

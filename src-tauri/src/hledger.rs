@@ -137,6 +137,7 @@ mod tests {
             journal_path: String::new(),
             hledger_path: "/custom/bin/hledger".to_string(),
             theme: "system".to_string(),
+            language: "system".to_string(),
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
