@@ -1,7 +1,8 @@
 {
   "name": "ledgera",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-rc.3",
+  "author": "Michele Broggi",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -11,12 +12,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
     "build:mac": "scripts/build-mac.sh",
     "build:win": "scripts/build-win.sh",
+    "build:win:zip": "scripts/build-win.sh --portable-only",
     "build:linux": "scripts/build-linux.sh",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

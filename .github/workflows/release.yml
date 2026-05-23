@@ -1,0 +1,213 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Test gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.12.0"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Validate release tag version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Release tag v${TAG_VERSION} does not match package.json version ${PACKAGE_VERSION}"
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Run frontend tests
+        run: npm run test
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            pkg-config
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Run backend tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            os: macos-latest
+          - platform: linux
+            os: ubuntu-latest
+          - platform: windows
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.12.0"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            pkg-config \
+            patchelf \
+            libfuse2
+
+      - name: Install Windows cross-build dependencies
+        if: matrix.platform == 'windows'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            lld \
+            llvm \
+            nsis \
+            pkg-config \
+            libssl-dev \
+            zip
+
+      - name: Install cargo-xwin
+        if: matrix.platform == 'windows'
+        run: cargo install cargo-xwin --locked
+
+      - name: Add Windows Rust target
+        if: matrix.platform == 'windows'
+        run: rustup target add x86_64-pc-windows-msvc
+
+      - name: Build macOS app and DMG
+        if: matrix.platform == 'macos'
+        run: npx tauri build --bundles app,dmg
+
+      - name: Collect macOS artifacts
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p release-artifacts
+          APP_PATH=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found"
+            exit 1
+          fi
+          APP_NAME=$(basename "$APP_PATH" .app)
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "release-artifacts/${APP_NAME}-${GITHUB_REF_NAME}-macos-app.zip"
+          cp src-tauri/target/release/bundle/dmg/*.dmg release-artifacts/
+
+      - name: Build Linux packages
+        if: matrix.platform == 'linux'
+        run: npx tauri build --bundles deb,appimage
+
+      - name: Collect Linux artifacts
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p release-artifacts
+          cp src-tauri/target/release/bundle/deb/*.deb release-artifacts/
+          cp src-tauri/target/release/bundle/appimage/*.AppImage release-artifacts/
+
+      - name: Build Windows installer and portable zip with cargo-xwin
+        if: matrix.platform == 'windows'
+        run: npm run build:win
+
+      - name: Collect Windows artifacts
+        if: matrix.platform == 'windows'
+        run: |
+          mkdir -p release-artifacts
+          cp ./*-win-x64-setup.exe release-artifacts/
+          cp ./*-win-x64-portable.zip release-artifacts/
+
+      - name: Upload ${{ matrix.platform }} artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ledgera-${{ matrix.platform }}-${{ github.ref_name }}
+          path: release-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Ledgera ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          body: |
+            Ledgera ${{ github.ref_name }} release artifacts.
+
+            Download the installer/package for your operating system from the assets below. Windows also includes a portable ZIP for running Ledgera without an installer.
+            This workflow does not generate or publish a Tauri updater manifest; updates are manual via GitHub Releases.
+          files: release-artifacts/*
