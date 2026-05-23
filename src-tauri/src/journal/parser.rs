@@ -380,6 +380,32 @@ pub(crate) fn summarize_transaction(postings: &[JournalPosting]) -> TransactionD
     let inferred_values = infer_posting_values(postings);
     let flow = summarize_transaction_flow(postings, &inferred_values);
 
+    if let Some(display_amount) = summarize_asset_transfer_with_expenses(postings, &inferred_values)
+    {
+        let account = postings
+            .iter()
+            .zip(inferred_values.iter())
+            .find_map(|(posting, value)| {
+                if is_asset_or_liability_account(&posting.account)
+                    && value.is_some_and(|value| value < 0.0)
+                {
+                    Some(posting.account.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| display_amount.account.clone());
+
+        return TransactionDisplay {
+            account,
+            amount: display_amount.amount,
+            formatted: display_amount.formatted,
+            kind: "transfer".to_string(),
+            tint: "negative".to_string(),
+            flow,
+        };
+    }
+
     if let Some(posting) = postings
         .iter()
         .find(|posting| posting.account.to_lowercase().starts_with("expenses"))
@@ -498,6 +524,13 @@ struct DisplayAmount {
     formatted: String,
 }
 
+#[derive(Debug)]
+struct AccountDisplayAmount {
+    account: String,
+    amount: String,
+    formatted: String,
+}
+
 fn infer_posting_values(postings: &[JournalPosting]) -> Vec<Option<f64>> {
     let mut values = postings
         .iter()
@@ -522,6 +555,61 @@ fn infer_posting_values(postings: &[JournalPosting]) -> Vec<Option<f64>> {
     }
 
     values
+}
+
+fn summarize_asset_transfer_with_expenses(
+    postings: &[JournalPosting],
+    values: &[Option<f64>],
+) -> Option<AccountDisplayAmount> {
+    let has_expense = postings
+        .iter()
+        .any(|posting| posting.account.to_lowercase().starts_with("expenses"));
+    if !has_expense {
+        return None;
+    }
+
+    let has_asset_or_liability_source =
+        postings.iter().zip(values.iter()).any(|(posting, value)| {
+            is_asset_or_liability_account(&posting.account)
+                && value.is_some_and(|value| value < 0.0)
+        });
+    if !has_asset_or_liability_source {
+        return None;
+    }
+
+    let positive_asset_indexes = postings
+        .iter()
+        .zip(values.iter())
+        .enumerate()
+        .filter_map(|(index, (posting, value))| {
+            if posting.account.to_lowercase().starts_with("assets")
+                && value.is_some_and(|value| value > 0.0)
+            {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let display_amount =
+        summarize_amount_indexes(postings, values, &positive_asset_indexes, None, true)?;
+    let account = positive_asset_indexes
+        .first()
+        .and_then(|index| postings.get(*index))
+        .map(|posting| posting.account.clone())
+        .unwrap_or_default();
+
+    Some(AccountDisplayAmount {
+        account,
+        amount: display_amount.amount,
+        formatted: display_amount.formatted,
+    })
+}
+
+fn is_asset_or_liability_account(account: &str) -> bool {
+    let account = account.to_lowercase();
+    account.starts_with("assets") || account.starts_with("liabilities")
 }
 
 fn summarize_kind_amount(

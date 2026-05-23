@@ -186,6 +186,21 @@ mod tests {
     }
 
     #[test]
+    fn summarizes_asset_transfer_with_fee_by_main_asset_amount() {
+        let display = summarize_transaction(&[
+            posting("assets:bank:fineco", "-71", "€"),
+            posting("expenses:fees", "1", "€"),
+            posting("assets:cash", "70", "€"),
+        ]);
+
+        assert_eq!(display.kind, "transfer");
+        assert_eq!(display.amount, "€70");
+        assert_eq!(display.formatted, "€70.00");
+        assert_eq!(display.flow.from, vec!["assets:bank:fineco"]);
+        assert_eq!(display.flow.to, vec!["expenses:fees", "assets:cash"]);
+    }
+
+    #[test]
     fn summarizes_split_expense_flow_and_total_amount() {
         let display = summarize_transaction(&[
             posting("expenses:shopping", "26.58", "€"),
