@@ -38,7 +38,17 @@ Open the **Settings** tab to configure:
 | hledger path | Custom executable path (auto-detected by default) |
 | Default commodity | e.g. `EUR`, `€`, `USD` |
 | Theme | System / Dark / Light |
+| Language | System / English / Italian |
 | Power user | Show raw journal entries, line numbers, and the Logs section |
+
+## Translations
+
+Ledgera ships with English and Italian translations. Translation files live in `src/locales/` and use the same nested JSON key structure as `en.json`. To add or update a language:
+
+1. Copy `src/locales/en.json` to a new locale file, for example `fr.json`.
+2. Translate all values while keeping keys unchanged.
+3. Register the locale in `src/i18n.ts` and `src/utils/language.ts`.
+4. Run `npm run typecheck` and `npm run test` before opening a PR.
 
 ## CI/CD and releases
 

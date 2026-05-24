@@ -1,6 +1,7 @@
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { Input, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
 import type { JournalSearchMatch, JournalSearchResult, JournalTransaction, SearchMatchRange } from "../types";
@@ -15,6 +16,7 @@ export function CommandPalette({
   onClose: () => void;
   onTransaction: (transaction: JournalTransaction) => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -86,21 +88,21 @@ export function CommandPalette({
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
-            placeholder="Search the journal…"
+            placeholder={t("search.placeholder")}
           />
         </div>
         <div className={styles.results}>
           {debouncedQuery.trim().length === 0 ? (
             <Typography.Text type="secondary" className={styles.empty}>
-              Start typing to search transactions
+              {t("search.start_typing")}
             </Typography.Text>
           ) : resultsQuery.isFetching && results.length === 0 ? (
             <Typography.Text type="secondary" className={styles.empty}>
-              Searching…
+              {t("search.searching")}
             </Typography.Text>
           ) : results.length === 0 ? (
             <Typography.Text type="secondary" className={styles.empty}>
-              No matching transactions
+              {t("search.no_results")}
             </Typography.Text>
           ) : (
             results.map((result, index) => (
@@ -119,7 +121,7 @@ export function CommandPalette({
                   <span className={styles.secondary}>{resultSubtitle(result.transaction)}</span>
                   {bestSecondaryMatch(result.matches) ? (
                     <span className={styles.match_context}>
-                      {matchLabel(bestSecondaryMatch(result.matches)!)}: {renderHighlightedText(bestSecondaryMatch(result.matches)!.value, bestSecondaryMatch(result.matches)!.ranges)}
+                      {matchLabel(bestSecondaryMatch(result.matches)!, t)}: {renderHighlightedText(bestSecondaryMatch(result.matches)!.value, bestSecondaryMatch(result.matches)!.ranges)}
                     </span>
                   ) : null}
                 </span>
@@ -128,9 +130,9 @@ export function CommandPalette({
           )}
         </div>
         <div className={styles.help}>
-          <span>↑↓ Navigate</span>
-          <span>Enter Open</span>
-          <span>Esc Close</span>
+          <span>{t("search.navigate_shortcut")}</span>
+          <span>{t("search.open_shortcut")}</span>
+          <span>{t("search.close_shortcut")}</span>
         </div>
       </div>
     </div>
@@ -149,10 +151,10 @@ function bestSecondaryMatch(matches: JournalSearchMatch[]): JournalSearchMatch |
     ?? matches.find((match) => match.field === "account");
 }
 
-function matchLabel(match: JournalSearchMatch): string {
-  if (match.field === "comment") return "Comment";
-  if (match.field === "account") return "Account";
-  return "Description";
+function matchLabel(match: JournalSearchMatch, t: (key: string) => string): string {
+  if (match.field === "comment") return t("transactions.comment");
+  if (match.field === "account") return t("transactions.account");
+  return t("transactions.description");
 }
 
 function renderHighlightedText(value: string, ranges: SearchMatchRange[]): ReactNode {

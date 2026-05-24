@@ -14,6 +14,8 @@ import {
 } from "@ant-design/icons";
 
 import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import "dayjs/locale/it";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +38,7 @@ import type {
 
 import { navShortcut } from "./utils/shortcut";
 import { callCommand } from "./utils/command";
+import { resolveLanguagePreference } from "./utils/language";
 import { useUpdateStatus } from "./hooks/useUpdateStatus";
 import { useJournalData } from "./hooks/useJournalData";
 import { useAppSettings } from "./hooks/useAppSettings";
@@ -49,7 +52,7 @@ function App() {
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [settingsForm] = Form.useForm<AppSettings>();
   const [messageApi, contextHolder] = message.useMessage();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const systemPrefersDark = useSystemTheme();
   const isMacOs = navigator.userAgent.includes("Mac");
 
@@ -139,7 +142,13 @@ function App() {
     }
   }, [settingsForm, settingsQuery.data]);
 
-
+  useEffect(() => {
+    const language = resolveLanguagePreference(activeSettings.language);
+    if (i18n.resolvedLanguage !== language) {
+      i18n.changeLanguage(language);
+    }
+    dayjs.locale(language);
+  }, [activeSettings.language, i18n]);
 
   const shortcuts = useMemo(() => {
     const hasJournal = Boolean(activeSettings.journalPath.trim());
