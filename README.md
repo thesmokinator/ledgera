@@ -64,7 +64,7 @@ The release workflow builds and uploads manual download artifacts to GitHub Rele
 - Linux `.deb` and AppImage
 - Windows NSIS installer and portable zip, cross-built with `cargo-xwin`
 
-Ledgera does not publish a Tauri updater manifest. Users choose and download the package they want from GitHub Releases. For Windows, use the portable zip to run Ledgera without installing shortcuts or system-wide entries.
+Ledgera does not publish a Tauri updater manifest. Users choose and download the package they want from GitHub Releases. On Windows, the NSIS installer embeds the Microsoft Edge WebView2 offline installer so it can complete without downloading WebView2 during setup. Use the portable zip to run Ledgera without installing shortcuts or system-wide entries; the portable zip requires WebView2 to already be installed on the system.
 
 ### macOS unsigned builds
 

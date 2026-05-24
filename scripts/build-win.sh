@@ -90,7 +90,8 @@ Run ${PRODUCT_NAME}.exe directly. This ZIP does not install shortcuts,
 file associations, or automatic updates.
 
 Requirements:
-- Microsoft Edge WebView2 Runtime (included with most supported Windows installations)
+- Microsoft Edge WebView2 Runtime already installed on this Windows system
+  (the setup.exe installer includes the offline WebView2 installer; this portable ZIP does not)
 - hledger available in PATH or configured in ${PRODUCT_NAME} settings
 EOF
 
