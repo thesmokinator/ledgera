@@ -5,6 +5,16 @@ export type LanguagePreference = "system" | "en" | "it";
 
 export type AppView = "transactions" | "accounts" | "balances" | "settings" | "logs";
 
+export type AppModuleSettings = {
+  enabled: boolean;
+};
+
+export type AppModulesSettings = {
+  marketPrices: AppModuleSettings;
+  developerTools: AppModuleSettings;
+  gitSync: AppModuleSettings;
+};
+
 export type AppSettings = {
   journalPath: string;
   hledgerPath: string;
@@ -17,6 +27,7 @@ export type AppSettings = {
   excludeBalances: string;
   includeInvestments: string;
   prefillPostings: boolean;
+  modules: AppModulesSettings;
 };
 
 export type HledgerStatus = {

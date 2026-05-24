@@ -1,4 +1,10 @@
-import type { AppSettings } from "../types";
+import type { AppModulesSettings, AppSettings } from "../types";
+
+export const defaultModules: AppModulesSettings = {
+  marketPrices: { enabled: false },
+  developerTools: { enabled: false },
+  gitSync: { enabled: false },
+};
 
 export const defaultSettings: AppSettings = {
   journalPath: "",
@@ -12,15 +18,31 @@ export const defaultSettings: AppSettings = {
   excludeBalances: "",
   includeInvestments: "",
   prefillPostings: false,
+  modules: defaultModules,
 };
 
+export function normalizeModules(settings?: Partial<AppSettings>): AppModulesSettings {
+  const modules = settings?.modules;
+  const marketPricesEnabled = modules?.marketPrices?.enabled ?? settings?.fetchPrices ?? false;
+  const developerToolsEnabled = modules?.developerTools?.enabled ?? settings?.powerUser ?? false;
+
+  return {
+    marketPrices: { enabled: marketPricesEnabled },
+    developerTools: { enabled: developerToolsEnabled },
+    gitSync: { enabled: modules?.gitSync?.enabled ?? false },
+  };
+}
+
 export function normalizeSettings(settings?: Partial<AppSettings>): AppSettings {
+  const modules = normalizeModules(settings);
+
   return {
     ...defaultSettings,
     ...settings,
     theme: settings?.theme ?? "system",
     language: settings?.language ?? "system",
-    powerUser: settings?.powerUser ?? false,
-    fetchPrices: settings?.fetchPrices ?? false,
+    powerUser: modules.developerTools.enabled,
+    fetchPrices: modules.marketPrices.enabled,
+    modules,
   };
 }

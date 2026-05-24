@@ -39,6 +39,7 @@ Open the **Settings** tab to configure:
 | Default commodity | e.g. `EUR`, `€`, `USD` |
 | Theme | System / Dark / Light |
 | Language | System / English / Italian |
+| Modules | Enable optional modules such as Market prices and Developer tools |
 | Power user | Show raw journal entries, line numbers, and the Logs section |
 
 ## Translations

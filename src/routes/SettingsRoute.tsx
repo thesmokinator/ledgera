@@ -262,35 +262,7 @@ export function SettingsRoute({
                 <Switch />
               </Form.Item>
             </div>
-            <div className={styles.developer_settings}>
-              <div>
-                <Typography.Text strong>{t("settings.fetch_prices")}</Typography.Text>
-                <Typography.Paragraph type="secondary">
-                  {t("settings.fetch_prices_help")}
-                </Typography.Paragraph>
-              </div>
-              <Form.Item name="fetchPrices" valuePropName="checked" noStyle>
-                <Switch />
-              </Form.Item>
-            </div>
-            <Form.Item noStyle shouldUpdate={(prev, cur) => prev.fetchPrices !== cur.fetchPrices}>
-              {({ getFieldValue }) =>
-                getFieldValue("fetchPrices") ? (
-                  <Form.Item
-                    className={styles.text_area_setting}
-                    label={t("settings.commodity_symbols")}
-                    name="commoditySymbols"
-                    help={t("settings.commodity_symbols_help")}
-                  >
-                    <Input.TextArea
-                      rows={3}
-                      placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
-                      style={{ fontFamily: "monospace", fontSize: 13 }}
-                    />
-                  </Form.Item>
-                ) : null
-              }
-            </Form.Item>
+
             <Form.Item
               className={styles.text_area_setting}
               label={t("settings.exclude_balances")}
@@ -315,15 +287,75 @@ export function SettingsRoute({
                 style={{ fontFamily: "monospace", fontSize: 13 }}
               />
             </Form.Item>
+          </div>
+        </Card>
+
+        {/* ── Modules ──────────────────────────────── */}
+        <Card
+          className={styles.card}
+          title={<CardTitle icon={<SettingOutlined />} label={t("settings.modules")} />}
+        >
+          <div className={styles.preferences_stack}>
+            <Typography.Paragraph type="secondary">
+              {t("settings.modules_help")}
+            </Typography.Paragraph>
             <div className={styles.developer_settings}>
               <div>
-                <Typography.Text strong>{t("settings.developer_options")}</Typography.Text>
+                <Typography.Text strong>{t("settings.module_market_prices")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.fetch_prices_help")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name={["modules", "marketPrices", "enabled"]} valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
+            <Form.Item
+              noStyle
+              shouldUpdate={(prev, cur) =>
+                prev.modules?.marketPrices?.enabled !== cur.modules?.marketPrices?.enabled
+              }
+            >
+              {({ getFieldValue }) =>
+                getFieldValue(["modules", "marketPrices", "enabled"]) ? (
+                  <Form.Item
+                    className={styles.text_area_setting}
+                    label={t("settings.commodity_symbols")}
+                    name="commoditySymbols"
+                    help={t("settings.commodity_symbols_help")}
+                  >
+                    <Input.TextArea
+                      rows={3}
+                      placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
+                      style={{ fontFamily: "monospace", fontSize: 13 }}
+                    />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+            <div className={styles.developer_settings}>
+              <div>
+                <Typography.Text strong>{t("settings.module_developer_tools")}</Typography.Text>
                 <Typography.Paragraph type="secondary">
                   {t("settings.advanced_mode_help")}
                 </Typography.Paragraph>
               </div>
-              <Form.Item name="powerUser" valuePropName="checked" noStyle>
+              <Form.Item name={["modules", "developerTools", "enabled"]} valuePropName="checked" noStyle>
                 <Switch />
+              </Form.Item>
+            </div>
+            <div className={styles.developer_settings}>
+              <div>
+                <Space size="small">
+                  <Typography.Text strong>{t("settings.module_git_sync")}</Typography.Text>
+                  <Tag>{t("settings.module_coming_soon")}</Tag>
+                </Space>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.module_git_sync_help")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name={["modules", "gitSync", "enabled"]} valuePropName="checked" noStyle>
+                <Switch disabled />
               </Form.Item>
             </div>
           </div>
