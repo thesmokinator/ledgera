@@ -5,6 +5,24 @@ use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct AppModuleSettings {
+    #[serde(default)]
+    pub(crate) enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AppModulesSettings {
+    #[serde(default)]
+    pub(crate) market_prices: AppModuleSettings,
+    #[serde(default)]
+    pub(crate) developer_tools: AppModuleSettings,
+    #[serde(default)]
+    pub(crate) git_sync: AppModuleSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct AppSettings {
     pub(crate) journal_path: String,
     pub(crate) hledger_path: String,
@@ -26,6 +44,24 @@ pub(crate) struct AppSettings {
     pub(crate) include_investments: String,
     #[serde(default)]
     pub(crate) prefill_postings: bool,
+    #[serde(default)]
+    pub(crate) modules: AppModulesSettings,
+}
+
+impl Default for AppModuleSettings {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
+impl Default for AppModulesSettings {
+    fn default() -> Self {
+        Self {
+            market_prices: AppModuleSettings::default(),
+            developer_tools: AppModuleSettings::default(),
+            git_sync: AppModuleSettings::default(),
+        }
+    }
 }
 
 impl Default for AppSettings {
@@ -42,6 +78,7 @@ impl Default for AppSettings {
             exclude_balances: String::new(),
             include_investments: String::new(),
             prefill_postings: false,
+            modules: AppModulesSettings::default(),
         }
     }
 }

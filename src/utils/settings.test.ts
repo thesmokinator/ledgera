@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeSettings, defaultSettings } from "./settings";
+import { normalizeModules, normalizeSettings, defaultModules, defaultSettings } from "./settings";
 import type { AppSettings } from "../types";
 
 describe("defaultSettings", () => {
@@ -16,6 +16,37 @@ describe("defaultSettings", () => {
       excludeBalances: "",
       includeInvestments: "",
       prefillPostings: false,
+      modules: defaultModules,
+    });
+  });
+});
+
+describe("normalizeModules", () => {
+  it("returns module defaults when called with undefined", () => {
+    expect(normalizeModules(undefined)).toEqual(defaultModules);
+  });
+
+  it("migrates legacy fetchPrices and powerUser into modules", () => {
+    expect(normalizeModules({ fetchPrices: true, powerUser: true })).toEqual({
+      marketPrices: { enabled: true },
+      developerTools: { enabled: true },
+      gitSync: { enabled: false },
+    });
+  });
+
+  it("prefers explicit modules over legacy fields", () => {
+    expect(normalizeModules({
+      fetchPrices: true,
+      powerUser: true,
+      modules: {
+        marketPrices: { enabled: false },
+        developerTools: { enabled: false },
+        gitSync: { enabled: true },
+      },
+    })).toEqual({
+      marketPrices: { enabled: false },
+      developerTools: { enabled: false },
+      gitSync: { enabled: true },
     });
   });
 });
@@ -41,6 +72,7 @@ describe("normalizeSettings", () => {
     expect(result.theme).toBe("system");
     expect(result.language).toBe("system");
     expect(result.powerUser).toBe(false);
+    expect(result.modules).toEqual(defaultModules);
   });
 
   it("forces theme to 'system' when not provided", () => {
@@ -70,9 +102,26 @@ describe("normalizeSettings", () => {
     expect(normalizeSettings({ language: "system" }).language).toBe("system");
   });
 
-  it("preserves explicit powerUser value", () => {
-    expect(normalizeSettings({ powerUser: true }).powerUser).toBe(true);
-    expect(normalizeSettings({ powerUser: false }).powerUser).toBe(false);
+  it("normalizes legacy powerUser and fetchPrices values", () => {
+    const result = normalizeSettings({ powerUser: true, fetchPrices: true });
+    expect(result.powerUser).toBe(true);
+    expect(result.fetchPrices).toBe(true);
+    expect(result.modules.developerTools.enabled).toBe(true);
+    expect(result.modules.marketPrices.enabled).toBe(true);
+  });
+
+  it("normalizes modules back to legacy compatibility fields", () => {
+    const result = normalizeSettings({
+      modules: {
+        marketPrices: { enabled: true },
+        developerTools: { enabled: true },
+        gitSync: { enabled: true },
+      },
+    });
+
+    expect(result.fetchPrices).toBe(true);
+    expect(result.powerUser).toBe(true);
+    expect(result.modules.gitSync.enabled).toBe(true);
   });
 
   it("merges all fields", () => {
@@ -88,6 +137,11 @@ describe("normalizeSettings", () => {
       excludeBalances: "",
       includeInvestments: "",
       prefillPostings: false,
+      modules: {
+        marketPrices: { enabled: true },
+        developerTools: { enabled: true },
+        gitSync: { enabled: true },
+      },
     };
     expect(normalizeSettings(full)).toEqual(full);
   });

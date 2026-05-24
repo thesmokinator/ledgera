@@ -145,6 +145,7 @@ mod tests {
             exclude_balances: String::new(),
             include_investments: String::new(),
             prefill_postings: false,
+            modules: Default::default(),
         };
 
         assert_eq!(hledger_executable(&settings), "/custom/bin/hledger");

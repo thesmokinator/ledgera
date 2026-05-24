@@ -1,5 +1,8 @@
 export type {
   ThemePreference,
+  LanguagePreference,
+  AppModuleSettings,
+  AppModulesSettings,
   AppSettings,
   AppError,
   LogEntry,

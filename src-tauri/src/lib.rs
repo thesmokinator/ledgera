@@ -119,6 +119,7 @@ mod tests {
             exclude_balances: String::new(),
             include_investments: String::new(),
             prefill_postings: false,
+            modules: Default::default(),
         }
     }
 
