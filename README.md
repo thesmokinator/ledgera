@@ -39,8 +39,14 @@ Open the **Settings** tab to configure:
 | Default commodity | e.g. `EUR`, `€`, `USD` |
 | Theme | System / Dark / Light |
 | Language | System / English / Italian |
-| Modules | Enable optional modules such as Market prices and Developer tools |
+| Modules | Enable optional modules such as Market prices, Developer tools, and Git Sync |
 | Power user | Show raw journal entries, line numbers, and the Logs section |
+
+## Git Sync module
+
+The optional **Git Sync** module lets users synchronize configured journal files from the app using the system `git` executable. It detects the repository containing the journal, shows branch/ahead/behind/dirty status, supports manual `pull --ff-only`, and can commit and push known journal files with a customizable commit message.
+
+For safety, Ledgera stages only journal files it knows about and does not attempt merge conflict resolution. Resolve divergent branches or conflicts with your preferred Git client, then refresh the Sync view.
 
 ## Translations
 

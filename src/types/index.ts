@@ -3,16 +3,20 @@ import type { Dayjs } from "dayjs";
 export type ThemePreference = "system" | "dark" | "light";
 export type LanguagePreference = "system" | "en" | "it";
 
-export type AppView = "transactions" | "accounts" | "balances" | "settings" | "logs";
+export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs";
 
 export type AppModuleSettings = {
   enabled: boolean;
 };
 
+export type GitSyncModuleSettings = AppModuleSettings & {
+  commitMessage: string;
+};
+
 export type AppModulesSettings = {
   marketPrices: AppModuleSettings;
   developerTools: AppModuleSettings;
-  gitSync: AppModuleSettings;
+  gitSync: GitSyncModuleSettings;
 };
 
 export type AppSettings = {
@@ -228,6 +232,26 @@ export type InvestmentOverview = {
 };
 
 export type MonthSetter = (updater: (month: Dayjs) => Dayjs) => void;
+
+export type GitSyncFileStatus = {
+  path: string;
+  status: string;
+};
+
+export type GitSyncStatus = {
+  available: boolean;
+  repoFound: boolean;
+  repoRoot: string | null;
+  branch: string | null;
+  upstream: string | null;
+  remote: string | null;
+  ahead: number;
+  behind: number;
+  dirty: boolean;
+  files: GitSyncFileStatus[];
+  lastCommit: string | null;
+  error: string | null;
+};
 
 export type NavigationItem = {
   key: AppView;

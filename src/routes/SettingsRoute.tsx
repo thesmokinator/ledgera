@@ -348,16 +348,33 @@ export function SettingsRoute({
               <div>
                 <Space size="small">
                   <Typography.Text strong>{t("settings.module_git_sync")}</Typography.Text>
-                  <Tag>{t("settings.module_coming_soon")}</Tag>
                 </Space>
                 <Typography.Paragraph type="secondary">
                   {t("settings.module_git_sync_help")}
                 </Typography.Paragraph>
               </div>
               <Form.Item name={["modules", "gitSync", "enabled"]} valuePropName="checked" noStyle>
-                <Switch disabled />
+                <Switch />
               </Form.Item>
             </div>
+            <Form.Item
+              noStyle
+              shouldUpdate={(prev, cur) =>
+                prev.modules?.gitSync?.enabled !== cur.modules?.gitSync?.enabled
+              }
+            >
+              {({ getFieldValue }) =>
+                getFieldValue(["modules", "gitSync", "enabled"]) ? (
+                  <Form.Item
+                    label={t("settings.module_git_sync_commit_message")}
+                    name={["modules", "gitSync", "commitMessage"]}
+                    rules={[{ required: true, whitespace: true, message: t("settings.module_git_sync_commit_message_required") }]}
+                  >
+                    <Input maxLength={200} showCount />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
           </div>
         </Card>
 

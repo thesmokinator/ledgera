@@ -33,5 +33,5 @@ export function useHotkeys(shortcuts: Shortcut[]) {
     return () => {
       hotkeys.unbind();
     };
-  }, []);
+  }, [shortcuts]);
 }

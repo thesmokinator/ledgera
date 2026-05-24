@@ -1,9 +1,11 @@
 import type { AppModulesSettings, AppSettings } from "../types";
 
+export const defaultGitCommitMessage = "Update journal from Ledgera";
+
 export const defaultModules: AppModulesSettings = {
   marketPrices: { enabled: false },
   developerTools: { enabled: false },
-  gitSync: { enabled: false },
+  gitSync: { enabled: false, commitMessage: defaultGitCommitMessage },
 };
 
 export const defaultSettings: AppSettings = {
@@ -29,7 +31,10 @@ export function normalizeModules(settings?: Partial<AppSettings>): AppModulesSet
   return {
     marketPrices: { enabled: marketPricesEnabled },
     developerTools: { enabled: developerToolsEnabled },
-    gitSync: { enabled: modules?.gitSync?.enabled ?? false },
+    gitSync: {
+      enabled: modules?.gitSync?.enabled ?? false,
+      commitMessage: modules?.gitSync?.commitMessage?.trim() || defaultGitCommitMessage,
+    },
   };
 }
 

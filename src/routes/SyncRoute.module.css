@@ -1,0 +1,13 @@
+.full_width {
+  width: 100%;
+}
+
+.stats_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.file_list {
+  margin-top: 8px;
+}
