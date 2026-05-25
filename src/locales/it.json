@@ -284,7 +284,6 @@
     "level": "Livello",
     "code": "Codice",
     "message": "Messaggio",
-    "details": "Dettagli",
     "copy": "Copia voce di log"
   },
   "balances": {

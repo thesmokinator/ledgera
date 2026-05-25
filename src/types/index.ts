@@ -184,7 +184,6 @@ export type LogEntry = {
   level: "info" | "warn" | "error";
   code: string;
   message: string;
-  details?: string;
 };
 
 export type Balance = {

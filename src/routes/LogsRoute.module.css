@@ -6,6 +6,23 @@
     border-radius: 14px;
 }
 
+.message {
+    max-width: 100%;
+}
+
+.message_preview {
+    max-width: min(720px, 70vw);
+    max-height: 420px;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.message_tooltip :global(.ant-tooltip-inner) {
+    max-width: none;
+}
+
 :global(.theme-light) .card {
     color: #111827;
     background: #ffffff;

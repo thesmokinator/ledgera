@@ -137,12 +137,11 @@ pub(crate) fn load_balances_for_settings(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        logs::log_event_with_details(
+        logs::log_error(
             app,
-            "error",
             "balance_failed",
-            "hledger balance failed",
-            Some(stderr.clone()),
+            "hledger balance command failed.",
+            stderr.clone(),
         );
         return Err(to_error_string_with_details(
             "hledger_balance_failed",

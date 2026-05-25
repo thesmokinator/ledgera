@@ -284,7 +284,6 @@
     "level": "Level",
     "code": "Code",
     "message": "Message",
-    "details": "Details",
     "copy": "Copy log entry"
   },
   "balances": {

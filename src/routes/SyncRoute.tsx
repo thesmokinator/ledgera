@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Input, List, Modal, Space, Statistic, Tag, Typography } from "antd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings, GitSyncStatus } from "../types";
 import { gitSyncSummary } from "../hooks/useGitSync";
@@ -56,6 +56,7 @@ export function SyncRoute({
   const { t } = useTranslation();
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [commitMessage, setCommitMessage] = useState(settings.modules.gitSync.commitMessage);
+  const awaitingCommitAndPush = useRef(false);
   const summary = gitSyncSummary(status);
   const busy = isChecking || isPulling || isCommittingAndPushing;
   const canPull = Boolean(status?.repoFound && status.behind > 0 && !status.dirty && !busy);
@@ -81,9 +82,18 @@ export function SyncRoute({
     setCommitModalOpen(true);
   }
 
+  useEffect(() => {
+    if (!awaitingCommitAndPush.current || isCommittingAndPushing) return;
+
+    awaitingCommitAndPush.current = false;
+    if (status?.repoFound && !status.dirty && !status.error) {
+      setCommitModalOpen(false);
+    }
+  }, [isCommittingAndPushing, status?.dirty, status?.error, status?.repoFound]);
+
   function submitCommitAndPush() {
+    awaitingCommitAndPush.current = true;
     onCommitAndPush(commitMessage);
-    setCommitModalOpen(false);
   }
 
   return (
@@ -166,8 +176,11 @@ export function SyncRoute({
         title={t("sync.commit_modal_title")}
         open={commitModalOpen}
         okText={t("sync.commit_and_push")}
-        okButtonProps={{ disabled: !commitMessage.trim() || commitMessage.length > 200 }}
+        okButtonProps={{ disabled: !commitMessage.trim() || commitMessage.length > 200 || isCommittingAndPushing }}
+        cancelButtonProps={{ disabled: isCommittingAndPushing }}
         confirmLoading={isCommittingAndPushing}
+        maskClosable={!isCommittingAndPushing}
+        keyboard={!isCommittingAndPushing}
         onCancel={() => setCommitModalOpen(false)}
         onOk={submitCommitAndPush}
       >
@@ -179,6 +192,7 @@ export function SyncRoute({
             value={commitMessage}
             maxLength={200}
             showCount
+            disabled={isCommittingAndPushing}
             onChange={(event) => setCommitMessage(event.target.value)}
           />
         </Space>

@@ -37,33 +37,95 @@ pub(crate) struct GitSyncStatus {
 }
 
 #[tauri::command]
-pub(crate) fn git_sync_status(app: AppHandle) -> Result<GitSyncStatus, String> {
-    match git_sync_status_for_app(&app) {
+pub(crate) async fn git_sync_status(app: AppHandle) -> Result<GitSyncStatus, String> {
+    let task_app = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || git_sync_status_for_app(&task_app))
+        .await
+        .map_err(|error| {
+            to_error_string_with_details(
+                "git_command_failed",
+                "Git status task failed.",
+                error.to_string(),
+            )
+        })?;
+
+    match result {
         Ok(status) => Ok(status),
         Err(error) => {
-            logs::log_event_with_details(&app, "error", "git_sync_status_failed", &error, None);
+            logs::log_error(
+                &app,
+                "git_sync_status_failed",
+                "Failed to refresh Git Sync status.",
+                &error,
+            );
             Ok(error_status(error))
         }
     }
 }
 
 #[tauri::command]
-pub(crate) fn git_pull_journal(app: AppHandle) -> Result<GitSyncStatus, String> {
-    let result = git_pull_journal_for_app(&app);
-    if let Err(error) = &result {
-        logs::log_event_with_details(&app, "error", "git_pull_failed", error, None);
+pub(crate) async fn git_pull_journal(app: AppHandle) -> Result<GitSyncStatus, String> {
+    logs::log_event(&app, "info", "git_pull_started", "Git pull started.");
+    let task_app = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || git_pull_journal_for_app(&task_app))
+        .await
+        .map_err(|error| {
+            to_error_string_with_details(
+                "git_command_failed",
+                "Git pull task failed.",
+                error.to_string(),
+            )
+        })?;
+
+    match &result {
+        Ok(_) => logs::log_event(
+            &app,
+            "info",
+            "git_pull_succeeded",
+            "Git pull completed successfully.",
+        ),
+        Err(error) => logs::log_error(&app, "git_pull_failed", "Git pull failed.", error),
     }
     result
 }
 
 #[tauri::command]
-pub(crate) fn git_commit_and_push_journal(
+pub(crate) async fn git_commit_and_push_journal(
     app: AppHandle,
     message: String,
 ) -> Result<GitSyncStatus, String> {
-    let result = git_commit_and_push_journal_for_app(&app, &message);
-    if let Err(error) = &result {
-        logs::log_event_with_details(&app, "error", "git_commit_push_failed", error, None);
+    logs::log_event(
+        &app,
+        "info",
+        "git_commit_push_started",
+        "Git commit and push started.",
+    );
+    let task_app = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        git_commit_and_push_journal_for_app(&task_app, &message)
+    })
+    .await
+    .map_err(|error| {
+        to_error_string_with_details(
+            "git_command_failed",
+            "Git commit and push task failed.",
+            error.to_string(),
+        )
+    })?;
+
+    match &result {
+        Ok(_) => logs::log_event(
+            &app,
+            "info",
+            "git_commit_push_succeeded",
+            "Git commit and push completed successfully.",
+        ),
+        Err(error) => logs::log_error(
+            &app,
+            "git_commit_push_failed",
+            "Git commit and push failed.",
+            error,
+        ),
     }
     result
 }
