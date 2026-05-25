@@ -68,7 +68,13 @@ GitHub Actions runs the CI pipeline on every push and pull request:
 
 A manual **Build verification** workflow is available in GitHub Actions to test distributable builds before publishing a release. It builds macOS and Linux packages on native runners and cross-builds the Windows installer and portable zip from Linux using `cargo-xwin`.
 
-Release builds are created only from Git tags matching `v*`. The tag version must match `package.json`:
+Release builds are created only from Git tags matching `v*`. Before tagging, update all app manifests with the release version:
+
+```bash
+npm run set-version -- 0.1.0
+```
+
+The tag version must match `package.json`:
 
 ```bash
 git tag v0.1.0
