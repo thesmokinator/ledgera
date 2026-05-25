@@ -4,6 +4,10 @@ A desktop app for managing [hledger](https://hledger.org) journals - built with 
 
 ![Screenshot](screenshots/001.png)
 
+## Documentation
+
+User documentation is available in the [Ledgera Wiki](https://github.com/thesmokinator/ledgera/wiki).
+
 ## Features
 
 - **Browse & filter** - monthly transactions, scheduled entries, accounts overview with time-range filters
