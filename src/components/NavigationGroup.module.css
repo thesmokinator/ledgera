@@ -73,6 +73,11 @@
     border-radius: 999px;
 }
 
+.nav_badge_danger {
+    color: #fee2e2;
+    background: #7f1d1d;
+}
+
 .nav_shortcut {
     margin-left: auto;
     font-size: 11px;
@@ -95,68 +100,7 @@
     background: #d1fae5;
 }
 
-.sync_footer {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    margin-top: auto;
-    padding: 10px 8px;
-    color: #f1f1f1;
-    text-align: left;
-    cursor: pointer;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-}
-
-.sync_dot {
-    flex: 0 0 auto;
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: #9ca3af;
-}
-
-.sync_dot_success {
-    background: #10b981;
-}
-
-.sync_dot_warning {
-    background: #f59e0b;
-}
-
-.sync_dot_danger {
-    background: #ef4444;
-}
-
-.sync_dot_neutral {
-    background: #9ca3af;
-}
-
-.sync_label,
-.sync_detail {
-    display: block;
-}
-
-.sync_label {
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.sync_detail {
-    margin-top: 2px;
-    font-size: 11px;
-    opacity: 0.72;
-}
-
 :global(.theme-light) .nav_item.is_disabled:hover {
     color: #374151;
     background: transparent;
-}
-
-:global(.theme-light) .sync_footer {
-    color: #374151;
-    background: rgba(17, 24, 39, 0.03);
-    border-color: rgba(17, 24, 39, 0.08);
 }

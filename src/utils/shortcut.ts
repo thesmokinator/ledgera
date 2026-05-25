@@ -76,3 +76,8 @@ export function spotlightShortcut(): string {
 export function navShortcut(index: number): string {
   return formatShortcut(`command+${index}, ctrl+${index}`);
 }
+
+/** Returns the shortcut label for the Git Sync action. */
+export function gitSyncShortcut(): string {
+  return formatShortcut("command+shift+g, ctrl+shift+g");
+}

@@ -260,4 +260,5 @@ export type NavigationItem = {
   disabled?: boolean;
   shortcut?: string;
   badge?: string;
+  badgeTone?: "warning" | "danger";
 };

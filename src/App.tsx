@@ -37,7 +37,7 @@ import type {
   NavigationItem,
 } from "./types";
 
-import { navShortcut } from "./utils/shortcut";
+import { gitSyncShortcut, navShortcut } from "./utils/shortcut";
 import { callCommand } from "./utils/command";
 import { resolveLanguagePreference } from "./utils/language";
 import { useUpdateStatus } from "./hooks/useUpdateStatus";
@@ -195,7 +195,22 @@ function App() {
       ];
 
       if (activeSettings.modules.gitSync.enabled) {
-        items.splice(3, 0, { key: "sync", label: "common.sync", icon: <SyncOutlined />, disabled: !hasJournal, shortcut: isMacOs ? "⇧⌘G" : "Ctrl+Shift+G" });
+        const summary = gitSyncSummary(gitSyncStatus);
+        const syncBadge = gitSyncStatus && summary.tone !== "success" && summary.tone !== "neutral"
+          ? summary.tone === "danger"
+            ? t("sync.nav_badge_issue")
+            : t(summary.labelKey, summary.labelOptions)
+          : undefined;
+
+        items.splice(3, 0, {
+          key: "sync",
+          label: "common.sync",
+          icon: <SyncOutlined />,
+          disabled: !hasJournal,
+          shortcut: gitSyncShortcut(),
+          badge: syncBadge,
+          badgeTone: summary.tone === "danger" ? "danger" : "warning",
+        });
       }
 
       if (activeSettings.powerUser) {
@@ -204,19 +219,8 @@ function App() {
 
       return items;
     },
-    [activeSettings.powerUser, activeSettings.journalPath, activeSettings.modules.gitSync.enabled, updateStatus?.available, t, isMacOs],
+    [activeSettings.powerUser, activeSettings.journalPath, activeSettings.modules.gitSync.enabled, updateStatus?.available, gitSyncStatus, t],
   );
-
-  const syncFooter = useMemo(() => {
-    if (!gitSyncEnabled) return undefined;
-    const summary = gitSyncSummary(gitSyncStatus);
-    return {
-      label: t("sync.footer_label"),
-      detail: t(summary.labelKey, summary.labelOptions),
-      tone: summary.tone,
-      onClick: () => setActiveView("sync"),
-    };
-  }, [gitSyncEnabled, gitSyncStatus, t]);
 
   // Show a loading spinner while the initial settings are being fetched
   if (settingsQuery.isPending) {
@@ -239,7 +243,6 @@ function App() {
           <NavigationGroup
             items={navigationItems}
             activeKey={activeView}
-            syncFooter={syncFooter}
             onSelect={(key) => setActiveView(key)}
           />
         </Layout.Sider>

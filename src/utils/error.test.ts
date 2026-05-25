@@ -39,6 +39,15 @@ describe("formatAppError", () => {
     expect(result).toContain("File journal non trovato.");
     expect(result).toContain("/tmp/test.journal");
   });
+
+  it("omits details when requested", () => {
+    const error: AppError = {
+      code: "JOURNAL_NOT_FOUND",
+      message: "Journal file does not exist.",
+      details: "Expected at: /tmp/test.journal",
+    };
+    expect(formatAppError(error, mockT, { includeDetails: false })).toBe("File journal non trovato.");
+  });
 });
 
 describe("parseError", () => {

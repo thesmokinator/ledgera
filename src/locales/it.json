@@ -197,7 +197,7 @@
   "sync": {
     "title": "Git Sync",
     "description": "Sincronizza i file journal configurati con il repository Git che li contiene.",
-    "footer_label": "Git Sync",
+    "nav_badge_issue": "Problema",
     "status_unknown": "Non controllato",
     "status_unknown_help": "Aggiorna lo stato Git per controllare il repository del journal configurato.",
     "status_synced": "Sincronizzato",
@@ -222,7 +222,14 @@
     "commit_modal_description": "Controlla o personalizza il messaggio di commit prima di inviare le modifiche del journal.",
     "pull_success": "Journal aggiornato da Git.",
     "commit_push_success": "Modifiche del journal committate e inviate.",
-    "nothing_to_commit": "Nessuna modifica journal da committare."
+    "nothing_to_commit": "Nessuna modifica journal da committare.",
+    "error_help": {
+      "git_not_available": "Installa Git o assicurati che sia disponibile nel PATH di sistema.",
+      "git_repo_not_found": "Sposta il journal in un repository Git oppure disattiva Git Sync nelle Impostazioni.",
+      "git_sync_dirty": "Committa, invia o scarta le modifiche locali prima di scaricare quelle remote.",
+      "git_sync_behind": "Esegui Pull prima di committare e inviare nuove modifiche.",
+      "git_no_journal_files": "Controlla che il journal configurato sia leggibile e incluso nel repository."
+    }
   },
   "errors": {
     "journal_not_configured": "Nessun file journal è stato configurato. Vai in Impostazioni e seleziona il file journal.",

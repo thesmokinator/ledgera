@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings, GitSyncStatus } from "../types";
 import { gitSyncSummary } from "../hooks/useGitSync";
+import { formatAppError, parseAppError } from "../utils/error";
 import styles from "./SyncRoute.module.css";
 
 export function SyncRoute({
@@ -31,6 +32,15 @@ export function SyncRoute({
   const busy = isChecking || isPulling || isCommittingAndPushing;
   const canPull = Boolean(status?.repoFound && !status.dirty && !busy);
   const canCommitAndPush = Boolean(status?.repoFound && status.dirty && status.behind === 0 && !busy);
+  const statusError = useMemo(() => status?.error ? parseAppError(status.error) : null, [status?.error]);
+  const statusErrorHelpKey = statusError ? `sync.error_help.${statusError.code}` : "";
+  const statusErrorHelp = statusError ? t(statusErrorHelpKey) : "";
+  const hasStatusErrorHelp = Boolean(statusError && statusErrorHelp !== statusErrorHelpKey);
+  const statusErrorMessage = status?.error
+    ? statusError
+      ? formatAppError(statusError, t, { includeDetails: false })
+      : status.error
+    : "";
   const statusColor = useMemo(() => {
     if (summary.tone === "success") return "success";
     if (summary.tone === "warning") return "warning";
@@ -56,7 +66,19 @@ export function SyncRoute({
             {t("sync.description")}
           </Typography.Paragraph>
 
-          {status?.error ? <Alert type="error" showIcon message={t("sync.status_issue")} description={status.error} /> : null}
+          {status?.error ? (
+            <Alert
+              type="error"
+              showIcon
+              message={t("sync.status_issue")}
+              description={(
+                <Space direction="vertical" size={4}>
+                  <span>{statusErrorMessage}</span>
+                  {hasStatusErrorHelp ? <Typography.Text type="secondary">{statusErrorHelp}</Typography.Text> : null}
+                </Space>
+              )}
+            />
+          ) : null}
           {!status ? <Alert type="info" showIcon message={t("sync.status_unknown")} description={t("sync.status_unknown_help")} /> : null}
 
           <div className={styles.stats_grid}>

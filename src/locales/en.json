@@ -197,7 +197,7 @@
   "sync": {
     "title": "Git Sync",
     "description": "Synchronize the configured journal files with the Git repository that contains them.",
-    "footer_label": "Git Sync",
+    "nav_badge_issue": "Issue",
     "status_unknown": "Not checked",
     "status_unknown_help": "Refresh Git status to inspect the configured journal repository.",
     "status_synced": "Synced",
@@ -222,7 +222,14 @@
     "commit_modal_description": "Review or customize the commit message before pushing your journal changes.",
     "pull_success": "Journal pulled from Git.",
     "commit_push_success": "Journal changes committed and pushed.",
-    "nothing_to_commit": "No journal changes to commit."
+    "nothing_to_commit": "No journal changes to commit.",
+    "error_help": {
+      "git_not_available": "Install Git or make sure it is available in the system PATH.",
+      "git_repo_not_found": "Move the journal into a Git repository or disable Git Sync in Settings.",
+      "git_sync_dirty": "Commit, push, or discard local changes before pulling remote changes.",
+      "git_sync_behind": "Pull remote changes before committing and pushing new changes.",
+      "git_no_journal_files": "Check that the configured journal is readable and included in the repository."
+    }
   },
   "errors": {
     "journal_not_configured": "No journal file has been configured. Go to Settings and select your journal file.",
