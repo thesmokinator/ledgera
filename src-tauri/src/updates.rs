@@ -43,9 +43,11 @@ pub(crate) async fn check_for_updates(
     let force = force.unwrap_or(false);
     let cache_path = update_status_path(&app)?;
 
+    let current_version = current_app_version(&app);
+
     if !force {
         if let Some(cached) = read_cached_update_status(&cache_path) {
-            if update_cache_is_fresh(&cached) {
+            if update_cache_is_fresh(&cached, &current_version) {
                 return Ok(UpdateStatus {
                     source: "cache".to_string(),
                     ..cached
@@ -55,7 +57,6 @@ pub(crate) async fn check_for_updates(
     }
 
     let checked_at = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
-    let current_version = current_app_version(&app);
 
     let status = match fetch_latest_github_release(&current_version).await {
         Ok(Some(release)) => {
@@ -125,7 +126,12 @@ fn write_cached_update_status(path: &Path, status: &UpdateStatus) -> Result<(), 
     fs::write(path, content).map_err(|error| error.to_string())
 }
 
-fn update_cache_is_fresh(status: &UpdateStatus) -> bool {
+fn update_cache_is_fresh(status: &UpdateStatus, current_version: &str) -> bool {
+    // If the app version changed (e.g. after an update), the cache is stale
+    if status.current_version != current_version {
+        return false;
+    }
+
     let Some(checked_at) = &status.checked_at else {
         return false;
     };
