@@ -61,6 +61,7 @@ pub(crate) struct JournalPosting {
     pub(crate) account: String,
     pub(crate) amount: String,
     pub(crate) commodity: String,
+    pub(crate) unit_price: String,
     pub(crate) comment: String,
     pub(crate) raw: String,
 }

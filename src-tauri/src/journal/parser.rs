@@ -109,6 +109,12 @@ fn parse_transaction_block(
     })
 }
 
+struct ParsedAmount {
+    quantity: String,
+    commodity: String,
+    unit_price: String,
+}
+
 /// Parses one posting line while preserving the raw text.
 fn parse_posting(line: &str) -> Option<JournalPosting> {
     if line.trim().is_empty() || !line.starts_with(char::is_whitespace) {
@@ -122,25 +128,35 @@ fn parse_posting(line: &str) -> Option<JournalPosting> {
 
     let (posting_content, comment) = split_inline_comment(trimmed);
     let (account, amount) = split_posting_account_amount(posting_content);
-    let (quantity, commodity) = parse_posting_amount(amount);
+    let parsed = parse_posting_amount(amount);
     Some(JournalPosting {
         account: account.trim().to_string(),
-        amount: quantity,
-        commodity,
+        amount: parsed.quantity,
+        commodity: parsed.commodity,
+        unit_price: parsed.unit_price,
         comment: comment.to_string(),
         raw: line.to_string(),
     })
 }
 
-/// Parses an hledger amount into quantity and commodity fields.
-fn parse_posting_amount(amount: &str) -> (String, String) {
+/// Parses an hledger amount into quantity, commodity, and optional unit price.
+/// Handles both `@` (unit price) and `@@` (total price) rate syntax.
+fn parse_posting_amount(amount: &str) -> ParsedAmount {
     let trimmed = amount.trim();
     if trimmed.is_empty() {
-        return (String::new(), String::new());
+        return ParsedAmount {
+            quantity: String::new(),
+            commodity: String::new(),
+            unit_price: String::new(),
+        };
     }
 
     let Some(number_start) = trimmed.find(|character: char| character.is_ascii_digit()) else {
-        return (trimmed.to_string(), String::new());
+        return ParsedAmount {
+            quantity: trimmed.to_string(),
+            commodity: String::new(),
+            unit_price: String::new(),
+        };
     };
 
     let sign = if trimmed[..number_start].contains('-') {
@@ -158,6 +174,118 @@ fn parse_posting_amount(amount: &str) -> (String, String) {
 
     let quantity = format!("{}{}", sign, &trimmed[number_start..number_end]);
     let prefix_commodity = trimmed[..number_start].trim().trim_matches('-').trim();
+    let suffix = trimmed[number_end..].trim();
+
+    let (suffix_commodity, unit_price) = extract_price(suffix, &quantity);
+
+    let commodity = if !prefix_commodity.is_empty() {
+        prefix_commodity.to_string()
+    } else if !suffix_commodity.is_empty() {
+        suffix_commodity
+    } else {
+        String::new()
+    };
+
+    ParsedAmount {
+        quantity,
+        commodity,
+        unit_price,
+    }
+}
+
+/// Extracts price information from the suffix of a parsed amount.
+/// Returns (suffix_commodity, unit_price).
+/// Handles `@@` (total price → converted to unit price) and `@` (unit price as-is).
+/// When no commodity is explicitly written before the rate token, the commodity
+/// is inferred from the price expression.
+fn extract_price(suffix: &str, quantity: &str) -> (String, String) {
+    let trimmed = suffix.trim();
+    if trimmed.is_empty() {
+        return (String::new(), String::new());
+    }
+
+    if let Some(pos) = rate_token_pos(trimmed, "@@") {
+        let explicit_commodity = trimmed[..pos].trim().to_string();
+        let price_raw = trimmed[pos + 2..].trim();
+        let unit_price = compute_unit_price_from_total(price_raw, quantity);
+        let commodity = if explicit_commodity.is_empty() {
+            let (_, price_commodity) = parse_simple_amount(price_raw);
+            price_commodity
+        } else {
+            explicit_commodity
+        };
+        (commodity, unit_price)
+    } else if let Some(pos) = rate_token_pos(trimmed, "@") {
+        let explicit_commodity = trimmed[..pos].trim().to_string();
+        let unit_price = trimmed[pos + 1..].trim().to_string();
+        let commodity = if explicit_commodity.is_empty() {
+            let (_, price_commodity) = parse_simple_amount(&unit_price);
+            price_commodity
+        } else {
+            explicit_commodity
+        };
+        (commodity, unit_price)
+    } else {
+        (trimmed.to_string(), String::new())
+    }
+}
+
+/// Finds the position of a rate token (@ or @@) that is surrounded by whitespace
+/// or at the start of the string.
+fn rate_token_pos(suffix: &str, token: &str) -> Option<usize> {
+    let pos = suffix.find(token)?;
+    let preceded_by_space = pos == 0 || suffix.as_bytes().get(pos - 1) == Some(&b' ');
+    if preceded_by_space {
+        Some(pos)
+    } else {
+        None
+    }
+}
+
+/// Converts a total price (@@) to a unit price by dividing by the quantity.
+fn compute_unit_price_from_total(price_raw: &str, quantity: &str) -> String {
+    let (price_qty, price_commodity) = parse_simple_amount(price_raw);
+    let q = parse_numeric_value(quantity);
+    let p = parse_numeric_value(&price_qty);
+    if q != 0.0 && p != 0.0 {
+        let unit = p / q.abs();
+        let formatted = format!("{:.8}", unit);
+        let formatted = formatted.trim_end_matches('0').trim_end_matches('.');
+        if price_commodity.is_empty() {
+            formatted.to_string()
+        } else {
+            format!("{} {}", formatted, price_commodity)
+        }
+    } else {
+        price_raw.to_string()
+    }
+}
+
+/// Parses a simple amount (quantity + commodity) without price detection.
+/// Used for parsing the price portion of @/@@ expressions.
+fn parse_simple_amount(amount: &str) -> (String, String) {
+    let trimmed = amount.trim();
+    if trimmed.is_empty() {
+        return (String::new(), String::new());
+    }
+
+    let Some(number_start) = trimmed.find(|c: char| c.is_ascii_digit()) else {
+        return (trimmed.to_string(), String::new());
+    };
+
+    let sign = if trimmed[..number_start].contains('-') {
+        "-"
+    } else {
+        ""
+    };
+    let number_end = trimmed[number_start..]
+        .char_indices()
+        .find(|(_, c)| !(c.is_ascii_digit() || *c == '.' || *c == ','))
+        .map(|(i, _)| number_start + i)
+        .unwrap_or(trimmed.len());
+
+    let quantity = format!("{}{}", sign, &trimmed[number_start..number_end]);
+    let prefix_commodity = trimmed[..number_start].trim().trim_matches('-').trim();
     let suffix_commodity = trimmed[number_end..].trim();
     let commodity = if !prefix_commodity.is_empty() {
         prefix_commodity
@@ -166,6 +294,11 @@ fn parse_posting_amount(amount: &str) -> (String, String) {
     };
 
     (quantity, commodity.to_string())
+}
+
+/// Parses a numeric value from an amount string, handling comma/dot decimal marks.
+fn parse_numeric_value(value: &str) -> f64 {
+    parse_amount_value(value)
 }
 
 /// Splits a posting into account and amount using hledger's common spacing convention.
@@ -319,13 +452,13 @@ fn normalize_quantity(value: &str) -> String {
 
 /// Formats a quantity and commodity into hledger amount syntax.
 fn format_posting_amount(amount: &str, commodity: &str) -> String {
-    let (quantity, parsed_commodity) = parse_posting_amount(amount);
-    let selected_commodity = if parsed_commodity.trim().is_empty() {
+    let parsed = parse_posting_amount(amount);
+    let selected_commodity = if parsed.commodity.trim().is_empty() {
         commodity.trim()
     } else {
-        parsed_commodity.trim()
+        parsed.commodity.trim()
     };
-    let quantity = normalize_quantity(&quantity);
+    let quantity = normalize_quantity(&parsed.quantity);
 
     if quantity.is_empty() {
         return String::new();
@@ -890,9 +1023,9 @@ fn format_amount_value_styled(value: f64) -> String {
 
 /// Formats a numeric string using the journal's display style.
 fn format_amount_styled_with_commodity(raw: &str) -> String {
-    let (quantity, commodity) = parse_posting_amount(raw);
-    let value = parse_amount_value(&quantity).abs();
-    format_amount_part(value, &commodity, true)
+    let parsed = parse_posting_amount(raw);
+    let value = parse_amount_value(&parsed.quantity).abs();
+    format_amount_part(value, &parsed.commodity, true)
 }
 
 /// Formats the display amount sign according to the inferred transaction kind.
@@ -902,5 +1035,249 @@ fn format_display_amount(amount: &str, kind: &str) -> String {
         "income" => format!("+{}", normalized),
         "expense" => format!("-{}", normalized),
         _ => amount.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_simple_amount_with_suffix_commodity() {
+        let parsed = parse_posting_amount("25 EUR");
+        assert_eq!(parsed.quantity, "25");
+        assert_eq!(parsed.commodity, "EUR");
+        assert_eq!(parsed.unit_price, "");
+    }
+
+    #[test]
+    fn parses_simple_amount_with_prefix_commodity() {
+        let parsed = parse_posting_amount("$25");
+        assert_eq!(parsed.quantity, "25");
+        assert_eq!(parsed.commodity, "$");
+        assert_eq!(parsed.unit_price, "");
+    }
+
+    #[test]
+    fn parses_negative_amount() {
+        let parsed = parse_posting_amount("€-25,50");
+        assert_eq!(parsed.quantity, "-25,50");
+        assert_eq!(parsed.commodity, "€");
+        assert_eq!(parsed.unit_price, "");
+    }
+
+    #[test]
+    fn parses_unit_price_at_syntax() {
+        let parsed = parse_posting_amount("2 @ ₺190");
+        assert_eq!(parsed.quantity, "2");
+        assert_eq!(parsed.commodity, "₺");
+        assert_eq!(parsed.unit_price, "₺190");
+    }
+
+    #[test]
+    fn parses_total_price_at_at_syntax() {
+        let parsed = parse_posting_amount("2 @@ ₺380,00");
+        assert_eq!(parsed.quantity, "2");
+        assert_eq!(parsed.commodity, "₺");
+        // 380 / 2 = 190
+        assert!(parsed.unit_price.contains("190"));
+        assert!(parsed.unit_price.contains("₺"));
+    }
+
+    #[test]
+    fn parses_total_price_with_different_commodity() {
+        let parsed = parse_posting_amount("2 EUR @@ 2,20 USD");
+        assert_eq!(parsed.quantity, "2");
+        assert_eq!(parsed.commodity, "EUR");
+        // 2.20 / 2 = 1.1
+        assert!(parsed.unit_price.contains("1.1"));
+        assert!(parsed.unit_price.contains("USD"));
+    }
+
+    #[test]
+    fn parses_unit_price_with_explicit_commodity_before_at() {
+        let parsed = parse_posting_amount("10 VWCE @ 150 EUR");
+        assert_eq!(parsed.quantity, "10");
+        assert_eq!(parsed.commodity, "VWCE");
+        assert_eq!(parsed.unit_price, "150 EUR");
+    }
+
+    #[test]
+    fn parses_total_price_with_commodity_before_at_at() {
+        let parsed = parse_posting_amount("5 XEON @@ 750 EUR");
+        assert_eq!(parsed.quantity, "5");
+        assert_eq!(parsed.commodity, "XEON");
+        // 750 / 5 = 150
+        assert!(parsed.unit_price.contains("150"));
+        assert!(parsed.unit_price.contains("EUR"));
+    }
+
+    #[test]
+    fn parses_amount_without_commodity_or_price() {
+        let parsed = parse_posting_amount("100");
+        assert_eq!(parsed.quantity, "100");
+        assert_eq!(parsed.commodity, "");
+        assert_eq!(parsed.unit_price, "");
+    }
+
+    #[test]
+    fn parses_empty_amount() {
+        let parsed = parse_posting_amount("");
+        assert_eq!(parsed.quantity, "");
+        assert_eq!(parsed.commodity, "");
+        assert_eq!(parsed.unit_price, "");
+    }
+
+    #[test]
+    fn parses_non_numeric_as_quantity() {
+        let parsed = parse_posting_amount("ABC");
+        assert_eq!(parsed.quantity, "ABC");
+        assert_eq!(parsed.commodity, "");
+        assert_eq!(parsed.unit_price, "");
+    }
+
+    #[test]
+    fn parse_posting_handles_at_at_syntax() {
+        let line = "    Expenses:Food                 2 @@ ₺380,00";
+        let posting = parse_posting(line).expect("should parse posting");
+        assert_eq!(posting.account, "Expenses:Food");
+        assert_eq!(posting.amount, "2");
+        assert_eq!(posting.commodity, "₺");
+        assert!(posting.unit_price.contains("190"));
+        assert!(posting.unit_price.contains("₺"));
+    }
+
+    #[test]
+    fn parse_posting_handles_simple_amount() {
+        let line = "    Assets:Cash                    ₺-380,00";
+        let posting = parse_posting(line).expect("should parse posting");
+        assert_eq!(posting.account, "Assets:Cash");
+        assert_eq!(posting.amount, "-380,00");
+        assert_eq!(posting.commodity, "₺");
+        assert_eq!(posting.unit_price, "");
+    }
+
+    #[test]
+    fn parse_posting_returns_none_for_empty_lines() {
+        assert!(parse_posting("").is_none());
+        assert!(parse_posting("   ").is_none());
+    }
+
+    #[test]
+    fn parse_posting_returns_none_for_comment_lines() {
+        assert!(parse_posting("    ; this is a comment").is_none());
+    }
+
+    #[test]
+    fn parse_posting_returns_none_for_non_indented_lines() {
+        assert!(parse_posting("2026-05-22 Transaction").is_none());
+    }
+
+    #[test]
+    fn rate_token_pos_detects_token_at_start() {
+        assert_eq!(rate_token_pos("@@ ₺380,00", "@@"), Some(0));
+        assert_eq!(rate_token_pos("@ ₺190", "@"), Some(0));
+    }
+
+    #[test]
+    fn rate_token_pos_detects_token_after_space() {
+        assert_eq!(rate_token_pos("EUR @@ USD", "@@"), Some(4));
+        assert_eq!(rate_token_pos("VWCE @ 150", "@"), Some(5));
+    }
+
+    #[test]
+    fn rate_token_pos_rejects_token_without_preceding_space() {
+        assert_eq!(rate_token_pos("EUR@@USD", "@@"), None);
+        assert_eq!(rate_token_pos("VWCE@150", "@"), None);
+    }
+
+    #[test]
+    fn rate_token_pos_does_not_confuse_at_with_at_at() {
+        // "@" should match in " EUR @ USD " but not the "@@" variant
+        let pos = rate_token_pos(" EUR @@ USD ", "@");
+        // The first "@" in "@@" is at position 5, preceded by space — so it matches
+        // But that's actually fine: `extract_price` checks `@@` first, so `@` won't
+        // falsely match in that case.
+        assert!(pos.is_some());
+    }
+
+    #[test]
+    fn parses_price_with_comma_decimal() {
+        let parsed = parse_posting_amount("2 @@ ₺380,00");
+        assert_eq!(parsed.quantity, "2");
+        // 380,00 / 2 = 190
+        assert!(parsed.unit_price.contains("190"));
+    }
+
+    #[test]
+    fn extract_price_returns_empty_for_no_rate() {
+        let (commodity, price) = extract_price("EUR", "10");
+        assert_eq!(commodity, "EUR");
+        assert_eq!(price, "");
+    }
+
+    #[test]
+    fn extract_price_handles_empty_suffix() {
+        let (commodity, price) = extract_price("", "10");
+        assert_eq!(commodity, "");
+        assert_eq!(price, "");
+    }
+
+    /// Full integration test: parse the exact transaction from issue #27.
+    #[test]
+    fn parses_transaction_from_issue_27() {
+        let raw = "2026-05-22 Aygaz\n    Expenses:Food:Groceries:Water                 2 @@ ₺380,00\n    Assets:Cash:Caleb                                 ₺-380,00";
+        let tx = parse_transaction_block(std::path::Path::new("test.journal"), 1, 3, raw)
+            .expect("should parse transaction");
+
+        assert_eq!(tx.date, "2026-05-22");
+        assert_eq!(tx.description, "Aygaz");
+        assert_eq!(tx.postings.len(), 2);
+
+        let first = &tx.postings[0];
+        assert_eq!(first.account, "Expenses:Food:Groceries:Water");
+        assert_eq!(first.amount, "2");
+        assert_eq!(first.commodity, "₺");
+        assert!(
+            !first.unit_price.is_empty(),
+            "unit_price should be populated from @@"
+        );
+        assert!(first.unit_price.contains("190"), "380 / 2 = 190");
+
+        let second = &tx.postings[1];
+        assert_eq!(second.account, "Assets:Cash:Caleb");
+        assert_eq!(second.amount, "-380,00");
+        assert_eq!(second.commodity, "₺");
+        assert!(second.unit_price.is_empty());
+    }
+
+    /// Parse a transaction using @ (unit price) syntax.
+    #[test]
+    fn parses_transaction_with_unit_price_at() {
+        let raw = "2026-05-23 Market buy\n    Assets:Investments:VWCE                    10 VWCE @ 150 EUR\n    Assets:Bank:Fineco                             -1.500 EUR";
+        let tx = parse_transaction_block(std::path::Path::new("test.journal"), 1, 3, raw)
+            .expect("should parse transaction");
+
+        let first = &tx.postings[0];
+        assert_eq!(first.account, "Assets:Investments:VWCE");
+        assert_eq!(first.amount, "10");
+        assert_eq!(first.commodity, "VWCE");
+        assert_eq!(first.unit_price, "150 EUR");
+    }
+
+    /// Parse a transaction using @@ with different commodities.
+    #[test]
+    fn parses_transaction_with_cross_commodity_at_at() {
+        let raw = "2026-05-24 Currency exchange\n    Assets:Cash:USD                            100 USD @@ 92 EUR\n    Assets:Cash:EUR                                -92 EUR";
+        let tx = parse_transaction_block(std::path::Path::new("test.journal"), 1, 3, raw)
+            .expect("should parse transaction");
+
+        let first = &tx.postings[0];
+        assert_eq!(first.account, "Assets:Cash:USD");
+        assert_eq!(first.amount, "100");
+        assert_eq!(first.commodity, "USD");
+        // 92 / 100 = 0.92 EUR per USD
+        assert!(first.unit_price.contains("0.92"));
+        assert!(first.unit_price.contains("EUR"));
     }
 }

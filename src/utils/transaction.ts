@@ -29,7 +29,7 @@ export function toTransactionInput(
           account: posting.account,
           amount: posting.amount,
           commodity: posting.commodity.trim() || defaultCommodity,
-          unitPrice: "",
+          unitPrice: posting.unitPrice,
           comment: posting.comment,
         }))
         : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
