@@ -236,24 +236,24 @@ button {
     color: #d4d4d4;
 }
 
-:global(.theme-light) .search_trigger {
+.theme-light .search_trigger {
     color: #6b7280;
     background: #f9fafb;
     border-color: #e5e7eb;
 }
 
-:global(.theme-light) .search_trigger:hover {
+.theme-light .search_trigger:hover {
     color: #111827;
     background: #ffffff;
     border-color: #d1d5db;
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
-:global(.theme-light) .search_trigger_icon {
+.theme-light .search_trigger_icon {
     color: #9ca3af;
 }
 
-:global(.theme-light) .search_trigger_shortcut {
+.theme-light .search_trigger_shortcut {
     color: #6b7280;
     background: #f3f4f6;
     border-color: #d1d5db;

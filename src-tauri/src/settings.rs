@@ -3,11 +3,22 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
+const DEFAULT_GIT_COMMIT_MESSAGE: &str = "Update journal from Ledgera";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppModuleSettings {
     #[serde(default)]
     pub(crate) enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GitSyncModuleSettings {
+    #[serde(default)]
+    pub(crate) enabled: bool,
+    #[serde(default = "default_git_commit_message")]
+    pub(crate) commit_message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,7 +29,7 @@ pub(crate) struct AppModulesSettings {
     #[serde(default)]
     pub(crate) developer_tools: AppModuleSettings,
     #[serde(default)]
-    pub(crate) git_sync: AppModuleSettings,
+    pub(crate) git_sync: GitSyncModuleSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,12 +65,21 @@ impl Default for AppModuleSettings {
     }
 }
 
+impl Default for GitSyncModuleSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            commit_message: default_git_commit_message(),
+        }
+    }
+}
+
 impl Default for AppModulesSettings {
     fn default() -> Self {
         Self {
             market_prices: AppModuleSettings::default(),
             developer_tools: AppModuleSettings::default(),
-            git_sync: AppModuleSettings::default(),
+            git_sync: GitSyncModuleSettings::default(),
         }
     }
 }
@@ -89,6 +109,10 @@ fn default_theme() -> String {
 
 fn default_language() -> String {
     "system".to_string()
+}
+
+fn default_git_commit_message() -> String {
+    DEFAULT_GIT_COMMIT_MESSAGE.to_string()
 }
 
 /// Returns persisted application settings from the platform config directory.

@@ -15,17 +15,11 @@ export function useHotkeys(shortcuts: Shortcut[]) {
     // Allow hotkeys everywhere, including inside form fields
     hotkeys.filter = () => true;
 
-    for (const { keys, disabled } of shortcutsRef.current) {
-      if (!disabled) {
-        hotkeys(keys, (event, handler) => {
-          const current = shortcutsRef.current.find((s) => {
-            const comboKeys = s.keys.split(",").map((k) => k.trim());
-            return !s.disabled && comboKeys.includes(handler.key);
-          });
-          if (current) {
-            event.preventDefault();
-            current.action(event, handler);
-          }
+    for (const shortcut of shortcutsRef.current) {
+      if (!shortcut.disabled) {
+        hotkeys(shortcut.keys, (event, handler) => {
+          event.preventDefault();
+          shortcut.action(event, handler);
         });
       }
     }
@@ -33,5 +27,5 @@ export function useHotkeys(shortcuts: Shortcut[]) {
     return () => {
       hotkeys.unbind();
     };
-  }, []);
+  }, [shortcuts]);
 }

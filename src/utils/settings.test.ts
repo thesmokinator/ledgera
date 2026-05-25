@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeModules, normalizeSettings, defaultModules, defaultSettings } from "./settings";
+import { normalizeModules, normalizeSettings, defaultGitCommitMessage, defaultModules, defaultSettings } from "./settings";
 import type { AppSettings } from "../types";
 
 describe("defaultSettings", () => {
@@ -30,7 +30,7 @@ describe("normalizeModules", () => {
     expect(normalizeModules({ fetchPrices: true, powerUser: true })).toEqual({
       marketPrices: { enabled: true },
       developerTools: { enabled: true },
-      gitSync: { enabled: false },
+      gitSync: { enabled: false, commitMessage: defaultGitCommitMessage },
     });
   });
 
@@ -41,12 +41,12 @@ describe("normalizeModules", () => {
       modules: {
         marketPrices: { enabled: false },
         developerTools: { enabled: false },
-        gitSync: { enabled: true },
+        gitSync: { enabled: true, commitMessage: "My journal update" },
       },
     })).toEqual({
       marketPrices: { enabled: false },
       developerTools: { enabled: false },
-      gitSync: { enabled: true },
+      gitSync: { enabled: true, commitMessage: "My journal update" },
     });
   });
 });
@@ -115,7 +115,7 @@ describe("normalizeSettings", () => {
       modules: {
         marketPrices: { enabled: true },
         developerTools: { enabled: true },
-        gitSync: { enabled: true },
+        gitSync: { enabled: true, commitMessage: "Sync journal" },
       },
     });
 
@@ -140,7 +140,7 @@ describe("normalizeSettings", () => {
       modules: {
         marketPrices: { enabled: true },
         developerTools: { enabled: true },
-        gitSync: { enabled: true },
+        gitSync: { enabled: true, commitMessage: "Sync journal" },
       },
     };
     expect(normalizeSettings(full)).toEqual(full);

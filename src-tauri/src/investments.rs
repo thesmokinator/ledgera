@@ -214,12 +214,11 @@ async fn fetch_prices(
                 }
             }
             Err(error) => {
-                logs::log_event_with_details(
+                logs::log_warn(
                     &app,
-                    "error",
                     "price_fetch_failed",
-                    &format!("HTTP request failed for {}", symbol),
-                    Some(error.to_string()),
+                    &format!("HTTP request failed for {}.", symbol),
+                    error.to_string(),
                 );
             }
         }

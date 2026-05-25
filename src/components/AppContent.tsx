@@ -7,6 +7,7 @@ import {
   BalancesRoute,
   LogsRoute,
   SettingsRoute,
+  SyncRoute,
   TransactionsRoute,
 } from "../routes";
 import type {
@@ -16,6 +17,7 @@ import type {
   JournalSummary,
   JournalTransaction,
   UpdateStatus,
+  GitSyncStatus,
 } from "../types";
 
 type AppContentProps = {
@@ -28,10 +30,17 @@ type AppContentProps = {
   journalError: string | null;
   updateStatus: UpdateStatus | undefined;
   isCheckingForUpdates: boolean;
+  gitSyncStatus: GitSyncStatus | undefined;
+  isCheckingGitSync: boolean;
+  isPullingGitSync: boolean;
+  isCommittingAndPushingGitSync: boolean;
   shouldShowCourtesy: boolean;
   courtesyReasons: string[];
   courtesyDetails: string | undefined;
   onCheckForUpdates: () => void;
+  onRefreshGitSyncStatus: () => void;
+  onPullGitSync: () => void;
+  onCommitAndPushGitSync: (message: string) => void;
   onSettingsValuesChange: (changed: Partial<AppSettings>, values: AppSettings) => void;
   onEditTransaction: (transaction: JournalTransaction) => void;
   onDeleteTransaction: (id: string) => void;
@@ -47,10 +56,17 @@ export function AppContent({
   journalError,
   updateStatus,
   isCheckingForUpdates,
+  gitSyncStatus,
+  isCheckingGitSync,
+  isPullingGitSync,
+  isCommittingAndPushingGitSync,
   shouldShowCourtesy,
   courtesyReasons,
   courtesyDetails,
   onCheckForUpdates,
+  onRefreshGitSyncStatus,
+  onPullGitSync,
+  onCommitAndPushGitSync,
   onSettingsValuesChange,
   onEditTransaction,
   onDeleteTransaction,
@@ -95,6 +111,21 @@ export function AppContent({
           isCheckingForUpdates={isCheckingForUpdates}
           onCheckForUpdates={onCheckForUpdates}
           onValuesChange={onSettingsValuesChange}
+        />
+      );
+    }
+
+    if (activeView === "sync") {
+      return (
+        <SyncRoute
+          settings={activeSettings}
+          status={gitSyncStatus}
+          isChecking={isCheckingGitSync}
+          isPulling={isPullingGitSync}
+          isCommittingAndPushing={isCommittingAndPushingGitSync}
+          onRefresh={onRefreshGitSyncStatus}
+          onPull={onPullGitSync}
+          onCommitAndPush={onCommitAndPushGitSync}
         />
       );
     }

@@ -4,6 +4,7 @@ import {
   Modal,
   Space,
   Table,
+  Tag,
   Tooltip,
   Typography,
 } from "antd";
@@ -19,7 +20,16 @@ import { useTranslation } from "react-i18next";
 import type { LogEntry } from "./types";
 import styles from "./LogsRoute.module.css";
 
+function levelColor(level: LogEntry["level"]): string {
+  if (level === "error") return "red";
+  if (level === "warn") return "gold";
+  return "blue";
+}
 
+function formatLogEntry(entry: LogEntry): string {
+  const timestamp = dayjs(entry.ts).format("YYYY-MM-DD HH:mm:ss");
+  return `[${timestamp}] ${entry.level.toUpperCase()} ${entry.code}\n\n${entry.message}`;
+}
 
 export function LogsRoute() {
   const { t } = useTranslation();
@@ -40,7 +50,7 @@ export function LogsRoute() {
   const logs = logsQuery.data ?? [];
 
   function copyLogEntry(entry: LogEntry) {
-    navigator.clipboard.writeText(JSON.stringify(entry, null, 2));
+    navigator.clipboard.writeText(formatLogEntry(entry));
   }
 
   function confirmClear() {
@@ -94,36 +104,34 @@ export function LogsRoute() {
               render: (ts: string) =>
                 dayjs(ts).format("YYYY-MM-DD HH:mm:ss"),
             },
-
+            {
+              title: t("logs.level"),
+              dataIndex: "level",
+              width: 96,
+              render: (level: LogEntry["level"]) => (
+                <Tag color={levelColor(level)}>{level.toUpperCase()}</Tag>
+              ),
+            },
             {
               title: t("logs.code"),
               dataIndex: "code",
-              width: 200,
+              width: 220,
               ellipsis: true,
             },
             {
               title: t("logs.message"),
               dataIndex: "message",
               ellipsis: true,
-            },
-            {
-              title: t("logs.details"),
-              dataIndex: "details",
-              width: 280,
-              ellipsis: true,
-              render: (details?: string) =>
-                details ? (
-                  <Tooltip title={details}>
-                    <Typography.Text
-                      style={{ maxWidth: 260 }}
-                      ellipsis
-                    >
-                      {details}
-                    </Typography.Text>
-                  </Tooltip>
-                ) : (
-                  "-"
-                ),
+              render: (message: string) => (
+                <Tooltip
+                  overlayClassName={styles.message_tooltip}
+                  title={<pre className={styles.message_preview}>{message}</pre>}
+                >
+                  <Typography.Text className={styles.message} ellipsis>
+                    {message}
+                  </Typography.Text>
+                </Tooltip>
+              ),
             },
             {
               width: 48,
@@ -133,6 +141,7 @@ export function LogsRoute() {
                   size="small"
                   icon={<CopyOutlined />}
                   aria-label={t("logs.copy")}
+                  title={t("logs.copy")}
                   onClick={(e) => {
                     e.stopPropagation();
                     copyLogEntry(entry);

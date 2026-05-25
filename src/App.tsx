@@ -11,6 +11,7 @@ import {
   HomeOutlined,
   PieChartOutlined,
   SettingOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
 
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ import { useJournalData } from "./hooks/useJournalData";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useTransactionModal } from "./hooks/useTransactionModal";
 import { useTransactionActions } from "./hooks/useTransactionActions";
+import { gitSyncSummary, useGitSync } from "./hooks/useGitSync";
 import "./App.css";
 
 /** Renders the Ledgera desktop application. */
@@ -88,6 +90,17 @@ function App() {
   } = useJournalData(activeSettings);
 
   const {
+    enabled: gitSyncEnabled,
+    gitSyncStatus,
+    isCheckingGitSync,
+    isPulling: isPullingGitSync,
+    isCommittingAndPushing: isCommittingAndPushingGitSync,
+    refreshGitSyncStatus,
+    pullJournal,
+    commitAndPushJournal,
+  } = useGitSync({ activeSettings, messageApi, t });
+
+  const {
     transactionForm,
     transactionType,
     editingTransaction,
@@ -119,6 +132,7 @@ function App() {
     onSaved: () => {
       closeTransactionModal();
       clearEditingTransaction();
+      if (gitSyncEnabled) refreshGitSyncStatus();
     },
   });
 
@@ -152,18 +166,22 @@ function App() {
 
   const shortcuts = useMemo(() => {
     const hasJournal = Boolean(activeSettings.journalPath.trim());
+    const logsIndex = activeSettings.modules.gitSync.enabled ? 5 : 4;
+    const settingsIndex = 4 + Number(activeSettings.modules.gitSync.enabled) + Number(activeSettings.powerUser);
+
     return [
       { keys: "command+n, ctrl+n", action: () => { if (!shouldShowCourtesy) openCreateTransaction(); } },
       { keys: "command+1, ctrl+1", action: () => setActiveView("transactions"), disabled: !hasJournal },
       { keys: "command+2, ctrl+2", action: () => setActiveView("accounts"), disabled: !hasJournal },
       { keys: "command+3, ctrl+3", action: () => setActiveView("balances"), disabled: !hasJournal },
-      { keys: "command+4, ctrl+4", action: () => setActiveView("settings") },
-      { keys: "command+5, ctrl+5", action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
-      { keys: "command+,, ctrl+,", action: () => setActiveView("settings") },
+      { keys: "command+4, ctrl+4", action: () => setActiveView("sync"), disabled: !hasJournal || !activeSettings.modules.gitSync.enabled },
+      { keys: `command+${logsIndex}, ctrl+${logsIndex}`, action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
+      { keys: "command+shift+g, ctrl+shift+g", action: () => { if (activeView === "sync") refreshGitSyncStatus(); else setActiveView("sync"); }, disabled: !gitSyncEnabled },
+      { keys: `command+${settingsIndex}, ctrl+${settingsIndex}`, action: () => setActiveView("settings") },
       { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true) },
       { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) closeTransactionModalWithCleanup(); } },
     ];
-  }, [activeSettings.journalPath, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen, closeTransactionModalWithCleanup]);
+  }, [activeSettings.journalPath, activeSettings.modules.gitSync.enabled, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen, closeTransactionModalWithCleanup, activeView, gitSyncEnabled, refreshGitSyncStatus]);
 
   useHotkeys(shortcuts);
 
@@ -176,16 +194,44 @@ function App() {
         { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal, shortcut: navShortcut(1) },
         { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
         { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
-        { key: "settings", label: "common.settings", icon: <SettingOutlined />, shortcut: navShortcut(4), badge: updateStatus?.available ? t("settings.update_badge") : undefined },
       ];
 
-      if (activeSettings.powerUser) {
-        items.push({ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(5) });
+      if (activeSettings.modules.gitSync.enabled) {
+        const summary = gitSyncSummary(gitSyncStatus);
+        const syncBadge = gitSyncStatus && summary.tone !== "success" && summary.tone !== "neutral"
+          ? summary.tone === "danger"
+            ? t("sync.nav_badge_issue")
+            : t(summary.labelKey, summary.labelOptions)
+          : undefined;
+
+        items.splice(3, 0, {
+          key: "sync",
+          label: "common.sync",
+          icon: <SyncOutlined />,
+          disabled: !hasJournal,
+          shortcut: navShortcut(4),
+          badge: syncBadge,
+          badgeTone: summary.tone === "danger" ? "danger" : "warning",
+        });
       }
+
+      if (activeSettings.powerUser) {
+        const logsIndex = activeSettings.modules.gitSync.enabled ? 5 : 4;
+        items.push({ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(logsIndex) });
+      }
+
+      const settingsIndex = items.length + 1;
+      items.push({
+        key: "settings",
+        label: "common.settings",
+        icon: <SettingOutlined />,
+        shortcut: navShortcut(settingsIndex),
+        badge: updateStatus?.available ? t("settings.update_badge") : undefined,
+      });
 
       return items;
     },
-    [activeSettings.powerUser, activeSettings.journalPath, updateStatus?.available, t],
+    [activeSettings.powerUser, activeSettings.journalPath, activeSettings.modules.gitSync.enabled, updateStatus?.available, gitSyncStatus, t],
   );
 
   // Show a loading spinner while the initial settings are being fetched
@@ -231,10 +277,17 @@ function App() {
             journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
             updateStatus={updateStatus}
             isCheckingForUpdates={isCheckingForUpdates}
+            gitSyncStatus={gitSyncStatus}
+            isCheckingGitSync={isCheckingGitSync}
+            isPullingGitSync={isPullingGitSync}
+            isCommittingAndPushingGitSync={isCommittingAndPushingGitSync}
             shouldShowCourtesy={shouldShowCourtesy}
             courtesyReasons={courtesyReasons}
             courtesyDetails={journalLoadError || hledgerQuery.data?.message}
             onCheckForUpdates={checkForUpdates}
+            onRefreshGitSyncStatus={() => { refreshGitSyncStatus(); }}
+            onPullGitSync={pullJournal}
+            onCommitAndPushGitSync={commitAndPushJournal}
             onSettingsValuesChange={updateSettingsOnChange}
             onEditTransaction={openEditTransaction}
             onDeleteTransaction={deleteTransaction}

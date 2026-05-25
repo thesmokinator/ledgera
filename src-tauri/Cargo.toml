@@ -1,6 +1,6 @@
 [package]
 name = "ledgera"
-version = "0.1.0"
+version = "0.1.0-rc.6"
 description = "Just another user interface for managing hledger journal transactions"
 authors = ["Michele Broggi"]
 edition = "2021"

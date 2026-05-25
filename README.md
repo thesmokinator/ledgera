@@ -4,6 +4,10 @@ A desktop app for managing [hledger](https://hledger.org) journals - built with 
 
 ![Screenshot](screenshots/001.png)
 
+## Documentation
+
+User documentation is available in the [Ledgera Wiki](https://github.com/thesmokinator/ledgera/wiki).
+
 ## Features
 
 - **Browse & filter** - monthly transactions, scheduled entries, accounts overview with time-range filters
@@ -39,8 +43,14 @@ Open the **Settings** tab to configure:
 | Default commodity | e.g. `EUR`, `€`, `USD` |
 | Theme | System / Dark / Light |
 | Language | System / English / Italian |
-| Modules | Enable optional modules such as Market prices and Developer tools |
+| Modules | Enable optional modules such as Market prices, Developer tools, and Git Sync |
 | Power user | Show raw journal entries, line numbers, and the Logs section |
+
+## Git Sync module
+
+The optional **Git Sync** module lets users synchronize configured journal files from the app using the system `git` executable. It detects the repository containing the journal, shows branch/ahead/behind/dirty status, supports manual `pull --ff-only`, and can commit and push known journal files with a customizable commit message.
+
+For safety, Ledgera stages only journal files it knows about and does not attempt merge conflict resolution. Resolve divergent branches or conflicts with your preferred Git client, then refresh the Sync view.
 
 ## Translations
 
@@ -62,7 +72,13 @@ GitHub Actions runs the CI pipeline on every push and pull request:
 
 A manual **Build verification** workflow is available in GitHub Actions to test distributable builds before publishing a release. It builds macOS and Linux packages on native runners and cross-builds the Windows installer and portable zip from Linux using `cargo-xwin`.
 
-Release builds are created only from Git tags matching `v*`. The tag version must match `package.json`:
+Release builds are created only from Git tags matching `v*`. Before tagging, update all app manifests with the release version:
+
+```bash
+npm run set-version -- 0.1.0
+```
+
+The tag version must match `package.json`:
 
 ```bash
 git tag v0.1.0

@@ -13,6 +13,7 @@ mod investments;
 mod journal;
 mod logs;
 mod settings;
+mod sync;
 mod updates;
 
 use amount_style::AmountStyle;
@@ -74,6 +75,9 @@ pub fn run() {
             settings::get_app_settings,
             settings::update_app_settings,
             hledger::check_hledger,
+            sync::git_sync_status,
+            sync::git_pull_journal,
+            sync::git_commit_and_push_journal,
             updates::check_for_updates,
             journal::autocomplete::get_autocomplete_suggestions,
             journal::commands::list_transactions,
