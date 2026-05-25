@@ -1,0 +1,18 @@
+; Example journal demonstrating @ and @@ rate syntax parsing
+; Used to verify issue #27 fix
+
+2026-05-22 Aygaz
+    Expenses:Food:Groceries:Water                 2 @@ ₺380,00
+    Assets:Cash:Caleb                                 ₺-380,00
+
+2026-05-23 Market buy
+    Assets:Investments:VWCE                    10 VWCE @ 150 EUR
+    Assets:Bank:Fineco                             -1.500 EUR
+
+2026-05-24 Currency exchange
+    Assets:Cash:USD                              100 USD @@ 92 EUR
+    Assets:Cash:EUR                                 -92 EUR
+
+2026-05-25 Simple expense
+    Expenses:Transport:Taxi                        25 EUR
+    Assets:Cash                                       -25 EUR
