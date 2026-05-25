@@ -6,6 +6,34 @@ import { gitSyncSummary } from "../hooks/useGitSync";
 import { formatAppError, parseAppError } from "../utils/error";
 import styles from "./SyncRoute.module.css";
 
+type GitFileStatusMeta = {
+  labelKey: string;
+  color: string;
+};
+
+function gitFileStatusMeta(status: string): GitFileStatusMeta {
+  if (status.includes("U")) return { labelKey: "sync.file_status_conflict", color: "red" };
+
+  switch (status) {
+    case "??":
+      return { labelKey: "sync.file_status_new", color: "green" };
+    case "A":
+      return { labelKey: "sync.file_status_added", color: "green" };
+    case "M":
+      return { labelKey: "sync.file_status_modified", color: "gold" };
+    case "D":
+      return { labelKey: "sync.file_status_deleted", color: "red" };
+    case "R":
+      return { labelKey: "sync.file_status_renamed", color: "blue" };
+    case "C":
+      return { labelKey: "sync.file_status_copied", color: "cyan" };
+    case "!!":
+      return { labelKey: "sync.file_status_ignored", color: "default" };
+    default:
+      return { labelKey: "sync.file_status_changed", color: "default" };
+  }
+}
+
 export function SyncRoute({
   settings,
   status,
@@ -30,7 +58,7 @@ export function SyncRoute({
   const [commitMessage, setCommitMessage] = useState(settings.modules.gitSync.commitMessage);
   const summary = gitSyncSummary(status);
   const busy = isChecking || isPulling || isCommittingAndPushing;
-  const canPull = Boolean(status?.repoFound && !status.dirty && !busy);
+  const canPull = Boolean(status?.repoFound && status.behind > 0 && !status.dirty && !busy);
   const canCommitAndPush = Boolean(status?.repoFound && status.dirty && status.behind === 0 && !busy);
   const statusError = useMemo(() => status?.error ? parseAppError(status.error) : null, [status?.error]);
   const statusErrorHelpKey = statusError ? `sync.error_help.${statusError.code}` : "";
@@ -62,23 +90,18 @@ export function SyncRoute({
     <Space direction="vertical" size={24} className="content-stack">
       <Card title={t("sync.title")} extra={<Tag color={statusColor}>{t(summary.labelKey, summary.labelOptions)}</Tag>}>
         <Space direction="vertical" size={16} className={styles.full_width}>
-          <Typography.Paragraph type="secondary">
-            {t("sync.description")}
-          </Typography.Paragraph>
-
           {status?.error ? (
             <Alert
               type="error"
               showIcon
-              message={t("sync.status_issue")}
-              description={(
-                <Space direction="vertical" size={4}>
-                  <span>{statusErrorMessage}</span>
-                  {hasStatusErrorHelp ? <Typography.Text type="secondary">{statusErrorHelp}</Typography.Text> : null}
-                </Space>
-              )}
+              message={statusErrorMessage}
+              description={hasStatusErrorHelp ? statusErrorHelp : undefined}
             />
-          ) : null}
+          ) : (
+            <Typography.Paragraph type="secondary">
+              {t("sync.description")}
+            </Typography.Paragraph>
+          )}
           {!status ? <Alert type="info" showIcon message={t("sync.status_unknown")} description={t("sync.status_unknown_help")} /> : null}
 
           <div className={styles.stats_grid}>
@@ -109,14 +132,20 @@ export function SyncRoute({
                 className={styles.file_list}
                 size="small"
                 dataSource={status.files}
-                renderItem={(file) => (
-                  <List.Item>
-                    <Space>
-                      <Tag>{file.status}</Tag>
-                      <Typography.Text code>{file.path}</Typography.Text>
-                    </Space>
-                  </List.Item>
-                )}
+                renderItem={(file) => {
+                  const fileStatus = gitFileStatusMeta(file.status);
+
+                  return (
+                    <List.Item>
+                      <Space>
+                        <Tag color={fileStatus.color} title={t("sync.file_status_raw", { status: file.status })}>
+                          {t(fileStatus.labelKey)}
+                        </Tag>
+                        <Typography.Text code>{file.path}</Typography.Text>
+                      </Space>
+                    </List.Item>
+                  );
+                }}
               />
             ) : (
               <Typography.Paragraph type="secondary">{t("sync.no_changes")}</Typography.Paragraph>

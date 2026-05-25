@@ -323,6 +323,10 @@ fn run_git(cwd: &Path, args: &[&str]) -> Result<GitOutput, String> {
     let output = Command::new("git")
         .args(args)
         .current_dir(cwd)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "true")
+        .env("GCM_INTERACTIVE", "never")
+        .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
         .output()
         .map_err(|error| {
             to_error_string_with_details(

@@ -79,15 +79,32 @@
 }
 
 .nav_shortcut {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 20px;
     margin-left: auto;
+    padding: 0 6px;
+    color: #d4d4d4;
     font-size: 11px;
-    font-weight: 500;
-    opacity: 0.55;
+    font-weight: 650;
+    line-height: 1;
     letter-spacing: 0.02em;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
 }
 
 .nav_badge + .nav_shortcut {
     margin-left: 0;
+}
+
+.nav_item:hover:not(:disabled) .nav_shortcut,
+.nav_item.is_active .nav_shortcut {
+    color: #064e3b;
+    background: rgba(6, 78, 59, 0.08);
+    border-color: rgba(6, 78, 59, 0.18);
 }
 
 :global(.theme-light) .nav_item {
@@ -103,4 +120,10 @@
 :global(.theme-light) .nav_item.is_disabled:hover {
     color: #374151;
     background: transparent;
+}
+
+:global(.theme-light) .nav_shortcut {
+    color: #4b5563;
+    background: rgba(17, 24, 39, 0.04);
+    border-color: rgba(17, 24, 39, 0.1);
 }
