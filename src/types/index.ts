@@ -16,6 +16,7 @@ export type GitSyncModuleSettings = AppModuleSettings & {
 export type AppModulesSettings = {
   marketPrices: AppModuleSettings;
   developerTools: AppModuleSettings;
+  updateChecker: AppModuleSettings;
   gitSync: GitSyncModuleSettings;
 };
 

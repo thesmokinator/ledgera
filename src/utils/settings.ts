@@ -5,6 +5,7 @@ export const defaultGitCommitMessage = "Update journal from Ledgera";
 export const defaultModules: AppModulesSettings = {
   marketPrices: { enabled: false },
   developerTools: { enabled: false },
+  updateChecker: { enabled: true },
   gitSync: { enabled: false, commitMessage: defaultGitCommitMessage },
 };
 
@@ -31,6 +32,7 @@ export function normalizeModules(settings?: Partial<AppSettings>): AppModulesSet
   return {
     marketPrices: { enabled: marketPricesEnabled },
     developerTools: { enabled: developerToolsEnabled },
+    updateChecker: { enabled: modules?.updateChecker?.enabled ?? true },
     gitSync: {
       enabled: modules?.gitSync?.enabled ?? false,
       commitMessage: modules?.gitSync?.commitMessage?.trim() || defaultGitCommitMessage,
