@@ -1,0 +1,40 @@
+; Multi-currency investment example for testing per-commodity formatting
+; Demonstrates EUR (€), USD ($), and GBP (£) with different decimal styles
+
+commodity €1.000,00
+  format 1.000,00 €
+
+commodity 1,000.00 USD
+  format 1,000.00 USD
+
+commodity 1,000.00 GBP
+  format 1,000.00 GBP
+
+commodity XEON
+  format 1.000,0000 XEON
+
+commodity VWCE
+  format 1.000,0000 VWCE
+
+commodity VUSA
+  format 1.000,0000 VUSA
+
+P 2026-01-01 XEON €155,50
+P 2026-01-01 VWCE €120,75
+P 2026-01-01 VUSA $98,50
+
+2026-01-15 Buy XEON (EUR denominated ETF)
+    assets:investments:xeon      10 XEON @ €155,50
+    assets:bank:fineco               €-1.555,00
+
+2026-01-15 Buy VWCE (EUR denominated ETF)
+    assets:investments:vwce      5 VWCE @ €120,75
+    assets:bank:fineco               €-603,75
+
+2026-02-01 Buy VUSA (USD denominated ETF)
+    assets:investments:vusa     15 VUSA @ $98,50
+    assets:bank:fineco               $-1.477,50
+
+2026-02-15 Buy more XEON
+    assets:investments:xeon       3 XEON @ €158,20
+    assets:bank:fineco               €-474,60

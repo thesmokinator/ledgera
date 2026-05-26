@@ -141,7 +141,7 @@ mod tests {
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
-            commodity_symbols: String::new(),
+            commodity_symbols: Vec::new(),
             exclude_balances: String::new(),
             include_investments: String::new(),
             prefill_postings: false,

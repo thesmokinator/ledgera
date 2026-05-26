@@ -14,9 +14,11 @@ import {
 import type { FormInstance } from "antd";
 import {
   CodeOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   FolderOutlined,
   InfoCircleOutlined,
+  PlusOutlined,
   SettingOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
@@ -321,16 +323,45 @@ export function SettingsRoute({
               {({ getFieldValue }) =>
                 getFieldValue(["modules", "marketPrices", "enabled"]) ? (
                   <Form.Item
-                    className={styles.text_area_setting}
                     label={t("settings.commodity_symbols")}
-                    name="commoditySymbols"
                     help={t("settings.commodity_symbols_help")}
                   >
-                    <Input.TextArea
-                      rows={3}
-                      placeholder={"VWCE=VWCE.DE\nXEON=XEON.DE"}
-                      style={{ fontFamily: "monospace", fontSize: 13 }}
-                    />
+                    <Form.List name="commoditySymbols">
+                      {(fields, { add, remove }) => (
+                        <Space direction="vertical" style={{ width: "100%" }}>
+                          {fields.map((field) => (
+                            <Space key={field.key} align="start">
+                              <Form.Item
+                                name={[field.name, "commodity"]}
+                                rules={[{ required: true, whitespace: true, message: t("settings.commodity_required") }]}
+                                noStyle
+                              >
+                                <Input placeholder="VWCE" style={{ width: 140 }} />
+                              </Form.Item>
+                              <Form.Item
+                                name={[field.name, "yahooSymbol"]}
+                                rules={[{ required: true, whitespace: true, message: t("settings.yahoo_symbol_required") }]}
+                                noStyle
+                              >
+                                <Input placeholder="VWCE.DE" style={{ width: 140 }} />
+                              </Form.Item>
+                              <Button
+                                danger
+                                icon={<DeleteOutlined />}
+                                aria-label={t("settings.remove_symbol_mapping")}
+                                onClick={() => remove(field.name)}
+                              />
+                            </Space>
+                          ))}
+                          <Button
+                            icon={<PlusOutlined />}
+                            onClick={() => add({ commodity: "", yahooSymbol: "" })}
+                          >
+                            {t("settings.add_symbol_mapping")}
+                          </Button>
+                        </Space>
+                      )}
+                    </Form.List>
                   </Form.Item>
                 ) : null
               }

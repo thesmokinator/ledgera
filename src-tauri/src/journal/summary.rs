@@ -1,12 +1,12 @@
 use crate::{
-    amount_style::parse_amount_style,
+    amount_style::{parse_amount_style, parse_commodity_styles},
     journal::{
         autocomplete::collect_declared_commodities,
         files::load_journal_files,
         parser::load_transactions_from_journal_via_files,
         types::{DashboardSummary, JournalSummary, JournalTransaction},
     },
-    AMOUNT_STYLE,
+    AMOUNT_STYLE, COMMODITY_STYLES,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use std::path::Path;
@@ -18,6 +18,8 @@ pub(crate) fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary
 
     let amount_style = parse_amount_style(&files, "€");
     let _ = AMOUNT_STYLE.set(amount_style.clone());
+    let commodity_styles = parse_commodity_styles(&files);
+    let _ = COMMODITY_STYLES.set(commodity_styles);
 
     let transactions = load_transactions_from_journal_via_files(&files)?;
     let commodities = collect_declared_commodities(&files);

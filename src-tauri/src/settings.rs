@@ -36,6 +36,14 @@ pub(crate) struct AppModulesSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct CommoditySymbolMapping {
+    pub(crate) commodity: String,
+    #[serde(rename = "yahooSymbol")]
+    pub(crate) yahoo_symbol: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct AppSettings {
     pub(crate) journal_path: String,
     pub(crate) hledger_path: String,
@@ -50,7 +58,7 @@ pub(crate) struct AppSettings {
     #[serde(default)]
     pub(crate) fetch_prices: bool,
     #[serde(default)]
-    pub(crate) commodity_symbols: String,
+    pub(crate) commodity_symbols: Vec<CommoditySymbolMapping>,
     #[serde(default)]
     pub(crate) exclude_balances: String,
     #[serde(default)]
@@ -97,7 +105,7 @@ impl Default for AppSettings {
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
-            commodity_symbols: String::new(),
+            commodity_symbols: Vec::new(),
             exclude_balances: String::new(),
             include_investments: String::new(),
             prefill_postings: false,

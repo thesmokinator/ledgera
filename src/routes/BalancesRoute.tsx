@@ -63,8 +63,8 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
         {
           title: t("balances.price"), width: 140, align: "right" as const,
           render: (_: unknown, record: InvestmentOverview) => {
-            if (!record.priceFormatted || !record.currency) return "-";
-            return `${record.currency} ${record.priceFormatted}`;
+            if (!record.priceFormatted) return "-";
+            return record.priceFormatted;
           },
         },
         {
