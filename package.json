@@ -27,6 +27,7 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.7",
     "@ant-design/icons": "^6.2.3",
     "@tanstack/react-query": "^5.100.10",
     "@tanstack/react-table": "^8.21.3",

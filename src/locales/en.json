@@ -318,6 +318,9 @@
     "generate": "Generate",
     "generating": "Generating report…",
     "select_and_generate": "Select a report and interval, then click Generate.",
-    "generation_failed": "Unable to generate the report. Check the journal configuration."
+    "generation_failed": "Unable to generate the report. Check the journal configuration.",
+    "chart_by_period": "By period",
+    "chart_distribution": "Distribution",
+    "chart_table_below": "Detailed data in the table below"
   }
 }

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
 import { Amount } from "../components/Amount";
+import { ReportCharts } from "../components/ReportCharts";
 import type { ReportPeriodAmount, ReportResult, ReportRow } from "./types";
 import styles from "./ReportsRoute.module.css";
 
@@ -94,7 +95,6 @@ export function ReportsRoute() {
 
   const isLoading = reportQuery.isFetching;
   const data = reportQuery.data?.rows ?? [];
-  const hasData = reportQuery.data && data.length > 0;
   const hasError = reportQuery.isError;
   const isEmpty = reportQuery.data && data.length === 0 && !isLoading;
 
@@ -144,13 +144,16 @@ export function ReportsRoute() {
             description={t("reports.select_and_generate")}
           />
         ) : (
-          <Table<ReportRow>
-            rowKey={(row) => `${row.account}-${row.indent}-${String(row.isTotal)}`}
-            dataSource={hasData ? data : []}
-            pagination={false}
-            scroll={{ x: "max-content" }}
-            columns={columns}
-          />
+          <>
+            <ReportCharts data={reportQuery.data} />
+            <Table<ReportRow>
+              rowKey={(row) => `${row.account}-${row.indent}-${String(row.isTotal)}`}
+              dataSource={data}
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              columns={columns}
+            />
+          </>
         )}
       </Card>
     </div>
