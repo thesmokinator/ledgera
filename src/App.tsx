@@ -84,6 +84,7 @@ function App() {
     descriptionOptions,
     accountOptions,
     commodityOptions,
+    commentOptions,
     defaultCommodity,
     hasConfiguredJournal,
     journalLoadError,
@@ -312,6 +313,7 @@ function App() {
           descriptionOptions={descriptionOptions}
           accountOptions={accountOptions}
           commodityOptions={commodityOptions}
+          commentOptions={commentOptions}
           defaultCommodity={defaultCommodity}
           saveError={transactionError}
           onClose={closeTransactionModalWithCleanup}

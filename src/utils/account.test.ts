@@ -47,6 +47,7 @@ const defaultSuggestions: AutocompleteSuggestions = {
     "revenues:consulting",
   ],
   commodities: ["EUR", "USD"],
+  comments: [],
   defaultCommodity: "EUR",
   defaultCashAccount: "assets:bank:checking",
   defaultExpenseAccount: "expenses:food",

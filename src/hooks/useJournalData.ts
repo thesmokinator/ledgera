@@ -9,6 +9,7 @@ const emptyAutocompleteSuggestions: AutocompleteSuggestions = {
   descriptions: [],
   accounts: [],
   commodities: [],
+  comments: [],
   defaultCommodity: "",
   defaultCashAccount: "",
   defaultExpenseAccount: "",
@@ -53,6 +54,10 @@ export function useJournalData(settings: AppSettings) {
     () => toAutocompleteOptions(autocompleteSuggestions.commodities),
     [autocompleteSuggestions.commodities],
   );
+  const commentOptions = useMemo(
+    () => toAutocompleteOptions(autocompleteSuggestions.comments),
+    [autocompleteSuggestions.comments],
+  );
 
   return {
     transactionsQuery,
@@ -62,6 +67,7 @@ export function useJournalData(settings: AppSettings) {
     descriptionOptions,
     accountOptions,
     commodityOptions,
+    commentOptions,
     defaultCommodity: autocompleteSuggestions.defaultCommodity || "",
     hasConfiguredJournal,
     journalLoadError: transactionsQuery.isError ? String(transactionsQuery.error) : "",

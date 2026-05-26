@@ -140,6 +140,7 @@ export type AutocompleteSuggestions = {
   descriptions: string[];
   accounts: string[];
   commodities: string[];
+  comments: string[];
   defaultCommodity: string;
   defaultCashAccount: string;
   defaultExpenseAccount: string;
