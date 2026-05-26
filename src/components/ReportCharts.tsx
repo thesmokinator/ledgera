@@ -106,11 +106,11 @@ export function ReportCharts({ data }: ReportChartsProps) {
                 },
               }}
               tooltip={{
-                title: (d: ReportChartEntry) => d.account,
+                title: "account",
                 items: [
                   {
-                    name: (d: ReportChartEntry) => d.formatted,
-                    value: () => "",
+                    field: "formatted",
+                    name: "",
                   },
                 ],
               }}
