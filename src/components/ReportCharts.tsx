@@ -109,8 +109,8 @@ export function ReportCharts({ data }: ReportChartsProps) {
                 title: (d: ReportChartEntry) => d.account,
                 items: [
                   {
-                    name: t("balances.value"),
-                    value: (d: ReportChartEntry) => d.formatted,
+                    name: (d: ReportChartEntry) => d.formatted,
+                    value: () => "",
                   },
                 ],
               }}
