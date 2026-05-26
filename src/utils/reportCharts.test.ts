@@ -163,11 +163,13 @@ describe("toPieChartData", () => {
     expect(result).toContainEqual({
       account: "Revenues",
       amount: 2200,
+      chartAmount: 2200,
       formatted: "2.200,00",
     });
     expect(result).toContainEqual({
       account: "Expenses",
       amount: -1700,
+      chartAmount: 1700,
       formatted: "-1.700,00",
     });
   });

@@ -11,6 +11,8 @@ export interface ChartDatum {
 export interface PieDatum {
   account: string;
   amount: number;
+  /** Absolute amount used only for pie slice sizing. */
+  chartAmount: number;
   /** Backend-formatted display string */
   formatted: string;
 }
@@ -50,6 +52,7 @@ export function toPieChartData(rows: ReportRow[]): PieDatum[] {
     .map((row) => ({
       account: row.account,
       amount: row.total.amount,
+      chartAmount: Math.abs(row.total.amount),
       formatted: row.total.formatted,
     }));
 }

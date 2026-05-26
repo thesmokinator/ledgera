@@ -14,6 +14,15 @@ interface ReportChartsProps {
   data: ReportResult;
 }
 
+const maxPieLabels = 8;
+
+function compactAxisValue(value: number): string {
+  const absolute = Math.abs(value);
+  if (absolute >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (absolute >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+  return String(value);
+}
+
 export function ReportCharts({ data }: ReportChartsProps) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
@@ -34,9 +43,22 @@ export function ReportCharts({ data }: ReportChartsProps) {
     [pieData.length],
   );
 
-  // Label color that adapts to the current Ant Design theme
-  const labelColor = token.colorText;
-  const labelFontSize = 11;
+  const textColor = token.colorText;
+  const secondaryTextColor = token.colorTextSecondary;
+  const gridColor = token.colorBorderSecondary;
+  const pieLabelsEnabled = pieData.length <= maxPieLabels;
+
+  const axisStyle = {
+    labelFill: secondaryTextColor,
+    labelFillOpacity: 1,
+    lineStroke: gridColor,
+    tickStroke: gridColor,
+  };
+
+  const legendStyle = {
+    itemLabelFill: secondaryTextColor,
+    itemLabelFillOpacity: 1,
+  };
 
   const hasColumnData = columnData.length > 0;
   const hasPieData = pieData.length > 0;
@@ -64,11 +86,21 @@ export function ReportCharts({ data }: ReportChartsProps) {
                 color: {
                   position: "bottom",
                   layout: { justifyContent: "center" },
+                  ...legendStyle,
                 },
               }}
               axis={{
-                x: { title: false },
-                y: { title: false, labelFormatter: (value: number) => String(value) },
+                x: {
+                  title: false,
+                  ...axisStyle,
+                },
+                y: {
+                  title: false,
+                  labelFormatter: compactAxisValue,
+                  gridStroke: gridColor,
+                  gridStrokeOpacity: 0.35,
+                  ...axisStyle,
+                },
               }}
               tooltip={{
                 title: (d: { period: string }) => d.period,
@@ -92,25 +124,28 @@ export function ReportCharts({ data }: ReportChartsProps) {
           <div className={styles.chart_container}>
             <Pie
               data={pieData}
-              angleField="amount"
+              angleField="chartAmount"
               colorField="account"
               color={pieColors}
               autoFit
               radius={0.8}
               innerRadius={0.5}
-              label={{
-                text: "account",
-                position: "outside",
-                style: {
-                  fontSize: labelFontSize,
-                  fill: labelColor,
-                },
-              }}
+              label={pieLabelsEnabled
+                ? {
+                  text: "account",
+                  position: "outside",
+                  style: {
+                    fontSize: 11,
+                    fill: textColor,
+                    fillOpacity: 0.9,
+                  },
+                }
+                : false}
               legend={{
                 color: {
                   position: "bottom",
                   layout: { justifyContent: "center" },
-                  itemLabelFill: labelColor,
+                  ...legendStyle,
                 },
               }}
               tooltip={{
