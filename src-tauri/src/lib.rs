@@ -79,7 +79,6 @@ pub fn run() {
             sync::git_pull_journal,
             sync::git_commit_and_push_journal,
             updates::check_for_updates,
-            journal::autocomplete::get_autocomplete_suggestions,
             journal::commands::list_transactions,
             journal::search::search_journal,
             journal::commands::create_transaction,
@@ -285,7 +284,7 @@ mod tests {
             "2026-05-02 Split\n    expenses:office  10 EUR\n    assets:cash\n",
         );
 
-        let summary = read_journal_summary(&main).expect("split journal should load");
+        let summary = read_journal_summary(&main, "").expect("split journal should load");
 
         assert_eq!(summary.transactions.len(), 2);
         assert!(summary
@@ -320,7 +319,7 @@ mod tests {
             "P 2026-05-16 XEON €148,70087\n",
         );
 
-        let summary = read_journal_summary(&main).expect("tree journal should load");
+        let summary = read_journal_summary(&main, "").expect("tree journal should load");
 
         assert_eq!(summary.transactions.len(), 2);
         assert!(summary
@@ -497,7 +496,7 @@ mod tests {
             "2026-05-02 Original\n    expenses:office  10 EUR\n    assets:cash\n",
         );
         let settings = settings_for(&main);
-        let summary = read_journal_summary(&main).expect("summary should load");
+        let summary = read_journal_summary(&main, "").expect("summary should load");
         let transaction_id = summary.transactions[0].id.clone();
 
         update_transaction_for_settings(
@@ -510,7 +509,7 @@ mod tests {
         assert!(updated_content.contains("2026-05-02 * Updated"));
         assert!(!updated_content.contains("Original"));
 
-        let updated_summary = read_journal_summary(&main).expect("updated summary should load");
+        let updated_summary = read_journal_summary(&main, "").expect("updated summary should load");
         delete_transaction_for_settings(&settings, &updated_summary.transactions[0].id)
             .expect("source subjournal transaction should delete");
         let deleted_content = fs::read_to_string(&may).expect("may should be readable");

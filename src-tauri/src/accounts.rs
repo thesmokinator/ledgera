@@ -18,7 +18,7 @@ pub(crate) async fn get_accounts_overview(
 ) -> Result<AccountsOverview, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
-    let summary = read_journal_summary(&journal_path)?;
+    let summary = read_journal_summary(&journal_path, settings.default_commodity.trim())?;
     let app_for_task = app.clone();
     let settings_for_task = settings.clone();
 

@@ -13,12 +13,13 @@ use crate::{
 };
 use tauri::AppHandle;
 
-/// Reads the configured journal and returns parsed transaction blocks.
+/// Reads the configured journal and returns parsed transaction blocks
+/// along with autocomplete suggestions in a single pass.
 #[tauri::command]
 pub(crate) fn list_transactions(app: AppHandle) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
-    read_journal_summary(&journal_path)
+    read_journal_summary(&journal_path, settings.default_commodity.trim())
 }
 
 /// Appends a new transaction using the existing journal style where possible.

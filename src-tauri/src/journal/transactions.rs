@@ -23,7 +23,7 @@ pub(crate) fn create_transaction_for_settings(
     validate_transaction_input(input)?;
     let journal_path = require_journal_path(settings)?;
     append_transaction_routed(settings, &journal_path, input)?;
-    read_journal_summary(&journal_path)
+    read_journal_summary(&journal_path, settings.default_commodity.trim())
 }
 
 pub(crate) fn update_transaction_for_settings(
@@ -45,7 +45,7 @@ pub(crate) fn update_transaction_for_settings(
             &replacement,
         ))
     })?;
-    read_journal_summary(&journal_path)
+    read_journal_summary(&journal_path, settings.default_commodity.trim())
 }
 
 pub(crate) fn delete_transaction_for_settings(
@@ -64,7 +64,7 @@ pub(crate) fn delete_transaction_for_settings(
             "",
         ))
     })?;
-    read_journal_summary(&journal_path)
+    read_journal_summary(&journal_path, settings.default_commodity.trim())
 }
 
 fn validate_transaction_input(input: &TransactionInput) -> Result<(), String> {

@@ -30,14 +30,9 @@ export function useJournalData(settings: AppSettings) {
     refetchOnMount: true,
   });
 
-  const autocompleteQuery = useQuery({
-    queryKey: ["autocomplete-suggestions"],
-    queryFn: () => callCommand<AutocompleteSuggestions>("get_autocomplete_suggestions"),
-    enabled: hasConfiguredJournal,
-    retry: false,
-  });
-
-  const autocompleteSuggestions = autocompleteQuery.data ?? emptyAutocompleteSuggestions;
+  // Suggestions are now embedded in JournalSummary — no separate query needed.
+  const autocompleteSuggestions =
+    transactionsQuery.data?.suggestions ?? emptyAutocompleteSuggestions;
   const codeOptions = useMemo(
     () => toAutocompleteOptions(autocompleteSuggestions.codes),
     [autocompleteSuggestions.codes],
@@ -61,7 +56,6 @@ export function useJournalData(settings: AppSettings) {
 
   return {
     transactionsQuery,
-    autocompleteQuery,
     autocompleteSuggestions,
     codeOptions,
     descriptionOptions,

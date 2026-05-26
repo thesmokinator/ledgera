@@ -37,13 +37,12 @@ export function useAppSettings({
       if (prev.journalPath !== next.journalPath) {
         queryClient.resetQueries({ queryKey: ["transactions"] });
         await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
       }
       if (prev.hledgerPath !== next.hledgerPath) {
         await queryClient.invalidateQueries({ queryKey: ["hledger-status"] });
       }
       if (prev.defaultCommodity !== next.defaultCommodity) {
-        await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
+        await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       }
       if (prev.excludeBalances !== next.excludeBalances) {
         await queryClient.invalidateQueries({ queryKey: ["balances"] });

@@ -1,7 +1,10 @@
 use crate::{
     amount_style::parse_amount_style,
     journal::{
-        autocomplete::collect_declared_commodities,
+        autocomplete::{
+            build_journal_profile, collect_declared_commodities, unique_sorted,
+            AutocompleteSuggestions,
+        },
         files::load_journal_files,
         parser::load_transactions_from_journal_via_files,
         types::{DashboardSummary, JournalSummary, JournalTransaction},
@@ -11,7 +14,10 @@ use crate::{
 use chrono::{Datelike, Local, NaiveDate};
 use std::path::Path;
 
-pub(crate) fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary, String> {
+pub(crate) fn read_journal_summary(
+    journal_path: &Path,
+    default_commodity: &str,
+) -> Result<JournalSummary, String> {
     let files = load_journal_files(journal_path)?;
     let file_count = files.len();
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
@@ -22,11 +28,54 @@ pub(crate) fn read_journal_summary(journal_path: &Path) -> Result<JournalSummary
     let transactions = load_transactions_from_journal_via_files(&files)?;
     let commodities = collect_declared_commodities(&files);
     let dashboard = build_dashboard_summary(&transactions);
+    let profile = build_journal_profile(&transactions, default_commodity);
+
+    let suggestions = AutocompleteSuggestions {
+        codes: unique_sorted(
+            transactions
+                .iter()
+                .map(|t| t.code.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect(),
+        ),
+        descriptions: unique_sorted(
+            transactions
+                .iter()
+                .map(|t| t.description.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect(),
+        ),
+        accounts: unique_sorted(
+            transactions
+                .iter()
+                .flat_map(|t| t.postings.iter())
+                .map(|p| p.account.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect(),
+        ),
+        commodities: commodities.clone(),
+        comments: unique_sorted(
+            transactions
+                .iter()
+                .flat_map(|t| t.postings.iter())
+                .map(|p| p.comment.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect(),
+        ),
+        default_commodity: default_commodity.to_string(),
+        default_cash_account: profile.default_cash_account,
+        default_expense_account: profile.default_expense_account,
+        default_income_account: profile.default_income_account,
+        default_transfer_account: profile.default_transfer_account,
+        default_investment_account: profile.default_investment_account,
+        default_investment_commodity: profile.default_investment_commodity,
+    };
 
     Ok(JournalSummary {
         path: journal_path.to_string_lossy().to_string(),
         transactions,
         commodities,
+        suggestions,
         file_count,
         total_size_bytes,
         amount_style,
