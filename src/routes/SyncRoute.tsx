@@ -97,9 +97,9 @@ export function SyncRoute({
   }
 
   return (
-    <Space direction="vertical" size={24} className="content-stack">
+    <Space orientation="vertical" size={24} className="content-stack">
       <Card title={t("sync.title")} extra={<Tag color={statusColor}>{t(summary.labelKey, summary.labelOptions)}</Tag>}>
-        <Space direction="vertical" size={16} className={styles.full_width}>
+        <Space orientation="vertical" size={16} className={styles.full_width}>
           {status?.error ? (
             <Alert
               type="error"
@@ -184,7 +184,7 @@ export function SyncRoute({
         onCancel={() => setCommitModalOpen(false)}
         onOk={submitCommitAndPush}
       >
-        <Space direction="vertical" className={styles.full_width}>
+        <Space orientation="vertical" className={styles.full_width}>
           <Typography.Paragraph type="secondary">
             {t("sync.commit_modal_description")}
           </Typography.Paragraph>

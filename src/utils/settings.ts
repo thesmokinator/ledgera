@@ -17,9 +17,9 @@ export const defaultSettings: AppSettings = {
   powerUser: false,
   defaultCommodity: "",
   fetchPrices: false,
-  commoditySymbols: "",
-  excludeBalances: "",
-  includeInvestments: "",
+  commoditySymbols: [],
+  excludeBalances: [],
+  includeInvestments: [],
   prefillPostings: false,
   modules: defaultModules,
 };

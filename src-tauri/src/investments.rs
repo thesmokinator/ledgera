@@ -1,15 +1,19 @@
 use crate::{
-    amount_style::AmountStyle,
-    app_error::{to_error_string, to_error_string_with_details},
+    amount_style::{resolve_currency_display, style_for_commodity},
+    app_error::to_error_string_with_details,
     balances::{parse_balance_output, Balance},
     hledger::hledger_executable,
     journal::files::require_journal_path,
     logs,
-    settings::read_settings,
-    AMOUNT_STYLE,
+    settings::{read_settings, CommoditySymbolMapping},
 };
 use serde::Serialize;
-use std::{process::Command, sync::OnceLock};
+use std::{
+    collections::HashMap,
+    process::Command,
+    sync::{Mutex, OnceLock},
+    time::{Duration, Instant},
+};
 use tauri::AppHandle;
 
 // ── Holdings & Prices ────────────────────────────────────────────────────
@@ -29,9 +33,9 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
 
     let include_accounts: Vec<&str> = settings
         .include_investments
-        .lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
         .collect();
 
     if include_accounts.is_empty() {
@@ -74,6 +78,7 @@ pub(crate) struct InvestmentOverview {
     currency: Option<String>,
     market_value_formatted: Option<String>,
     tint: String,
+    error: Option<String>,
 }
 
 #[tauri::command]
@@ -95,34 +100,36 @@ pub(crate) async fn get_investments_overview(
                 currency: None,
                 market_value_formatted: None,
                 tint: h.tint,
+                error: None,
             })
             .collect());
     }
 
+    let mappings: Vec<CommoditySymbolMapping> = settings.commodity_symbols.clone();
     let symbols: Vec<String> = holdings.iter().map(|h| h.commodity.clone()).collect();
-    let prices = fetch_prices(app.clone(), symbols).await.unwrap_or_default();
-
-    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
-        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
-        DEFAULT.get_or_init(AmountStyle::default)
-    });
+    let prices = fetch_prices(app.clone(), &symbols, &mappings).await;
 
     Ok(holdings
         .into_iter()
         .map(|h| {
+            let commodity_style = style_for_commodity(&h.commodity);
             let price_info = prices.get(&h.commodity);
-            let (price, price_formatted, currency, market_value_formatted) =
-                if let Some(info) = price_info {
+            let (price, price_formatted, currency, market_value_formatted, error) = match price_info
+            {
+                Some(Ok(info)) => {
                     let mv = h.amount * info.price;
+                    let resolved_currency = resolve_currency_display(&info.currency);
                     (
                         Some(info.price),
                         Some(info.formatted.clone()),
-                        Some(info.currency.clone()),
-                        Some(format!("{} {}", info.currency, style.format(mv))),
+                        Some(resolved_currency.clone()),
+                        Some(commodity_style.format_amount(mv, &resolved_currency)),
+                        None,
                     )
-                } else {
-                    (None, None, None, None)
-                };
+                }
+                Some(Err(err)) => (None, None, None, None, Some(err.clone())),
+                None => (None, None, None, None, None),
+            };
             InvestmentOverview {
                 commodity: h.commodity.clone(),
                 account: h.account,
@@ -133,95 +140,120 @@ pub(crate) async fn get_investments_overview(
                 currency,
                 market_value_formatted,
                 tint: h.tint,
+                error,
             }
         })
         .collect())
 }
 
-/// Fetches current prices from Yahoo Finance for a list of symbols.
+/// Session-level price cache with timestamp.
+static PRICE_CACHE: OnceLock<Mutex<HashMap<String, (Instant, PriceInfo)>>> = OnceLock::new();
+const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
+
+fn price_cache() -> &'static Mutex<HashMap<String, (Instant, PriceInfo)>> {
+    PRICE_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Fetches current prices from Yahoo Finance for a list of symbols,
+/// using session-level caching and respecting rate limits.
 async fn fetch_prices(
     app: AppHandle,
-    symbols: Vec<String>,
-) -> Result<std::collections::HashMap<String, PriceInfo>, String> {
-    let settings = read_settings(&app)?;
+    symbols: &[String],
+    mappings: &[CommoditySymbolMapping],
+) -> HashMap<String, Result<PriceInfo, String>> {
+    let mut prices = HashMap::new();
 
-    if !settings.fetch_prices {
-        return Err(to_error_string(
-            "prices_disabled",
-            "Market price fetching is disabled in Settings.",
-        ));
-    }
-
-    let mut prices = std::collections::HashMap::new();
-
-    // Parse commodity symbols mapping (format: "VWCE=VWCE.DE\nXEON=XEON.DE")
-    let mapping: std::collections::HashMap<String, String> = settings
-        .commodity_symbols
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                return None;
-            }
-            let (k, v) = line.split_once('=')?;
-            Some((k.trim().to_string(), v.trim().to_string()))
-        })
+    // Build mapping lookup: commodity → yahoo symbol
+    let mapping: HashMap<&str, &str> = mappings
+        .iter()
+        .map(|m| (m.commodity.as_str(), m.yahoo_symbol.as_str()))
         .collect();
 
-    for symbol in &symbols {
-        let yahoo_symbol = mapping.get(symbol).unwrap_or(symbol);
+    for symbol in symbols {
+        // Check session cache first
+        {
+            let cache = price_cache().lock().unwrap();
+            if let Some((cached_at, info)) = cache.get(symbol) {
+                if cached_at.elapsed() < CACHE_TTL {
+                    prices.insert(symbol.clone(), Ok(info.clone()));
+                    continue;
+                }
+            }
+        }
+
+        let yahoo_symbol = mapping
+            .get(symbol.as_str())
+            .copied()
+            .unwrap_or(symbol.as_str());
 
         let url = format!(
             "https://query1.finance.yahoo.com/v8/finance/chart/{}",
             yahoo_symbol
         );
-        let client = reqwest::Client::new();
-        let response = client
-            .get(&url)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            )
-            .header("Accept", "application/json")
-            .send()
-            .await;
-        match response {
-            Ok(response) => {
-                let body_text = response.text().await.unwrap_or_default();
-                match serde_json::from_str::<serde_json::Value>(&body_text) {
-                    Ok(json) => {
-                        let meta = &json["chart"]["result"][0]["meta"];
-                        if let (Some(price), Some(currency)) = (
-                            meta["regularMarketPrice"].as_f64(),
-                            meta["currency"].as_str(),
-                        ) {
-                            let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
-                                static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
-                                DEFAULT.get_or_init(AmountStyle::default)
-                            });
-                            let formatted = style.format(price);
-                            prices.insert(
-                                symbol.clone(),
-                                PriceInfo {
-                                    price,
-                                    currency: currency.to_string(),
-                                    formatted,
-                                },
-                            );
-                        }
-                    }
-                    Err(_) => {}
-                }
+
+        let result = fetch_single_price(&url).await;
+
+        let price_result = match result {
+            Ok((price, currency)) => {
+                let style = style_for_commodity(symbol);
+                let resolved_currency = resolve_currency_display(&currency);
+                let formatted = style.format_amount(price, &resolved_currency);
+                let info = PriceInfo {
+                    price,
+                    currency,
+                    formatted,
+                };
+                let mut cache = price_cache().lock().unwrap();
+                cache.insert(symbol.clone(), (Instant::now(), info.clone()));
+                Ok(info)
             }
-            Err(error) => {
+            Err(err) => {
                 logs::log_warn(
                     &app,
                     "price_fetch_failed",
-                    &format!("HTTP request failed for {}.", symbol),
-                    error.to_string(),
+                    &format!(
+                        "Failed to fetch price for {} (Yahoo: {}).",
+                        symbol, yahoo_symbol
+                    ),
+                    &err,
                 );
+                Err(err)
             }
-        }
+        };
+
+        prices.insert(symbol.clone(), price_result);
     }
-    Ok(prices)
+
+    prices
+}
+
+/// Fetches a single price from Yahoo Finance v8 API.
+async fn fetch_single_price(url: &str) -> Result<(f64, String), String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        )
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    let body_text = response.text().await.unwrap_or_default();
+    let json: serde_json::Value =
+        serde_json::from_str(&body_text).map_err(|e| format!("Invalid JSON: {e}"))?;
+
+    let meta = &json["chart"]["result"][0]["meta"];
+    let price = meta["regularMarketPrice"]
+        .as_f64()
+        .ok_or_else(|| "Missing regularMarketPrice".to_string())?;
+    let currency = meta["currency"].as_str().unwrap_or("USD").to_string();
+
+    Ok((price, currency))
 }

@@ -5,12 +5,12 @@ import { newTransactionShortcut, spotlightShortcut } from "../utils/shortcut";
 
 export function AppHeader({
   title,
-  disableCreateTransaction,
+  disableActions,
   onCreateTransaction,
   onOpenSearch,
 }: {
   title: string;
-  disableCreateTransaction: boolean;
+  disableActions: boolean;
   onCreateTransaction: () => void;
   onOpenSearch: () => void;
 }) {
@@ -25,6 +25,7 @@ export function AppHeader({
         <button
           type="button"
           className="search_trigger"
+          disabled={disableActions}
           onClick={onOpenSearch}
           title={t("common.search")}
           aria-label={t("common.search")}
@@ -33,7 +34,7 @@ export function AppHeader({
           <span className="search_trigger_label">Search journal…</span>
           <span className="search_trigger_shortcut">{spotlightShortcut()}</span>
         </button>
-        <Button type="primary" disabled={disableCreateTransaction} onClick={onCreateTransaction}>
+        <Button type="primary" disabled={disableActions} onClick={onCreateTransaction}>
           {t("transactions.new_transaction")} ({newTransactionShortcut()})
         </Button>
       </div>

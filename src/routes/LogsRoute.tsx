@@ -66,7 +66,7 @@ export function LogsRoute() {
   }
 
   return (
-    <Space direction="vertical" size={24} className="content-stack">
+    <Space orientation="vertical" size={24} className="content-stack">
       {modalContextHolder}
       <Card
         className={styles.card}

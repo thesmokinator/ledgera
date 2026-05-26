@@ -20,6 +20,11 @@ export type AppModulesSettings = {
   gitSync: GitSyncModuleSettings;
 };
 
+export type CommoditySymbolMapping = {
+  commodity: string;
+  yahooSymbol: string;
+};
+
 export type AppSettings = {
   journalPath: string;
   hledgerPath: string;
@@ -28,9 +33,9 @@ export type AppSettings = {
   powerUser: boolean;
   defaultCommodity: string;
   fetchPrices: boolean;
-  commoditySymbols: string;
-  excludeBalances: string;
-  includeInvestments: string;
+  commoditySymbols: CommoditySymbolMapping[];
+  excludeBalances: string[];
+  includeInvestments: string[];
   prefillPostings: boolean;
   modules: AppModulesSettings;
 };
@@ -232,6 +237,7 @@ export type InvestmentOverview = {
   currency: string | null;
   marketValueFormatted: string | null;
   tint: AmountTint;
+  error: string | null;
 };
 
 export type MonthSetter = (updater: (month: Dayjs) => Dayjs) => void;

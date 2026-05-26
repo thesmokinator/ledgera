@@ -236,6 +236,18 @@ button {
     color: #d4d4d4;
 }
 
+.search_trigger:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.search_trigger:disabled:hover {
+    color: #a3a3a3;
+    background: #111111;
+    border-color: #2c2c2c;
+    box-shadow: none;
+}
+
 .theme-light .search_trigger {
     color: #6b7280;
     background: #f9fafb;
@@ -257,6 +269,18 @@ button {
     color: #6b7280;
     background: #f3f4f6;
     border-color: #d1d5db;
+}
+
+.theme-light .search_trigger:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.theme-light .search_trigger:disabled:hover {
+    color: #6b7280;
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    box-shadow: none;
 }
 
 .app-main {

@@ -48,6 +48,7 @@ use std::{
     path::{Path, PathBuf},
 };
 static AMOUNT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
+static COMMODITY_STYLES: OnceLock<std::collections::HashMap<String, AmountStyle>> = OnceLock::new();
 
 /// Starts the Tauri application and registers backend commands.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -118,9 +119,9 @@ mod tests {
             power_user: false,
             default_commodity: String::new(),
             fetch_prices: false,
-            commodity_symbols: String::new(),
-            exclude_balances: String::new(),
-            include_investments: String::new(),
+            commodity_symbols: Vec::new(),
+            exclude_balances: Vec::new(),
+            include_investments: Vec::new(),
             prefill_postings: false,
             modules: Default::default(),
         }
