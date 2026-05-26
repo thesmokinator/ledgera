@@ -12,6 +12,7 @@ mod hledger;
 mod investments;
 mod journal;
 mod logs;
+mod reports;
 mod settings;
 mod sync;
 mod updates;
@@ -88,6 +89,7 @@ pub fn run() {
             logs::get_logs,
             logs::clear_logs,
             investments::get_investments_overview,
+            reports::run_report,
             balances::get_balances,
             accounts::get_accounts_overview,
         ])

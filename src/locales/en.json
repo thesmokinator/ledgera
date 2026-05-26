@@ -3,6 +3,7 @@
     "transactions": "Transactions",
     "accounts": "Accounts",
     "balances": "Balances",
+    "reports": "Reports",
     "sync": "Sync",
     "logs": "Logs",
     "settings": "Settings",
@@ -271,6 +272,7 @@
     "prices_disabled": "Market price fetching is disabled in Settings.",
     "price_fetch_failed": "Unable to fetch market price.",
     "balance_failed": "Unable to retrieve balances.",
+    "report_failed": "Unable to generate report.",
     "shell": "Unable to detect shell environment.",
     "git_not_available": "Git is not available. Install Git or make it available in PATH.",
     "git_repo_not_found": "Journal not in a Git repository.",
@@ -304,5 +306,18 @@
     "price": "Price",
     "value": "Market value",
     "refresh_prices": "Refresh prices"
+  },
+  "reports": {
+    "income_statement": "Income Statement",
+    "balance_sheet": "Balance Sheet",
+    "cashflow": "Cashflow",
+    "no_interval": "No interval",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "yearly": "Yearly",
+    "generate": "Generate",
+    "generating": "Generating report…",
+    "select_and_generate": "Select a report and interval, then click Generate.",
+    "generation_failed": "Unable to generate the report. Check the journal configuration."
   }
 }

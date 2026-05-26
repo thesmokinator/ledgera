@@ -6,6 +6,7 @@ import {
   AccountsRoute,
   BalancesRoute,
   LogsRoute,
+  ReportsRoute,
   SettingsRoute,
   SyncRoute,
   TransactionsRoute,
@@ -138,6 +139,10 @@ export function AppContent({
 
     if (activeView === "logs") {
       return <LogsRoute />;
+    }
+
+    if (activeView === "reports") {
+      return <ReportsRoute />;
     }
 
     if (shouldShowCourtesy) {

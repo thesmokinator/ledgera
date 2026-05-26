@@ -3,6 +3,7 @@
     "transactions": "Transazioni",
     "accounts": "Conti",
     "balances": "Saldi",
+    "reports": "Report",
     "sync": "Sync",
     "logs": "Log",
     "settings": "Impostazioni",
@@ -271,6 +272,7 @@
     "prices_disabled": "Il recupero dei prezzi di mercato è disabilitato nelle Impostazioni.",
     "price_fetch_failed": "Impossibile recuperare il prezzo di mercato.",
     "balance_failed": "Impossibile recuperare i saldi.",
+    "report_failed": "Impossibile generare il report.",
     "shell": "Impossibile rilevare l'ambiente shell.",
     "git_not_available": "Git non è disponibile. Installa Git o rendilo disponibile nel PATH.",
     "git_repo_not_found": "Journal non in un repository Git.",
@@ -304,5 +306,18 @@
     "price": "Prezzo",
     "value": "Valore di mercato",
     "refresh_prices": "Aggiorna prezzi"
+  },
+  "reports": {
+    "income_statement": "Conto economico",
+    "balance_sheet": "Stato patrimoniale",
+    "cashflow": "Flusso di cassa",
+    "no_interval": "Nessun intervallo",
+    "monthly": "Mensile",
+    "quarterly": "Trimestrale",
+    "yearly": "Annuale",
+    "generate": "Genera",
+    "generating": "Generazione report…",
+    "select_and_generate": "Seleziona un report e un intervallo, poi clicca Genera.",
+    "generation_failed": "Impossibile generare il report. Verifica la configurazione del journal."
   }
 }

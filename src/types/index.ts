@@ -3,7 +3,7 @@ import type { Dayjs } from "dayjs";
 export type ThemePreference = "system" | "dark" | "light";
 export type LanguagePreference = "system" | "en" | "it";
 
-export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs";
+export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs" | "reports";
 
 export type AppModuleSettings = {
   enabled: boolean;
@@ -201,6 +201,29 @@ export type Balance = {
   commodity: string;
   formatted: string;
   tint: AmountTint;
+};
+
+export type ReportResult = {
+  reportType: string;
+  interval: string;
+  periodColumns: string[];
+  rows: ReportRow[];
+};
+
+export type ReportPeriodAmount = {
+  period: string;
+  amount: number;
+  commodity: string;
+  formatted: string;
+  tint: AmountTint;
+};
+
+export type ReportRow = {
+  account: string;
+  indent: number;
+  isTotal: boolean;
+  amounts: ReportPeriodAmount[];
+  total: ReportPeriodAmount;
 };
 
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";

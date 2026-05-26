@@ -7,6 +7,7 @@ import {
 } from "antd";
 import {
   BankOutlined,
+  BarChartOutlined,
   FileTextOutlined,
   HomeOutlined,
   PieChartOutlined,
@@ -171,15 +172,16 @@ function App() {
 
   const shortcuts = useMemo(() => {
     const hasJournal = Boolean(activeSettings.journalPath.trim());
-    const logsIndex = activeSettings.modules.gitSync.enabled ? 5 : 4;
-    const settingsIndex = 4 + Number(activeSettings.modules.gitSync.enabled) + Number(activeSettings.powerUser);
+    const logsIndex = activeSettings.modules.gitSync.enabled ? 6 : 5;
+    const settingsIndex = 5 + Number(activeSettings.modules.gitSync.enabled) + Number(activeSettings.powerUser);
 
     return [
       { keys: "command+n, ctrl+n", action: () => { if (!shouldShowCourtesy) openCreateTransaction(); } },
       { keys: "command+1, ctrl+1", action: () => setActiveView("transactions"), disabled: !hasJournal },
       { keys: "command+2, ctrl+2", action: () => setActiveView("accounts"), disabled: !hasJournal },
       { keys: "command+3, ctrl+3", action: () => setActiveView("balances"), disabled: !hasJournal },
-      { keys: "command+4, ctrl+4", action: () => setActiveView("sync"), disabled: !hasJournal || !activeSettings.modules.gitSync.enabled },
+      { keys: "command+4, ctrl+4", action: () => setActiveView("reports"), disabled: !hasJournal },
+      { keys: "command+5, ctrl+5", action: () => setActiveView("sync"), disabled: !hasJournal || !activeSettings.modules.gitSync.enabled },
       { keys: `command+${logsIndex}, ctrl+${logsIndex}`, action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
       { keys: "command+shift+g, ctrl+shift+g", action: () => { if (activeView === "sync") refreshGitSyncStatus(); else setActiveView("sync"); }, disabled: !gitSyncEnabled },
       { keys: `command+${settingsIndex}, ctrl+${settingsIndex}`, action: () => setActiveView("settings") },
@@ -199,6 +201,7 @@ function App() {
         { key: "transactions", label: "common.transactions", icon: <HomeOutlined />, disabled: !hasJournal, shortcut: navShortcut(1) },
         { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
         { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
+        { key: "reports", label: "common.reports", icon: <BarChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(4) },
       ];
 
       if (activeSettings.modules.gitSync.enabled) {
@@ -209,19 +212,19 @@ function App() {
             : t(summary.labelKey, summary.labelOptions)
           : undefined;
 
-        items.splice(3, 0, {
+        items.splice(4, 0, {
           key: "sync",
           label: "common.sync",
           icon: <SyncOutlined />,
           disabled: !hasJournal,
-          shortcut: navShortcut(4),
+          shortcut: navShortcut(5),
           badge: syncBadge,
           badgeTone: summary.tone === "danger" ? "danger" : "warning",
         });
       }
 
       if (activeSettings.powerUser) {
-        const logsIndex = activeSettings.modules.gitSync.enabled ? 5 : 4;
+        const logsIndex = activeSettings.modules.gitSync.enabled ? 6 : 5;
         items.push({ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(logsIndex) });
       }
 
