@@ -67,7 +67,6 @@ export function ReportCharts({ data }: ReportChartsProps) {
     [visualization.entries.length, visualization.periods.length],
   );
 
-  const textColor = token.colorText;
   const secondaryTextColor = token.colorTextSecondary;
   const gridColor = token.colorBorderSecondary;
 
@@ -98,15 +97,7 @@ export function ReportCharts({ data }: ReportChartsProps) {
               autoFit
               radius={0.8}
               innerRadius={0.5}
-              label={{
-                text: "label",
-                position: "outside",
-                style: {
-                  fontSize: 11,
-                  fill: textColor,
-                  fillOpacity: 0.9,
-                },
-              }}
+              label={false}
               legend={{
                 color: {
                   position: "bottom",
