@@ -103,22 +103,23 @@ describe("toColumnChartData", () => {
   it("flattens rows with period amounts, excluding total rows", () => {
     const result = toColumnChartData(sampleResult);
 
-    expect(result).toHaveLength(4); // 2 accounts × 2 periods
+    expect(result).toHaveLength(4);
     expect(result).toContainEqual({
       period: "2026-01",
       account: "Revenues",
       amount: 1000,
+      formatted: "1.000,00",
     });
     expect(result).toContainEqual({
       period: "2026-02",
       account: "Expenses",
       amount: -900,
+      formatted: "-900,00",
     });
   });
 
   it("does not include total rows", () => {
     const result = toColumnChartData(sampleResult);
-
     const totalAccounts = result.filter((d) => d.account === "Net Income");
     expect(totalAccounts).toHaveLength(0);
   });
@@ -149,24 +150,30 @@ describe("toColumnChartData", () => {
         },
       ],
     };
-
     const result = toColumnChartData(emptyRowsResult);
     expect(result).toEqual([]);
   });
 });
 
 describe("toPieChartData", () => {
-  it("extracts total amounts from non-total rows", () => {
+  it("extracts total amounts with formatted strings from non-total rows", () => {
     const result = toPieChartData(sampleResult.rows);
 
     expect(result).toHaveLength(2);
-    expect(result).toContainEqual({ account: "Revenues", amount: 2200 });
-    expect(result).toContainEqual({ account: "Expenses", amount: -1700 });
+    expect(result).toContainEqual({
+      account: "Revenues",
+      amount: 2200,
+      formatted: "2.200,00",
+    });
+    expect(result).toContainEqual({
+      account: "Expenses",
+      amount: -1700,
+      formatted: "-1.700,00",
+    });
   });
 
   it("excludes total rows", () => {
     const result = toPieChartData(sampleResult.rows);
-
     const netIncome = result.filter((d) => d.account === "Net Income");
     expect(netIncome).toHaveLength(0);
   });
@@ -180,28 +187,24 @@ describe("chartColorPalette", () => {
 
   it("cycles through the base palette", () => {
     const colors = chartColorPalette(15);
-    // Second cycle: first color should repeat
-    expect(colors[0]).toBe(colors[12]); // 12 colors in base palette
+    expect(colors[0]).toBe(colors[12]);
   });
 });
 
 describe("topAccountsByAmount", () => {
   it("returns account names sorted by absolute total amount descending", () => {
     const result = topAccountsByAmount(sampleResult.rows);
-
     expect(result).toEqual(["Revenues", "Expenses"]);
   });
 
   it("respects the limit parameter", () => {
     const result = topAccountsByAmount(sampleResult.rows, 1);
-
     expect(result).toHaveLength(1);
     expect(result[0]).toBe("Revenues");
   });
 
   it("excludes total rows", () => {
     const result = topAccountsByAmount(sampleResult.rows);
-
     expect(result).not.toContain("Net Income");
   });
 });

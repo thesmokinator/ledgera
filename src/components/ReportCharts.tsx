@@ -1,4 +1,5 @@
 import { Column, Pie } from "@ant-design/charts";
+import { theme } from "antd";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReportResult } from "../types";
@@ -15,13 +16,27 @@ interface ReportChartsProps {
 
 export function ReportCharts({ data }: ReportChartsProps) {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const columnData = useMemo(() => toColumnChartData(data), [data]);
   const pieData = useMemo(() => toPieChartData(data.rows), [data]);
+
+  const uniqueAccounts = useMemo(
+    () => [...new Set(columnData.map((d) => d.account))],
+    [columnData],
+  );
+  const columnColors = useMemo(
+    () => chartColorPalette(uniqueAccounts.length),
+    [uniqueAccounts.length],
+  );
   const pieColors = useMemo(
     () => chartColorPalette(pieData.length),
     [pieData.length],
   );
+
+  // Label color that adapts to the current Ant Design theme
+  const labelColor = token.colorText;
+  const labelFontSize = 11;
 
   const hasColumnData = columnData.length > 0;
   const hasPieData = pieData.length > 0;
@@ -43,9 +58,7 @@ export function ReportCharts({ data }: ReportChartsProps) {
               xField="period"
               yField="amount"
               seriesField="account"
-              color={chartColorPalette(
-                new Set(columnData.map((d) => d.account)).size,
-              )}
+              color={columnColors}
               autoFit
               legend={{
                 color: {
@@ -55,7 +68,16 @@ export function ReportCharts({ data }: ReportChartsProps) {
               }}
               axis={{
                 x: { title: false },
-                y: { title: false },
+                y: { title: false, labelFormatter: (value: number) => String(value) },
+              }}
+              tooltip={{
+                title: (d: { period: string }) => d.period,
+                items: [
+                  {
+                    name: (d: { account: string }) => d.account,
+                    value: (d: { formatted: string }) => d.formatted,
+                  },
+                ],
               }}
             />
           </div>
@@ -79,25 +101,24 @@ export function ReportCharts({ data }: ReportChartsProps) {
               label={{
                 text: "account",
                 position: "outside",
-                style: { fontSize: 11 },
+                style: {
+                  fontSize: labelFontSize,
+                  fill: labelColor,
+                },
               }}
               legend={{
                 color: {
                   position: "bottom",
                   layout: { justifyContent: "center" },
+                  itemLabelFill: labelColor,
                 },
               }}
               tooltip={{
+                title: (d: { account: string }) => d.account,
                 items: [
                   {
-                    channel: "angle",
-                    valueFormatter: (value: number) =>
-                      // Use Intl for compact number formatting
-                      Math.abs(value) >= 1_000_000
-                        ? `${(value / 1_000_000).toFixed(1)}M`
-                        : Math.abs(value) >= 1_000
-                          ? `${(value / 1_000).toFixed(1)}K`
-                          : String(value),
+                    name: t("balances.value"),
+                    value: (d: { formatted: string }) => d.formatted,
                   },
                 ],
               }}

@@ -4,11 +4,15 @@ export interface ChartDatum {
   period: string;
   account: string;
   amount: number;
+  /** Backend-formatted display string (e.g. "1.000,00 €") */
+  formatted: string;
 }
 
 export interface PieDatum {
   account: string;
   amount: number;
+  /** Backend-formatted display string */
+  formatted: string;
 }
 
 /**
@@ -28,6 +32,7 @@ export function toColumnChartData(result: ReportResult): ChartDatum[] {
         period: amt.period,
         account: row.account,
         amount: amt.amount,
+        formatted: amt.formatted,
       });
     }
   }
@@ -45,6 +50,7 @@ export function toPieChartData(rows: ReportRow[]): PieDatum[] {
     .map((row) => ({
       account: row.account,
       amount: row.total.amount,
+      formatted: row.total.formatted,
     }));
 }
 
