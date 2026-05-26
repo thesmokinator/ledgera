@@ -9,7 +9,7 @@ use crate::{
 };
 use serde::Serialize;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Read,
     process::{Command, Output, Stdio},
     thread,
@@ -228,12 +228,72 @@ fn aggregate_report_periods(
         .collect()
 }
 
+const MIN_USEFUL_BALANCE_SHEET_GROUPS: usize = 4;
+const MAX_USEFUL_BALANCE_SHEET_GROUPS: usize = 10;
+
+fn account_depth(account: &str) -> u32 {
+    account
+        .split(':')
+        .filter(|part| !part.is_empty())
+        .count()
+        .max(1) as u32
+}
+
+fn max_account_depth(rows: &[ReportRow]) -> u32 {
+    rows.iter()
+        .filter(|row| !row.is_total && row.total.amount != 0.0)
+        .map(|row| account_depth(&row.account))
+        .max()
+        .unwrap_or(2)
+}
+
+fn group_count_at_level(rows: &[ReportRow], level: u32) -> usize {
+    rows.iter()
+        .filter(|row| !row.is_total && row.total.amount != 0.0)
+        .map(|row| account_at_level(&row.account, level))
+        .collect::<HashSet<_>>()
+        .len()
+}
+
+fn choose_balance_sheet_account_level(rows: &[ReportRow]) -> u32 {
+    let max_depth = max_account_depth(rows);
+    let start_level = 2.min(max_depth).max(1);
+    let mut best_level = start_level;
+
+    for level in start_level..=max_depth {
+        let group_count = group_count_at_level(rows, level);
+        if group_count == 0 {
+            continue;
+        }
+
+        if group_count > MAX_USEFUL_BALANCE_SHEET_GROUPS {
+            return best_level;
+        }
+
+        best_level = level;
+
+        if group_count >= MIN_USEFUL_BALANCE_SHEET_GROUPS {
+            return level;
+        }
+    }
+
+    best_level
+}
+
+fn choose_account_level(report_type: &str, rows: &[ReportRow]) -> u32 {
+    match report_type {
+        "bs" => choose_balance_sheet_account_level(rows),
+        "is" | "cf" => 2,
+        _ => 2,
+    }
+}
+
 fn build_visualization(
     report_type: &str,
     period_columns: &[String],
     rows: &[ReportRow],
 ) -> ReportVisualization {
-    let account_level = 2;
+    let account_level = choose_account_level(report_type, rows);
     ReportVisualization {
         kind: report_visualization_kind(report_type),
         entries: aggregate_report_entries(rows, account_level),
@@ -247,7 +307,7 @@ fn empty_visualization(report_type: &str) -> ReportVisualization {
         kind: report_visualization_kind(report_type),
         entries: Vec::new(),
         periods: Vec::new(),
-        account_level: 2,
+        account_level: choose_account_level(report_type, &[]),
     }
 }
 
@@ -1000,6 +1060,38 @@ mod tests {
     }
 
     #[test]
+    fn choose_balance_sheet_account_level_keeps_shallow_ledgers_at_level_2() {
+        let rows = vec![
+            row("assets:fineco", 100.0, vec![]),
+            row("assets:postepay", 50.0, vec![]),
+            row("assets:cash", 10.0, vec![]),
+        ];
+
+        assert_eq!(choose_balance_sheet_account_level(&rows), 2);
+    }
+
+    #[test]
+    fn choose_balance_sheet_account_level_drills_into_nested_accounts_when_useful() {
+        let rows = vec![
+            row("assets:bank:fineco", 100.0, vec![]),
+            row("assets:bank:postepay", 50.0, vec![]),
+            row("assets:investments:xeon", 1000.0, vec![]),
+            row("assets:cash", 10.0, vec![]),
+        ];
+
+        assert_eq!(choose_balance_sheet_account_level(&rows), 3);
+    }
+
+    #[test]
+    fn choose_balance_sheet_account_level_avoids_too_many_groups() {
+        let rows = (0..12)
+            .map(|index| row(&format!("assets:bank:account{}", index), 10.0, vec![]))
+            .collect::<Vec<_>>();
+
+        assert_eq!(choose_balance_sheet_account_level(&rows), 2);
+    }
+
+    #[test]
     fn build_visualization_uses_report_specific_kind() {
         let rows = vec![row(
             "assets:bank:fineco",
@@ -1015,7 +1107,9 @@ mod tests {
         assert_eq!(bs.kind, "allocation");
         assert_eq!(is.kind, "breakdown");
         assert_eq!(cf.kind, "cashflow");
-        assert_eq!(bs.account_level, 2);
-        assert_eq!(bs.entries[0].account, "assets:bank");
+        assert_eq!(bs.account_level, 3);
+        assert_eq!(is.account_level, 2);
+        assert_eq!(cf.account_level, 2);
+        assert_eq!(bs.entries[0].account, "assets:bank:fineco");
     }
 }
