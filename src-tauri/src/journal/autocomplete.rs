@@ -1,30 +1,22 @@
-use crate::{
-    journal::{
-        files::{load_journal_files, require_journal_path, JournalFile},
-        parser::load_transactions_from_journal_via_files,
-        types::JournalTransaction,
-    },
-    settings::read_settings,
-};
+use crate::journal::{files::JournalFile, types::JournalTransaction};
 use serde::Serialize;
 use std::collections::HashMap;
-use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutocompleteSuggestions {
-    codes: Vec<String>,
-    descriptions: Vec<String>,
-    accounts: Vec<String>,
-    commodities: Vec<String>,
-    comments: Vec<String>,
-    default_commodity: String,
-    default_cash_account: String,
-    default_expense_account: String,
-    default_income_account: String,
-    default_transfer_account: String,
-    default_investment_account: String,
-    default_investment_commodity: String,
+    pub(crate) codes: Vec<String>,
+    pub(crate) descriptions: Vec<String>,
+    pub(crate) accounts: Vec<String>,
+    pub(crate) commodities: Vec<String>,
+    pub(crate) comments: Vec<String>,
+    pub(crate) default_commodity: String,
+    pub(crate) default_cash_account: String,
+    pub(crate) default_expense_account: String,
+    pub(crate) default_income_account: String,
+    pub(crate) default_transfer_account: String,
+    pub(crate) default_investment_account: String,
+    pub(crate) default_investment_commodity: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -37,63 +29,8 @@ pub(crate) struct JournalProfile {
     pub(crate) default_investment_commodity: String,
 }
 
-/// Reads distinct values that can be reused while editing transactions.
-#[tauri::command]
-pub(crate) fn get_autocomplete_suggestions(
-    app: AppHandle,
-) -> Result<AutocompleteSuggestions, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let files = load_journal_files(&journal_path)?;
-    let transactions = load_transactions_from_journal_via_files(&files)?;
-    let commodities = collect_declared_commodities(&files);
-
-    let profile = build_journal_profile(&transactions, settings.default_commodity.trim());
-
-    Ok(AutocompleteSuggestions {
-        codes: unique_sorted(
-            transactions
-                .iter()
-                .map(|transaction| transaction.code.trim().to_string())
-                .filter(|value| !value.is_empty())
-                .collect(),
-        ),
-        descriptions: unique_sorted(
-            transactions
-                .iter()
-                .map(|transaction| transaction.description.trim().to_string())
-                .filter(|value| !value.is_empty())
-                .collect(),
-        ),
-        accounts: unique_sorted(
-            transactions
-                .iter()
-                .flat_map(|transaction| transaction.postings.iter())
-                .map(|posting| posting.account.trim().to_string())
-                .filter(|value| !value.is_empty())
-                .collect(),
-        ),
-        commodities,
-        comments: unique_sorted(
-            transactions
-                .iter()
-                .flat_map(|transaction| transaction.postings.iter())
-                .map(|posting| posting.comment.trim().to_string())
-                .filter(|value| !value.is_empty())
-                .collect(),
-        ),
-        default_commodity: settings.default_commodity.trim().to_string(),
-        default_cash_account: profile.default_cash_account,
-        default_expense_account: profile.default_expense_account,
-        default_income_account: profile.default_income_account,
-        default_transfer_account: profile.default_transfer_account,
-        default_investment_account: profile.default_investment_account,
-        default_investment_commodity: profile.default_investment_commodity,
-    })
-}
-
 /// Sorts and removes duplicate values.
-fn unique_sorted(mut values: Vec<String>) -> Vec<String> {
+pub(crate) fn unique_sorted(mut values: Vec<String>) -> Vec<String> {
     values.sort_by_key(|value| value.to_lowercase());
     values.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
     values

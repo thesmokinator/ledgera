@@ -1,4 +1,4 @@
-use crate::amount_style::AmountStyle;
+use crate::{amount_style::AmountStyle, journal::autocomplete::AutocompleteSuggestions};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
@@ -7,6 +7,7 @@ pub(crate) struct JournalSummary {
     pub(crate) path: String,
     pub(crate) transactions: Vec<JournalTransaction>,
     pub(crate) commodities: Vec<String>,
+    pub(crate) suggestions: AutocompleteSuggestions,
     pub(crate) file_count: usize,
     pub(crate) total_size_bytes: u64,
     pub(crate) amount_style: AmountStyle,

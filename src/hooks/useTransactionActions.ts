@@ -55,7 +55,6 @@ export function useTransactionActions({
 
   async function invalidateJournalData() {
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["autocomplete-suggestions"] });
   }
 
   const createTransactionMutation = useMutation({

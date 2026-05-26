@@ -130,6 +130,7 @@ export type JournalSummary = {
   path: string;
   transactions: JournalTransaction[];
   commodities: string[];
+  suggestions: AutocompleteSuggestions;
   fileCount: number;
   totalSizeBytes: number;
   amountStyle: AmountStyle;
