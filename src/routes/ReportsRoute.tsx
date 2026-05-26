@@ -1,5 +1,5 @@
 import { BarChartOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, Select, Space, Spin, Table } from "antd";
+import { Button, Card, Collapse, Empty, Select, Space, Spin, Table } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,7 +29,11 @@ function renderState(children: React.ReactNode) {
   return <div className={styles.center_state}>{children}</div>;
 }
 
-export function ReportsRoute() {
+export function ReportsRoute({
+  showDetailedTable = false,
+}: {
+  showDetailedTable?: boolean;
+}) {
   const { t } = useTranslation();
   const [reportType, setReportType] = useState<ReportType>("is");
   const [interval, setInterval] = useState<ReportInterval>("-M");
@@ -146,13 +150,26 @@ export function ReportsRoute() {
         ) : (
           <>
             <ReportCharts data={reportQuery.data} />
-            <Table<ReportRow>
-              rowKey={(row) => `${row.account}-${row.indent}-${String(row.isTotal)}`}
-              dataSource={data}
-              pagination={false}
-              scroll={{ x: "max-content" }}
-              columns={columns}
-            />
+            {showDetailedTable ? (
+              <Collapse
+                className={styles.detailed_table_collapse}
+                items={[
+                  {
+                    key: "detailed-table",
+                    label: t("reports.detailed_table"),
+                    children: (
+                      <Table<ReportRow>
+                        rowKey={(row) => `${row.account}-${row.indent}-${String(row.isTotal)}`}
+                        dataSource={data}
+                        pagination={false}
+                        scroll={{ x: "max-content" }}
+                        columns={columns}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            ) : null}
           </>
         )}
       </Card>

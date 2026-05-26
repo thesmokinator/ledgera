@@ -325,6 +325,7 @@
     "chart_breakdown": "Dettaglio per categoria",
     "chart_cashflow": "Flusso di cassa per periodo",
     "chart_grouped_by": "Raggruppato per livello conto {{level}}",
-    "chart_table_below": "Dati dettagliati nella tabella sottostante"
+    "chart_table_below": "Dati dettagliati nella tabella sottostante",
+    "detailed_table": "Tabella hledger dettagliata"
   }
 }

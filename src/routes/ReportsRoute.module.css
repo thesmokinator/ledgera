@@ -47,3 +47,17 @@
 .account_cell_total {
     font-weight: 600;
 }
+
+.detailed_table_collapse {
+    margin-top: 12px;
+    background: transparent;
+}
+
+.detailed_table_collapse :global(.ant-collapse-content-box) {
+    padding: 0;
+}
+
+.detailed_table_collapse :global(.ant-collapse-header) {
+    color: var(--ant-color-text-secondary);
+    font-weight: 500;
+}

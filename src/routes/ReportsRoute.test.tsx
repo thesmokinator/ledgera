@@ -32,6 +32,7 @@ vi.mock("react-i18next", () => ({
         "reports.generation_failed": "Unable to generate the report.",
         "transactions.account": "Account",
         "balances.value": "Value",
+        "reports.detailed_table": "Detailed hledger table",
       };
       return translations[key] ?? key;
     },
@@ -39,13 +40,13 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-function renderWithProviders() {
+function renderWithProviders(props?: React.ComponentProps<typeof ReportsRoute>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ReportsRoute />
+      <ReportsRoute {...props} />
     </QueryClientProvider>,
   );
 }
@@ -108,7 +109,7 @@ describe("ReportsRoute", () => {
     });
   });
 
-  it("renders table with data after successful generation", async () => {
+  it("hides the detailed table by default", async () => {
     mockedInvoke.mockResolvedValueOnce({
       reportType: "is",
       interval: "-M",
@@ -166,13 +167,72 @@ describe("ReportsRoute", () => {
     fireEvent.click(screen.getByRole("button", { name: /generate/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Revenues")).toBeTruthy();
+      expect(screen.getByText("income:revenues")).toBeTruthy();
     });
 
-    // Ant Design creates hidden measure rows, so use getAllByText
-    expect(screen.getAllByText("2026-01").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("2026-02").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("2.200,00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Detailed hledger table")).toBeNull();
+  });
+
+  it("shows the detailed table collapse when enabled", async () => {
+    mockedInvoke.mockResolvedValueOnce({
+      reportType: "is",
+      interval: "-M",
+      periodColumns: ["2026-01", "2026-02"],
+      rows: [
+        {
+          account: "Revenues",
+          indent: 1,
+          isTotal: false,
+          amounts: [
+            {
+              period: "2026-01",
+              amount: 1000,
+              commodity: "EUR",
+              formatted: "1.000,00",
+              tint: "positive" as const,
+            },
+            {
+              period: "2026-02",
+              amount: 1200,
+              commodity: "EUR",
+              formatted: "1.200,00",
+              tint: "positive" as const,
+            },
+          ],
+          total: {
+            period: "",
+            amount: 2200,
+            commodity: "EUR",
+            formatted: "2.200,00",
+            tint: "positive" as const,
+          },
+        },
+      ],
+      visualization: {
+        kind: "breakdown",
+        entries: [
+          {
+            account: "income:revenues",
+            label: "revenues",
+            amount: 2200,
+            chartAmount: 2200,
+            chartAmountFormatted: "2.200,00",
+            commodity: "EUR",
+            formatted: "2.200,00",
+            tint: "positive" as const,
+          },
+        ],
+        periods: [],
+        accountLevel: 2,
+      },
+    });
+
+    renderWithProviders({ showDetailedTable: true });
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Detailed hledger table")).toBeTruthy();
+    });
   });
 
   it("shows error state when generation fails", async () => {

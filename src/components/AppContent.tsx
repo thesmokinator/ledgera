@@ -142,7 +142,11 @@ export function AppContent({
     }
 
     if (activeView === "reports") {
-      return <ReportsRoute />;
+      return (
+        <ReportsRoute
+          showDetailedTable={activeSettings.modules.developerTools.enabled}
+        />
+      );
     }
 
     if (shouldShowCourtesy) {
