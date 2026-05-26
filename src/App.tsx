@@ -183,7 +183,7 @@ function App() {
       { keys: `command+${logsIndex}, ctrl+${logsIndex}`, action: () => setActiveView("logs"), disabled: !activeSettings.powerUser },
       { keys: "command+shift+g, ctrl+shift+g", action: () => { if (activeView === "sync") refreshGitSyncStatus(); else setActiveView("sync"); }, disabled: !gitSyncEnabled },
       { keys: `command+${settingsIndex}, ctrl+${settingsIndex}`, action: () => setActiveView("settings") },
-      { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true) },
+      { keys: "command+k, ctrl+k", action: () => setSpotlightOpen(true), disabled: shouldShowCourtesy },
       { keys: "escape", action: () => { if (spotlightOpen) setSpotlightOpen(false); else if (isTransactionModalOpen) closeTransactionModalWithCleanup(); } },
     ];
   }, [activeSettings.journalPath, activeSettings.modules.gitSync.enabled, activeSettings.powerUser, shouldShowCourtesy, isTransactionModalOpen, spotlightOpen, closeTransactionModalWithCleanup, activeView, gitSyncEnabled, refreshGitSyncStatus]);
@@ -267,7 +267,7 @@ function App() {
         <Layout className="app-main">
           <AppHeader
             title={activeTitle}
-            disableCreateTransaction={shouldShowCourtesy}
+            disableActions={shouldShowCourtesy}
             onCreateTransaction={openCreateTransaction}
             onOpenSearch={() => setSpotlightOpen(true)}
           />

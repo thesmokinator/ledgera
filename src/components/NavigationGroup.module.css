@@ -54,12 +54,6 @@
     background: transparent;
 }
 
-.nav_item_lock {
-    margin-left: auto;
-    font-size: 11px;
-    opacity: 0.7;
-}
-
 .nav_badge {
     margin-left: auto;
     padding: 2px 6px;
