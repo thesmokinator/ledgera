@@ -46,6 +46,7 @@ pub(crate) struct ReportChartEntry {
     pub label: String,
     pub amount: f64,
     pub chart_amount: f64,
+    pub chart_amount_formatted: String,
     pub commodity: String,
     pub formatted: String,
     pub tint: String,
@@ -57,6 +58,7 @@ pub(crate) struct ReportPeriodSummary {
     pub period: String,
     pub amount: f64,
     pub chart_amount: f64,
+    pub chart_amount_formatted: String,
     pub commodity: String,
     pub formatted: String,
     pub tint: String,
@@ -165,11 +167,17 @@ fn aggregate_report_entries(rows: &[ReportRow], account_level: u32) -> Vec<Repor
             } else {
                 aggregated.commodity
             };
+            let chart_amount = aggregated.amount.abs();
             ReportChartEntry {
                 label: account_display_label(&account),
                 account,
                 amount: aggregated.amount,
-                chart_amount: aggregated.amount.abs(),
+                chart_amount,
+                chart_amount_formatted: format_amount(
+                    chart_amount,
+                    &commodity,
+                    &serde_json::Value::Null,
+                ),
                 formatted: format_amount(aggregated.amount, &commodity, &serde_json::Value::Null),
                 commodity,
                 tint: tint(aggregated.amount),
@@ -202,10 +210,16 @@ fn aggregate_report_periods(
             } else {
                 aggregated.commodity
             };
+            let chart_amount = aggregated.amount.abs();
             ReportPeriodSummary {
                 period: period.clone(),
                 amount: aggregated.amount,
-                chart_amount: aggregated.amount.abs(),
+                chart_amount,
+                chart_amount_formatted: format_amount(
+                    chart_amount,
+                    &commodity,
+                    &serde_json::Value::Null,
+                ),
                 formatted: format_amount(aggregated.amount, &commodity, &serde_json::Value::Null),
                 commodity,
                 tint: tint(aggregated.amount),
@@ -943,9 +957,11 @@ mod tests {
         assert_eq!(entries[0].account, "expenses:groceries");
         assert_eq!(entries[0].amount, -30.0);
         assert_eq!(entries[0].chart_amount, 30.0);
+        assert_eq!(entries[0].chart_amount_formatted, "EUR30.00");
         assert_eq!(entries[1].account, "expenses:shopping");
         assert_eq!(entries[1].amount, -25.0);
         assert_eq!(entries[1].chart_amount, 25.0);
+        assert_eq!(entries[1].chart_amount_formatted, "EUR25.00");
     }
 
     #[test]
@@ -976,9 +992,11 @@ mod tests {
         assert_eq!(periods[0].period, "2026-01");
         assert_eq!(periods[0].amount, 50.0);
         assert_eq!(periods[0].chart_amount, 50.0);
+        assert_eq!(periods[0].chart_amount_formatted, "EUR50.00");
         assert_eq!(periods[1].period, "2026-02");
         assert_eq!(periods[1].amount, 130.0);
         assert_eq!(periods[1].chart_amount, 130.0);
+        assert_eq!(periods[1].chart_amount_formatted, "EUR130.00");
     }
 
     #[test]

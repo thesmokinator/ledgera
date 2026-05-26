@@ -225,6 +225,7 @@ export type ReportChartEntry = {
   label: string;
   amount: number;
   chartAmount: number;
+  chartAmountFormatted: string;
   commodity: string;
   formatted: string;
   tint: AmountTint;
@@ -234,6 +235,7 @@ export type ReportPeriodSummary = {
   period: string;
   amount: number;
   chartAmount: number;
+  chartAmountFormatted: string;
   commodity: string;
   formatted: string;
   tint: AmountTint;

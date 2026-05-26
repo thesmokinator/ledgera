@@ -1,4 +1,4 @@
-import { Bar, Column, Pie } from "@ant-design/charts";
+import { Column, Pie } from "@ant-design/charts";
 import { theme } from "antd";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +17,44 @@ function compactAxisValue(value: number): string {
   if (absolute >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (absolute >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
   return String(value);
+}
+
+function RankedBars({
+  entries,
+  colors,
+}: {
+  entries: ReportChartEntry[];
+  colors: string[];
+}) {
+  const maxAmount = Math.max(...entries.map((entry) => entry.chartAmount), 1);
+
+  return (
+    <div className={styles.ranked_bars}>
+      {entries.map((entry, index) => {
+        const width = `${Math.max((entry.chartAmount / maxAmount) * 100, 2)}%`;
+        const color = colors[index % colors.length];
+
+        return (
+          <div
+            key={entry.account}
+            className={styles.ranked_bar_row}
+            title={`${entry.account}: ${entry.formatted}`}
+          >
+            <div className={styles.ranked_bar_header}>
+              <span className={styles.ranked_bar_account}>{entry.account}</span>
+              <span className={styles.ranked_bar_amount}>{entry.chartAmountFormatted}</span>
+            </div>
+            <div className={styles.ranked_bar_track}>
+              <div
+                className={styles.ranked_bar_fill}
+                style={{ width, backgroundColor: color }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export function ReportCharts({ data }: ReportChartsProps) {
@@ -87,37 +125,7 @@ export function ReportCharts({ data }: ReportChartsProps) {
               }}
             />
           ) : (
-            <Bar
-              data={visualization.entries}
-              xField="chartAmount"
-              yField="account"
-              colorField="account"
-              color={colors}
-              autoFit
-              legend={false}
-              axis={{
-                x: {
-                  title: false,
-                  labelFormatter: compactAxisValue,
-                  gridStroke: gridColor,
-                  gridStrokeOpacity: 0.35,
-                  ...axisStyle,
-                },
-                y: {
-                  title: false,
-                  ...axisStyle,
-                },
-              }}
-              tooltip={{
-                title: (d: ReportChartEntry) => d.account,
-                items: [
-                  {
-                    name: t("balances.value"),
-                    value: (d: ReportChartEntry) => d.formatted,
-                  },
-                ],
-              }}
-            />
+            <RankedBars entries={visualization.entries} colors={colors} />
           )}
         </div>
       </div>
@@ -168,37 +176,7 @@ export function ReportCharts({ data }: ReportChartsProps) {
     <div className={styles.single_chart_card}>
       <h4 className={styles.chart_title}>{t("reports.chart_breakdown")}</h4>
       <div className={styles.chart_container}>
-        <Bar
-          data={visualization.entries}
-          xField="chartAmount"
-          yField="account"
-          colorField="account"
-          color={colors}
-          autoFit
-          legend={false}
-          axis={{
-            x: {
-              title: false,
-              labelFormatter: compactAxisValue,
-              gridStroke: gridColor,
-              gridStrokeOpacity: 0.35,
-              ...axisStyle,
-            },
-            y: {
-              title: false,
-              ...axisStyle,
-            },
-          }}
-          tooltip={{
-            title: (d: ReportChartEntry) => d.account,
-            items: [
-              {
-                name: t("balances.value"),
-                value: (d: ReportChartEntry) => d.formatted,
-              },
-            ],
-          }}
-        />
+        <RankedBars entries={visualization.entries} colors={colors} />
       </div>
       <p className={styles.chart_note}>
         {t("reports.chart_grouped_by", { level: visualization.accountLevel })}

@@ -151,6 +151,7 @@ describe("ReportsRoute", () => {
             label: "revenues",
             amount: 2200,
             chartAmount: 2200,
+            chartAmountFormatted: "2.200,00",
             commodity: "EUR",
             formatted: "2.200,00",
             tint: "positive" as const,
@@ -171,7 +172,7 @@ describe("ReportsRoute", () => {
     // Ant Design creates hidden measure rows, so use getAllByText
     expect(screen.getAllByText("2026-01").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("2026-02").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("2.200,00")).toBeTruthy();
+    expect(screen.getAllByText("2.200,00").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows error state when generation fails", async () => {
