@@ -301,7 +301,7 @@ export function SettingsRoute({
                     <Button
                       icon={<PlusOutlined />}
                       onClick={() => add("")}
-                      style={{ marginTop: 8 }}
+                      style={{ marginBottom: 8 }}
                     >
                       {t("settings.add_account")}
                     </Button>
@@ -341,7 +341,7 @@ export function SettingsRoute({
                     <Button
                       icon={<PlusOutlined />}
                       onClick={() => add("")}
-                      style={{ marginTop: 8 }}
+                      style={{ marginBottom: 8 }}
                     >
                       {t("settings.add_account")}
                     </Button>
