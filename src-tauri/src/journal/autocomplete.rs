@@ -17,6 +17,7 @@ pub(crate) struct AutocompleteSuggestions {
     descriptions: Vec<String>,
     accounts: Vec<String>,
     commodities: Vec<String>,
+    comments: Vec<String>,
     default_commodity: String,
     default_cash_account: String,
     default_expense_account: String,
@@ -73,6 +74,14 @@ pub(crate) fn get_autocomplete_suggestions(
                 .collect(),
         ),
         commodities,
+        comments: unique_sorted(
+            transactions
+                .iter()
+                .flat_map(|transaction| transaction.postings.iter())
+                .map(|posting| posting.comment.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .collect(),
+        ),
         default_commodity: settings.default_commodity.trim().to_string(),
         default_cash_account: profile.default_cash_account,
         default_expense_account: profile.default_expense_account,

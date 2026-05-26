@@ -94,10 +94,12 @@ function accountRules(t: (key: string) => string): Rule[] {
 function MovementFields({
   accountOptions,
   commodityOptions,
+  commentOptions,
   defaultCommodity,
 }: {
   accountOptions: { value: string }[];
   commodityOptions: { value: string }[];
+  commentOptions: { value: string }[];
   defaultCommodity: string;
 }) {
   const { t } = useTranslation();
@@ -137,7 +139,7 @@ function MovementFields({
         </Form.Item>
       </div>
       <Form.Item name={["postings", 0, "comment"]} rules={[singleLineRule(t("transactions.single_line_field"))]}>
-        <Input placeholder={t("transactions.comment_placeholder")} />
+        <AutoComplete options={commentOptions} placeholder={t("transactions.comment_placeholder")} filterOption />
       </Form.Item>
     </div>
   );
@@ -146,10 +148,12 @@ function MovementFields({
 function InvestmentFields({
   accountOptions,
   commodityOptions,
+  commentOptions,
   defaultCommodity,
 }: {
   accountOptions: { value: string }[];
   commodityOptions: { value: string }[];
+  commentOptions: { value: string }[];
   defaultCommodity: string;
 }) {
   const { t } = useTranslation();
@@ -211,7 +215,7 @@ function InvestmentFields({
         </Form.Item>
       </div>
       <Form.Item name={["postings", 0, "comment"]} rules={[singleLineRule(t("transactions.single_line_field"))]}>
-        <Input placeholder={t("transactions.comment_placeholder")} />
+        <AutoComplete options={commentOptions} placeholder={t("transactions.comment_placeholder")} filterOption />
       </Form.Item>
     </div>
   );
@@ -221,12 +225,14 @@ function AdvancedPostingRow({
   field,
   accountOptions,
   commodityOptions,
+  commentOptions,
   defaultCommodity,
   onRemove,
 }: {
   field: { key: number; name: number };
   accountOptions: { value: string }[];
   commodityOptions: { value: string }[];
+  commentOptions: { value: string }[];
   defaultCommodity: string;
   onRemove: () => void;
 }) {
@@ -279,7 +285,7 @@ function AdvancedPostingRow({
         name={[field.name, "comment"]}
         rules={[singleLineRule(t("transactions.single_line_field"))]}
       >
-        <Input placeholder={t("transactions.comment_placeholder")} />
+        <AutoComplete options={commentOptions} placeholder={t("transactions.comment_placeholder")} filterOption />
       </Form.Item>
     </div>
   );
@@ -288,11 +294,13 @@ function AdvancedPostingRow({
 function AdvancedPostings({
   accountOptions,
   commodityOptions,
+  commentOptions,
   defaultCommodity,
   validateFormSilently,
 }: {
   accountOptions: { value: string }[];
   commodityOptions: { value: string }[];
+  commentOptions: { value: string }[];
   defaultCommodity: string;
   validateFormSilently: () => void;
 }) {
@@ -325,6 +333,7 @@ function AdvancedPostings({
               field={field}
               accountOptions={accountOptions}
               commodityOptions={commodityOptions}
+              commentOptions={commentOptions}
               defaultCommodity={defaultCommodity}
               onRemove={() => remove(field.name)}
             />
@@ -355,6 +364,7 @@ export function TransactionModal({
   descriptionOptions,
   accountOptions,
   commodityOptions,
+  commentOptions,
   defaultCommodity,
   saveError,
   onClose,
@@ -371,6 +381,7 @@ export function TransactionModal({
   descriptionOptions: { value: string }[];
   accountOptions: { value: string }[];
   commodityOptions: { value: string }[];
+  commentOptions: { value: string }[];
   defaultCommodity: string;
   saveError: string | null;
   onClose: () => void;
@@ -556,6 +567,7 @@ export function TransactionModal({
           <MovementFields
             accountOptions={accountOptions}
             commodityOptions={commodityOptions}
+            commentOptions={commentOptions}
             defaultCommodity={defaultCommodity}
           />
         ) : null}
@@ -563,6 +575,7 @@ export function TransactionModal({
           <InvestmentFields
             accountOptions={accountOptions}
             commodityOptions={commodityOptions}
+            commentOptions={commentOptions}
             defaultCommodity={defaultCommodity}
           />
         ) : null}
@@ -570,6 +583,7 @@ export function TransactionModal({
           <AdvancedPostings
             accountOptions={accountOptions}
             commodityOptions={commodityOptions}
+            commentOptions={commentOptions}
             defaultCommodity={defaultCommodity}
             validateFormSilently={validateFormSilently}
           />
