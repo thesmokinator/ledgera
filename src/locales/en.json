@@ -324,6 +324,7 @@
     "chart_allocation": "Allocation",
     "chart_breakdown": "Breakdown by category",
     "chart_cashflow": "Cashflow by period",
+    "chart_cashflow_empty": "Cashflow by period will appear here once the selected report contains cash movements.",
     "chart_grouped_by": "Grouped by account level {{level}}",
     "chart_table_below": "Detailed data in the table below",
     "detailed_table": "Detailed hledger table"

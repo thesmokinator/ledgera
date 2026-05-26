@@ -100,7 +100,11 @@ export function ReportsRoute({
   const isLoading = reportQuery.isFetching;
   const data = reportQuery.data?.rows ?? [];
   const hasError = reportQuery.isError;
-  const isEmpty = reportQuery.data && data.length === 0 && !isLoading;
+  const isEmpty =
+    reportQuery.data &&
+    data.length === 0 &&
+    reportQuery.data.visualization.kind !== "cashflow" &&
+    !isLoading;
 
   return (
     <div className={styles.container}>

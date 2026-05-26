@@ -1,5 +1,5 @@
 import { Column, Pie } from "@ant-design/charts";
-import { theme } from "antd";
+import { Empty, theme } from "antd";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReportChartEntry, ReportPeriodSummary, ReportResult } from "../types";
@@ -124,40 +124,53 @@ export function ReportCharts({ data }: ReportChartsProps) {
   }
 
   if (visualization.kind === "cashflow") {
+    const hasPeriods = visualization.periods.length > 0;
+
     return (
       <div className={styles.single_chart_card}>
         <h4 className={styles.chart_title}>{t("reports.chart_cashflow")}</h4>
         <div className={styles.chart_container}>
-          <Column
-            data={visualization.periods}
-            xField="period"
-            yField="amount"
-            color={colors[0]}
-            autoFit
-            legend={false}
-            axis={{
-              x: {
-                title: false,
-                ...axisStyle,
-              },
-              y: {
-                title: false,
-                labelFormatter: compactAxisValue,
-                gridStroke: gridColor,
-                gridStrokeOpacity: 0.35,
-                ...axisStyle,
-              },
-            }}
-            tooltip={{
-              title: (d: ReportPeriodSummary) => d.period,
-              items: [
-                {
-                  name: t("balances.value"),
-                  value: (d: ReportPeriodSummary) => d.formatted,
+          {hasPeriods ? (
+            <Column
+              data={visualization.periods}
+              xField="period"
+              yField="amount"
+              color={colors[0]}
+              autoFit
+              legend={false}
+              style={{
+                maxWidth: 56,
+              }}
+              axis={{
+                x: {
+                  title: false,
+                  ...axisStyle,
                 },
-              ],
-            }}
-          />
+                y: {
+                  title: false,
+                  labelFormatter: compactAxisValue,
+                  gridStroke: gridColor,
+                  gridStrokeOpacity: 0.35,
+                  ...axisStyle,
+                },
+              }}
+              tooltip={{
+                title: (d: ReportPeriodSummary) => d.period,
+                items: [
+                  {
+                    name: t("balances.value"),
+                    value: (d: ReportPeriodSummary) => d.formatted,
+                  },
+                ],
+              }}
+            />
+          ) : (
+            <Empty
+              className={styles.chart_empty_state}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("reports.chart_cashflow_empty")}
+            />
+          )}
         </div>
       </div>
     );
