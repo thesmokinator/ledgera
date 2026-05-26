@@ -25,6 +25,7 @@ type AppContentProps = {
   settingsForm: FormInstance<AppSettings>;
   activeSettings: AppSettings;
   commodityOptions: { value: string }[];
+  accountOptions: { value: string }[];
   hledgerStatus: HledgerStatus | undefined;
   journalSummary: JournalSummary | undefined;
   journalError: string | null;
@@ -52,6 +53,7 @@ export function AppContent({
   settingsForm,
   activeSettings,
   commodityOptions,
+  accountOptions,
   hledgerStatus,
   journalSummary,
   journalError,
@@ -106,6 +108,7 @@ export function AppContent({
           form={settingsForm}
           initialValues={activeSettings}
           commodityOptions={commodityOptions}
+          accountOptions={accountOptions}
           hledgerStatus={hledgerStatus}
           journalSummary={journalSummary}
           journalError={journalError}

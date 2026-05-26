@@ -277,6 +277,7 @@ function App() {
             settingsForm={settingsForm}
             activeSettings={activeSettings}
             commodityOptions={commodityOptions}
+            accountOptions={accountOptions}
             hledgerStatus={hledgerQuery.data}
             journalSummary={transactionsQuery.data}
             journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}

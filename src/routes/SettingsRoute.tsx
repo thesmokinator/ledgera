@@ -86,6 +86,7 @@ export function SettingsRoute({
   form,
   initialValues,
   commodityOptions,
+  accountOptions,
   hledgerStatus,
   journalSummary,
   journalError,
@@ -98,6 +99,7 @@ export function SettingsRoute({
   form: FormInstance<AppSettings>;
   initialValues: AppSettings;
   commodityOptions: { value: string }[];
+  accountOptions: { value: string }[];
   hledgerStatus: HledgerStatus | undefined;
   journalSummary: JournalSummary | undefined;
   journalError: string | null;
@@ -137,7 +139,7 @@ export function SettingsRoute({
       initialValues={initialValues}
       onValuesChange={onValuesChange}
     >
-      <Space direction="vertical" size={24} className="content-stack">
+      <Space orientation="vertical" size={24} className="content-stack">
         {/* ── Journal ──────────────────────────────── */}
         <Card
           className={styles.card}
@@ -268,28 +270,84 @@ export function SettingsRoute({
             </div>
 
             <Form.Item
-              className={styles.text_area_setting}
               label={t("settings.exclude_balances")}
-              name="excludeBalances"
               help={t("settings.exclude_balances_help")}
             >
-              <Input.TextArea
-                rows={3}
-                placeholder="assets:investments:xeon"
-                style={{ fontFamily: "monospace", fontSize: 13 }}
-              />
+              <Form.List name="excludeBalances">
+                {(fields, { add, remove }) => (
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    {fields.map((field) => (
+                      <Space key={field.key} align="start" style={{ width: "100%" }}>
+                        <Form.Item
+                          name={field.name}
+                          rules={[{ required: true, whitespace: true }]}
+                          noStyle
+                        >
+                          <AutoComplete
+                            options={accountOptions}
+                            placeholder="assets:investments"
+                            style={{ width: 280 }}
+                            filterOption
+                          />
+                        </Form.Item>
+                        <Button
+                          danger
+                          icon={<DeleteOutlined />}
+                          aria-label={t("settings.remove_symbol_mapping")}
+                          onClick={() => remove(field.name)}
+                        />
+                      </Space>
+                    ))}
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() => add("")}
+                      style={{ marginTop: 8 }}
+                    >
+                      {t("settings.add_account")}
+                    </Button>
+                  </Space>
+                )}
+              </Form.List>
             </Form.Item>
             <Form.Item
-              className={styles.text_area_setting}
               label={t("settings.include_investments")}
-              name="includeInvestments"
               help={t("settings.include_investments_help")}
             >
-              <Input.TextArea
-                rows={3}
-                placeholder="assets:investments:xeon"
-                style={{ fontFamily: "monospace", fontSize: 13 }}
-              />
+              <Form.List name="includeInvestments">
+                {(fields, { add, remove }) => (
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    {fields.map((field) => (
+                      <Space key={field.key} align="start" style={{ width: "100%" }}>
+                        <Form.Item
+                          name={field.name}
+                          rules={[{ required: true, whitespace: true }]}
+                          noStyle
+                        >
+                          <AutoComplete
+                            options={accountOptions}
+                            placeholder="assets:investments:xeon"
+                            style={{ width: 280 }}
+                            filterOption
+                          />
+                        </Form.Item>
+                        <Button
+                          danger
+                          icon={<DeleteOutlined />}
+                          aria-label={t("settings.remove_symbol_mapping")}
+                          onClick={() => remove(field.name)}
+                        />
+                      </Space>
+                    ))}
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() => add("")}
+                      style={{ marginTop: 8 }}
+                    >
+                      {t("settings.add_account")}
+                    </Button>
+                  </Space>
+                )}
+              </Form.List>
             </Form.Item>
           </div>
         </Card>
@@ -328,7 +386,7 @@ export function SettingsRoute({
                   >
                     <Form.List name="commoditySymbols">
                       {(fields, { add, remove }) => (
-                        <Space direction="vertical" style={{ width: "100%" }}>
+                        <Space orientation="vertical" style={{ width: "100%" }}>
                           {fields.map((field) => (
                             <Space key={field.key} align="start">
                               <Form.Item
@@ -356,6 +414,7 @@ export function SettingsRoute({
                           <Button
                             icon={<PlusOutlined />}
                             onClick={() => add({ commodity: "", yahooSymbol: "" })}
+                            style={{ marginBottom: 8 }}
                           >
                             {t("settings.add_symbol_mapping")}
                           </Button>

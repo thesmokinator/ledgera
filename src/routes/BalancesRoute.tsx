@@ -77,7 +77,7 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
   ];
 
   return (
-    <Space direction="vertical" size={24} className="content-stack">
+    <Space orientation="vertical" size={24} className="content-stack">
       {/* ── Account Balances ─────────────────────── */}
       <Card className={styles.card} title={t("balances.title")}>
         {isInitialLoadingBalances ? (

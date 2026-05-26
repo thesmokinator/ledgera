@@ -33,9 +33,9 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
 
     let include_accounts: Vec<&str> = settings
         .include_investments
-        .lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
         .collect();
 
     if include_accounts.is_empty() {

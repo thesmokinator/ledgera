@@ -81,7 +81,7 @@ export function AccountsRoute({
   ];
 
   return (
-    <Space direction="vertical" size={24} className="content-stack">
+    <Space orientation="vertical" size={24} className="content-stack">
       <Card
         className={styles.card}
         title={t("accounts.title")}

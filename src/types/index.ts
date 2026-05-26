@@ -34,8 +34,8 @@ export type AppSettings = {
   defaultCommodity: string;
   fetchPrices: boolean;
   commoditySymbols: CommoditySymbolMapping[];
-  excludeBalances: string;
-  includeInvestments: string;
+  excludeBalances: string[];
+  includeInvestments: string[];
   prefillPostings: boolean;
   modules: AppModulesSettings;
 };

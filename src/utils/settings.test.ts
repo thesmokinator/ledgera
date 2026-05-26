@@ -13,8 +13,8 @@ describe("defaultSettings", () => {
       defaultCommodity: "",
       fetchPrices: false,
       commoditySymbols: [],
-      excludeBalances: "",
-      includeInvestments: "",
+      excludeBalances: [],
+      includeInvestments: [],
       prefillPostings: false,
       modules: defaultModules,
     });
@@ -137,8 +137,8 @@ describe("normalizeSettings", () => {
       defaultCommodity: "USD",
       fetchPrices: true,
       commoditySymbols: [{ commodity: "TEST", yahooSymbol: "TEST.DE" }],
-      excludeBalances: "",
-      includeInvestments: "",
+      excludeBalances: [],
+      includeInvestments: [],
       prefillPostings: false,
       modules: {
         marketPrices: { enabled: true },

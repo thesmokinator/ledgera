@@ -79,6 +79,7 @@
     "yahoo_symbol_required": "Yahoo symbol is required",
     "add_symbol_mapping": "Add symbol",
     "remove_symbol_mapping": "Remove symbol",
+    "add_account": "Add account",
     "exclude_balances": "Exclude from balances",
     "exclude_balances_help": "Hide these accounts from the Balances view. One account per line.",
     "include_investments": "Include in investments",

@@ -326,7 +326,7 @@ function AdvancedPostings({
       ]}
     >
       {(fields, { add, remove }, { errors }) => (
-        <Space direction="vertical" className="content-stack">
+        <Space orientation="vertical" className="content-stack">
           {fields.map((field) => (
             <AdvancedPostingRow
               key={field.key}

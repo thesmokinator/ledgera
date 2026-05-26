@@ -79,6 +79,7 @@
     "yahoo_symbol_required": "Simbolo Yahoo obbligatorio",
     "add_symbol_mapping": "Aggiungi simbolo",
     "remove_symbol_mapping": "Rimuovi simbolo",
+    "add_account": "Aggiungi conto",
     "exclude_balances": "Escludi dai saldi",
     "exclude_balances_help": "Nasconde questi conti dalla vista Saldi. Un conto per riga.",
     "include_investments": "Includi negli investimenti",

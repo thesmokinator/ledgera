@@ -46,9 +46,9 @@ pub(crate) fn parse_balance_output(
 
     let exclude_set: std::collections::HashSet<&str> = settings
         .exclude_balances
-        .lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
         .collect();
 
     let mut result: Vec<Balance> = Vec::new();
