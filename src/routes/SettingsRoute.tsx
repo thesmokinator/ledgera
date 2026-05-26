@@ -89,6 +89,7 @@ export function SettingsRoute({
   journalError,
   updateStatus,
   isCheckingForUpdates,
+  updateCheckerEnabled,
   onCheckForUpdates,
   onValuesChange,
 }: {
@@ -100,6 +101,7 @@ export function SettingsRoute({
   journalError: string | null;
   updateStatus: UpdateStatus | undefined;
   isCheckingForUpdates: boolean;
+  updateCheckerEnabled: boolean;
   onCheckForUpdates: () => void;
   onValuesChange: (changed: Partial<AppSettings>, values: AppSettings) => void;
 }) {
@@ -346,6 +348,17 @@ export function SettingsRoute({
             </div>
             <div className={styles.developer_settings}>
               <div>
+                <Typography.Text strong>{t("settings.module_update_checker")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.module_update_checker_help")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name={["modules", "updateChecker", "enabled"]} valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
+            <div className={styles.developer_settings}>
+              <div>
                 <Space size="small">
                   <Typography.Text strong>{t("settings.module_git_sync")}</Typography.Text>
                 </Space>
@@ -393,33 +406,44 @@ export function SettingsRoute({
             </div>
             <div>
               <Typography.Text strong>{t("settings.updates")}</Typography.Text>
-              <Typography.Paragraph type={updateStatus?.error ? "danger" : "secondary"}>
-                {updateStatus?.error
-                  ? t("settings.update_check_failed")
-                  : updateStatus?.available
-                    ? t("settings.update_available", { version: updateStatus.latestVersion })
-                    : t("settings.up_to_date")}
-              </Typography.Paragraph>
-              {updateStatus?.checkedAt ? (
-                <Typography.Text type="secondary" className={styles.update_checked_at}>
-                  {t("settings.last_checked", { date: new Date(updateStatus.checkedAt).toLocaleString() })}
-                </Typography.Text>
-              ) : null}
+              {updateCheckerEnabled && (
+                <>
+                  <Typography.Paragraph type={updateStatus?.error ? "danger" : "secondary"}>
+                    {updateStatus?.error
+                      ? t("settings.update_check_failed")
+                      : updateStatus?.available
+                        ? t("settings.update_available", { version: updateStatus.latestVersion })
+                        : t("settings.up_to_date")}
+                  </Typography.Paragraph>
+                  {updateStatus?.checkedAt && (
+                    <Typography.Text type="secondary" className={styles.update_checked_at}>
+                      {t("settings.last_checked", { date: new Date(updateStatus.checkedAt).toLocaleString() })}
+                    </Typography.Text>
+                  )}
+                </>
+              )}
+              {!updateCheckerEnabled && (
+                <Typography.Paragraph type="secondary">
+                  {t("settings.update_check_disabled")}
+                </Typography.Paragraph>
+              )}
             </div>
-            <Space wrap>
-              <Button
-                icon={<DownloadOutlined />}
-                loading={isCheckingForUpdates}
-                onClick={onCheckForUpdates}
-              >
-                {t("settings.check_for_updates")}
-              </Button>
-              {updateStatus?.releaseUrl ? (
-                <Button href={updateStatus.releaseUrl} target="_blank">
-                  {t("settings.view_release")}
+            {updateCheckerEnabled && (
+              <Space wrap>
+                <Button
+                  icon={<DownloadOutlined />}
+                  loading={isCheckingForUpdates}
+                  onClick={onCheckForUpdates}
+                >
+                  {t("settings.check_for_updates")}
                 </Button>
-              ) : null}
-            </Space>
+                {updateStatus?.releaseUrl && (
+                  <Button href={updateStatus.releaseUrl} target="_blank">
+                    {t("settings.view_release")}
+                  </Button>
+                )}
+              </Space>
+            )}
           </div>
         </Card>
 

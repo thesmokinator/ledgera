@@ -30,6 +30,7 @@ describe("normalizeModules", () => {
     expect(normalizeModules({ fetchPrices: true, powerUser: true })).toEqual({
       marketPrices: { enabled: true },
       developerTools: { enabled: true },
+      updateChecker: { enabled: true },
       gitSync: { enabled: false, commitMessage: defaultGitCommitMessage },
     });
   });
@@ -46,6 +47,7 @@ describe("normalizeModules", () => {
     })).toEqual({
       marketPrices: { enabled: false },
       developerTools: { enabled: false },
+      updateChecker: { enabled: true },
       gitSync: { enabled: true, commitMessage: "My journal update" },
     });
   });
@@ -115,6 +117,7 @@ describe("normalizeSettings", () => {
       modules: {
         marketPrices: { enabled: true },
         developerTools: { enabled: true },
+        updateChecker: { enabled: true },
         gitSync: { enabled: true, commitMessage: "Sync journal" },
       },
     });
@@ -140,6 +143,7 @@ describe("normalizeSettings", () => {
       modules: {
         marketPrices: { enabled: true },
         developerTools: { enabled: true },
+        updateChecker: { enabled: true },
         gitSync: { enabled: true, commitMessage: "Sync journal" },
       },
     };

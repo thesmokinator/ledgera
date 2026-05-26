@@ -8,9 +8,11 @@ type Notifier = {
 };
 
 export function useUpdateStatus({
+  enabled,
   messageApi,
   t,
 }: {
+  enabled: boolean;
   messageApi: Notifier;
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
@@ -19,6 +21,7 @@ export function useUpdateStatus({
   const updateStatusQuery = useQuery({
     queryKey: ["update-status"],
     queryFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: false }),
+    enabled,
     retry: false,
   });
 

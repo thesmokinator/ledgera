@@ -30,6 +30,7 @@ type AppContentProps = {
   journalError: string | null;
   updateStatus: UpdateStatus | undefined;
   isCheckingForUpdates: boolean;
+  updateCheckerEnabled: boolean;
   gitSyncStatus: GitSyncStatus | undefined;
   isCheckingGitSync: boolean;
   isPullingGitSync: boolean;
@@ -56,6 +57,7 @@ export function AppContent({
   journalError,
   updateStatus,
   isCheckingForUpdates,
+  updateCheckerEnabled,
   gitSyncStatus,
   isCheckingGitSync,
   isPullingGitSync,
@@ -109,6 +111,7 @@ export function AppContent({
           journalError={journalError}
           updateStatus={updateStatus}
           isCheckingForUpdates={isCheckingForUpdates}
+          updateCheckerEnabled={updateCheckerEnabled}
           onCheckForUpdates={onCheckForUpdates}
           onValuesChange={onSettingsValuesChange}
         />

@@ -28,6 +28,8 @@ pub(crate) struct AppModulesSettings {
     pub(crate) market_prices: AppModuleSettings,
     #[serde(default)]
     pub(crate) developer_tools: AppModuleSettings,
+    #[serde(default = "default_update_checker")]
+    pub(crate) update_checker: AppModuleSettings,
     #[serde(default)]
     pub(crate) git_sync: GitSyncModuleSettings,
 }
@@ -79,6 +81,7 @@ impl Default for AppModulesSettings {
         Self {
             market_prices: AppModuleSettings::default(),
             developer_tools: AppModuleSettings::default(),
+            update_checker: default_update_checker(),
             git_sync: GitSyncModuleSettings::default(),
         }
     }
@@ -113,6 +116,10 @@ fn default_language() -> String {
 
 fn default_git_commit_message() -> String {
     DEFAULT_GIT_COMMIT_MESSAGE.to_string()
+}
+
+fn default_update_checker() -> AppModuleSettings {
+    AppModuleSettings { enabled: true }
 }
 
 /// Returns persisted application settings from the platform config directory.

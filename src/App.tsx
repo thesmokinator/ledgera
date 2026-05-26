@@ -75,7 +75,11 @@ function App() {
     updateStatus,
     isCheckingForUpdates,
     checkForUpdates,
-  } = useUpdateStatus({ messageApi, t });
+  } = useUpdateStatus({
+    enabled: activeSettings.modules.updateChecker.enabled,
+    messageApi,
+    t,
+  });
 
   const {
     transactionsQuery,
@@ -277,6 +281,7 @@ function App() {
             journalError={transactionsQuery.isError ? String(transactionsQuery.error) : null}
             updateStatus={updateStatus}
             isCheckingForUpdates={isCheckingForUpdates}
+            updateCheckerEnabled={activeSettings.modules.updateChecker.enabled}
             gitSyncStatus={gitSyncStatus}
             isCheckingGitSync={isCheckingGitSync}
             isPullingGitSync={isPullingGitSync}
