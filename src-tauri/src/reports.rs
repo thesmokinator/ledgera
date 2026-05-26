@@ -9,6 +9,7 @@ use crate::{
 };
 use serde::Serialize;
 use std::{
+    collections::HashMap,
     io::Read,
     process::{Command, Output, Stdio},
     thread,
@@ -40,11 +41,44 @@ pub(crate) struct ReportRow {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct ReportChartEntry {
+    pub account: String,
+    pub label: String,
+    pub amount: f64,
+    pub chart_amount: f64,
+    pub commodity: String,
+    pub formatted: String,
+    pub tint: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReportPeriodSummary {
+    pub period: String,
+    pub amount: f64,
+    pub chart_amount: f64,
+    pub commodity: String,
+    pub formatted: String,
+    pub tint: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReportVisualization {
+    pub kind: String,
+    pub entries: Vec<ReportChartEntry>,
+    pub periods: Vec<ReportPeriodSummary>,
+    pub account_level: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ReportResult {
     pub report_type: String,
     pub interval: String,
     pub period_columns: Vec<String>,
     pub rows: Vec<ReportRow>,
+    pub visualization: ReportVisualization,
 }
 
 fn tint(amount: f64) -> String {
@@ -54,6 +88,152 @@ fn tint(amount: f64) -> String {
         "positive".to_string()
     } else {
         "neutral".to_string()
+    }
+}
+
+fn report_visualization_kind(report_type: &str) -> String {
+    match report_type {
+        "bs" => "allocation".to_string(),
+        "is" => "breakdown".to_string(),
+        "cf" => "cashflow".to_string(),
+        _ => "breakdown".to_string(),
+    }
+}
+
+fn account_at_level(account: &str, level: u32) -> String {
+    if level == 0 {
+        return account.to_string();
+    }
+
+    let parts: Vec<&str> = account.split(':').filter(|part| !part.is_empty()).collect();
+    if parts.is_empty() {
+        return account.to_string();
+    }
+
+    parts
+        .iter()
+        .take(level as usize)
+        .copied()
+        .collect::<Vec<_>>()
+        .join(":")
+}
+
+fn account_display_label(account: &str) -> String {
+    account
+        .split(':')
+        .filter(|part| !part.is_empty())
+        .last()
+        .unwrap_or(account)
+        .to_string()
+}
+
+#[derive(Default)]
+struct AggregatedAmount {
+    amount: f64,
+    commodity: String,
+    mixed_commodities: bool,
+}
+
+fn merge_commodity(current: &mut AggregatedAmount, commodity: &str) {
+    if commodity.is_empty() {
+        return;
+    }
+
+    if current.commodity.is_empty() {
+        current.commodity = commodity.to_string();
+    } else if current.commodity != commodity {
+        current.mixed_commodities = true;
+        current.commodity.clear();
+    }
+}
+
+fn aggregate_report_entries(rows: &[ReportRow], account_level: u32) -> Vec<ReportChartEntry> {
+    let mut grouped: HashMap<String, AggregatedAmount> = HashMap::new();
+
+    for row in rows.iter().filter(|row| !row.is_total) {
+        let account = account_at_level(&row.account, account_level);
+        let entry = grouped.entry(account).or_default();
+        entry.amount += row.total.amount;
+        merge_commodity(entry, &row.total.commodity);
+    }
+
+    let mut entries: Vec<ReportChartEntry> = grouped
+        .into_iter()
+        .map(|(account, aggregated)| {
+            let commodity = if aggregated.mixed_commodities {
+                String::new()
+            } else {
+                aggregated.commodity
+            };
+            ReportChartEntry {
+                label: account_display_label(&account),
+                account,
+                amount: aggregated.amount,
+                chart_amount: aggregated.amount.abs(),
+                formatted: format_amount(aggregated.amount, &commodity, &serde_json::Value::Null),
+                commodity,
+                tint: tint(aggregated.amount),
+            }
+        })
+        .filter(|entry| entry.chart_amount > 0.0)
+        .collect();
+
+    entries.sort_by(|a, b| b.chart_amount.total_cmp(&a.chart_amount));
+    entries
+}
+
+fn aggregate_report_periods(
+    period_columns: &[String],
+    rows: &[ReportRow],
+) -> Vec<ReportPeriodSummary> {
+    period_columns
+        .iter()
+        .map(|period| {
+            let mut aggregated = AggregatedAmount::default();
+            for row in rows.iter().filter(|row| !row.is_total) {
+                if let Some(amount) = row.amounts.iter().find(|amount| &amount.period == period) {
+                    aggregated.amount += amount.amount;
+                    merge_commodity(&mut aggregated, &amount.commodity);
+                }
+            }
+
+            let commodity = if aggregated.mixed_commodities {
+                String::new()
+            } else {
+                aggregated.commodity
+            };
+            ReportPeriodSummary {
+                period: period.clone(),
+                amount: aggregated.amount,
+                chart_amount: aggregated.amount.abs(),
+                formatted: format_amount(aggregated.amount, &commodity, &serde_json::Value::Null),
+                commodity,
+                tint: tint(aggregated.amount),
+            }
+        })
+        .collect()
+}
+
+fn build_visualization(
+    report_type: &str,
+    period_columns: &[String],
+    rows: &[ReportRow],
+) -> ReportVisualization {
+    let account_level = 2;
+    ReportVisualization {
+        kind: report_visualization_kind(report_type),
+        entries: aggregate_report_entries(rows, account_level),
+        periods: aggregate_report_periods(period_columns, rows),
+        account_level,
+    }
+}
+
+fn empty_visualization(report_type: &str) -> ReportVisualization {
+    ReportVisualization {
+        kind: report_visualization_kind(report_type),
+        entries: Vec::new(),
+        periods: Vec::new(),
+        account_level: 2,
     }
 }
 
@@ -253,6 +433,7 @@ fn parse_compound_report_json(root: &serde_json::Value) -> Option<ReportResult> 
         interval: String::new(),
         period_columns,
         rows,
+        visualization: empty_visualization(""),
     })
 }
 
@@ -372,6 +553,7 @@ fn parse_legacy_account_tree_report_json(raw: &[serde_json::Value]) -> ReportRes
         interval: String::new(),
         period_columns,
         rows,
+        visualization: empty_visualization(""),
     }
 }
 
@@ -624,6 +806,7 @@ fn run_hledger_report(
     let mut result = parse_report_json(app, &stdout)?;
     result.report_type = report_type.to_string();
     result.interval = interval.to_string();
+    result.visualization = build_visualization(report_type, &result.period_columns, &result.rows);
     Ok(result)
 }
 
@@ -680,4 +863,141 @@ pub(crate) async fn run_report(
     );
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn amount(period: &str, value: f64, commodity: &str) -> ReportPeriodAmount {
+        ReportPeriodAmount {
+            period: period.to_string(),
+            amount: value,
+            commodity: commodity.to_string(),
+            formatted: format!("{} {}", value, commodity),
+            tint: tint(value),
+        }
+    }
+
+    fn row(account: &str, total: f64, amounts: Vec<ReportPeriodAmount>) -> ReportRow {
+        ReportRow {
+            account: account.to_string(),
+            indent: 1,
+            is_total: false,
+            amounts,
+            total: ReportPeriodAmount {
+                period: String::new(),
+                amount: total,
+                commodity: "EUR".to_string(),
+                formatted: format!("{} EUR", total),
+                tint: tint(total),
+            },
+        }
+    }
+
+    fn total_row(account: &str, total: f64) -> ReportRow {
+        ReportRow {
+            account: account.to_string(),
+            indent: 1,
+            is_total: true,
+            amounts: vec![],
+            total: ReportPeriodAmount {
+                period: String::new(),
+                amount: total,
+                commodity: "EUR".to_string(),
+                formatted: format!("{} EUR", total),
+                tint: tint(total),
+            },
+        }
+    }
+
+    #[test]
+    fn account_at_level_preserves_requested_hledger_depth() {
+        assert_eq!(account_at_level("expenses:shopping:home", 1), "expenses");
+        assert_eq!(
+            account_at_level("expenses:shopping:home", 2),
+            "expenses:shopping"
+        );
+        assert_eq!(
+            account_at_level("expenses:shopping:home", 3),
+            "expenses:shopping:home"
+        );
+        assert_eq!(
+            account_at_level("expenses:shopping:home", 0),
+            "expenses:shopping:home"
+        );
+    }
+
+    #[test]
+    fn aggregate_report_entries_groups_non_total_rows_by_account_level() {
+        let rows = vec![
+            row("expenses:shopping:home", -10.0, vec![]),
+            row("expenses:shopping:gifts", -15.0, vec![]),
+            row("expenses:groceries", -30.0, vec![]),
+            total_row("Expenses", -55.0),
+        ];
+
+        let entries = aggregate_report_entries(&rows, 2);
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].account, "expenses:groceries");
+        assert_eq!(entries[0].amount, -30.0);
+        assert_eq!(entries[0].chart_amount, 30.0);
+        assert_eq!(entries[1].account, "expenses:shopping");
+        assert_eq!(entries[1].amount, -25.0);
+        assert_eq!(entries[1].chart_amount, 25.0);
+    }
+
+    #[test]
+    fn aggregate_report_periods_sums_each_period_without_total_rows() {
+        let rows = vec![
+            row(
+                "income:salary",
+                300.0,
+                vec![
+                    amount("2026-01", 100.0, "EUR"),
+                    amount("2026-02", 200.0, "EUR"),
+                ],
+            ),
+            row(
+                "expenses:groceries",
+                -120.0,
+                vec![
+                    amount("2026-01", -50.0, "EUR"),
+                    amount("2026-02", -70.0, "EUR"),
+                ],
+            ),
+            total_row("Net", 180.0),
+        ];
+
+        let periods = aggregate_report_periods(&["2026-01".into(), "2026-02".into()], &rows);
+
+        assert_eq!(periods.len(), 2);
+        assert_eq!(periods[0].period, "2026-01");
+        assert_eq!(periods[0].amount, 50.0);
+        assert_eq!(periods[0].chart_amount, 50.0);
+        assert_eq!(periods[1].period, "2026-02");
+        assert_eq!(periods[1].amount, 130.0);
+        assert_eq!(periods[1].chart_amount, 130.0);
+    }
+
+    #[test]
+    fn build_visualization_uses_report_specific_kind() {
+        let rows = vec![row(
+            "assets:bank:fineco",
+            100.0,
+            vec![amount("2026", 100.0, "EUR")],
+        )];
+        let periods = vec!["2026".to_string()];
+
+        let bs = build_visualization("bs", &periods, &rows);
+        let is = build_visualization("is", &periods, &rows);
+        let cf = build_visualization("cf", &periods, &rows);
+
+        assert_eq!(bs.kind, "allocation");
+        assert_eq!(is.kind, "breakdown");
+        assert_eq!(cf.kind, "cashflow");
+        assert_eq!(bs.account_level, 2);
+        assert_eq!(bs.entries[0].account, "assets:bank");
+    }
 }

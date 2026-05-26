@@ -30,4 +30,8 @@ export type {
   ReportResult,
   ReportRow,
   ReportPeriodAmount,
+  ReportVisualization,
+  ReportVisualizationKind,
+  ReportChartEntry,
+  ReportPeriodSummary,
 } from "../types";

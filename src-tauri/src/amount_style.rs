@@ -403,7 +403,10 @@ mod tests {
         }];
         let styles = parse_commodity_styles(files);
 
-        assert!(styles.contains_key("\u{20AC}"), "EUR symbol should be present");
+        assert!(
+            styles.contains_key("\u{20AC}"),
+            "EUR symbol should be present"
+        );
         assert!(styles.contains_key("USD"), "USD should be present");
 
         let eur_style = styles.get("\u{20AC}").unwrap();

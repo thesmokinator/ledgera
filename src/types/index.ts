@@ -208,6 +208,35 @@ export type ReportResult = {
   interval: string;
   periodColumns: string[];
   rows: ReportRow[];
+  visualization: ReportVisualization;
+};
+
+export type ReportVisualizationKind = "allocation" | "breakdown" | "cashflow" | string;
+
+export type ReportVisualization = {
+  kind: ReportVisualizationKind;
+  entries: ReportChartEntry[];
+  periods: ReportPeriodSummary[];
+  accountLevel: number;
+};
+
+export type ReportChartEntry = {
+  account: string;
+  label: string;
+  amount: number;
+  chartAmount: number;
+  commodity: string;
+  formatted: string;
+  tint: AmountTint;
+};
+
+export type ReportPeriodSummary = {
+  period: string;
+  amount: number;
+  chartAmount: number;
+  commodity: string;
+  formatted: string;
+  tint: AmountTint;
 };
 
 export type ReportPeriodAmount = {

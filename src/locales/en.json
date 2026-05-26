@@ -321,6 +321,10 @@
     "generation_failed": "Unable to generate the report. Check the journal configuration.",
     "chart_by_period": "By period",
     "chart_distribution": "Distribution",
+    "chart_allocation": "Allocation",
+    "chart_breakdown": "Breakdown by category",
+    "chart_cashflow": "Cashflow by period",
+    "chart_grouped_by": "Grouped by account level {{level}}",
     "chart_table_below": "Detailed data in the table below"
   }
 }

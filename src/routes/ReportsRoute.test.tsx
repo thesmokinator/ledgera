@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 vi.mock("@ant-design/charts", () => ({
+  Bar: () => null,
   Column: () => null,
   Pie: () => null,
 }));
@@ -51,6 +52,13 @@ function renderWithProviders() {
 
 const mockedInvoke = invoke as ReturnType<typeof vi.fn>;
 
+const emptyVisualization = {
+  kind: "breakdown",
+  entries: [],
+  periods: [],
+  accountLevel: 2,
+};
+
 describe("ReportsRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,6 +94,7 @@ describe("ReportsRoute", () => {
       interval: "-M",
       periodColumns: ["2026-01", "2026-02"],
       rows: [],
+      visualization: emptyVisualization,
     });
 
     renderWithProviders();
@@ -134,6 +143,22 @@ describe("ReportsRoute", () => {
           },
         },
       ],
+      visualization: {
+        kind: "breakdown",
+        entries: [
+          {
+            account: "income:revenues",
+            label: "revenues",
+            amount: 2200,
+            chartAmount: 2200,
+            commodity: "EUR",
+            formatted: "2.200,00",
+            tint: "positive" as const,
+          },
+        ],
+        periods: [],
+        accountLevel: 2,
+      },
     });
 
     renderWithProviders();
@@ -172,6 +197,7 @@ describe("ReportsRoute", () => {
               interval: "-M",
               periodColumns: [],
               rows: [],
+              visualization: emptyVisualization,
             });
           }, 100);
         }),
