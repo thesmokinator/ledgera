@@ -1,12 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AppSettings, GitSyncStatus } from "../types";
+import type { AppSettings, GitSyncStatus, Notifier } from "../types";
 import { callCommand } from "../utils/command";
 import { parseError } from "../utils/error";
-
-type Notifier = {
-  success: (content: string) => void;
-  error: (content: string) => void;
-};
 
 export function gitSyncSummary(status: GitSyncStatus | undefined): {
   tone: "neutral" | "success" | "warning" | "danger";

@@ -51,6 +51,24 @@ use std::{
 static AMOUNT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
 static COMMODITY_STYLES: OnceLock<std::collections::HashMap<String, AmountStyle>> = OnceLock::new();
 
+pub(crate) fn global_amount_style() -> &'static AmountStyle {
+    AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT.get_or_init(AmountStyle::default)
+    })
+}
+
+/// Returns a tint label for a numeric amount.
+pub(crate) fn tint(amount: f64) -> &'static str {
+    if amount < 0.0 {
+        "negative"
+    } else if amount > 0.0 {
+        "positive"
+    } else {
+        "neutral"
+    }
+}
+
 /// Starts the Tauri application and registers backend commands.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

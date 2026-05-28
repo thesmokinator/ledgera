@@ -2,12 +2,20 @@ import { DeleteOutlined, EditOutlined, ArrowRightOutlined, SwapOutlined } from "
 import { Button, Modal, Popover, Space, Table, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction } from "./types";
-import { Amount } from "../components/Amount";
+import { Amount, classSuffix } from "../components/Amount";
+import type { TransactionDisplay } from "./types";
 import styles from "./TransactionsTable.module.css";
 
-function flowIcon(kind: string) {
+const flowIconClass: Record<string, string | undefined> = {
+  expense: styles.flowIconExpense,
+  income: styles.flowIconIncome,
+  transfer: styles.flow_icon_transfer,
+  investment: styles.flowIconInvestment,
+};
+
+function flowIcon(kind: TransactionDisplay["kind"]) {
   if (kind === "transfer") return <SwapOutlined className={`${styles.flow_icon} ${styles.flow_icon_transfer}`} />;
-  return <ArrowRightOutlined className={`${styles.flow_icon} ${styles[`flowIcon${kind.charAt(0).toUpperCase() + kind.slice(1)}`]}`} />;
+  return <ArrowRightOutlined className={`${styles.flow_icon} ${flowIconClass[kind] ?? styles[`flowIcon${classSuffix(kind)}`]}`} />;
 }
 
 function AccountList({ accounts }: { accounts: string[] }) {

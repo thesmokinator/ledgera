@@ -83,16 +83,6 @@ pub(crate) struct ReportResult {
     pub visualization: ReportVisualization,
 }
 
-fn tint(amount: f64) -> String {
-    if amount < 0.0 {
-        "negative".to_string()
-    } else if amount > 0.0 {
-        "positive".to_string()
-    } else {
-        "neutral".to_string()
-    }
-}
-
 fn report_visualization_kind(report_type: &str) -> String {
     match report_type {
         "bs" => "allocation".to_string(),
@@ -179,7 +169,7 @@ fn aggregate_report_entries(rows: &[ReportRow], account_level: u32) -> Vec<Repor
                 ),
                 formatted: format_amount(aggregated.amount, &commodity, &serde_json::Value::Null),
                 commodity,
-                tint: tint(aggregated.amount),
+                tint: crate::tint(aggregated.amount).to_string(),
             }
         })
         .filter(|entry| entry.chart_amount > 0.0)
@@ -221,7 +211,7 @@ fn aggregate_report_periods(
                 ),
                 formatted: format_amount(aggregated.amount, &commodity, &serde_json::Value::Null),
                 commodity,
-                tint: tint(aggregated.amount),
+                tint: crate::tint(aggregated.amount).to_string(),
             }
         })
         .collect()
@@ -559,7 +549,7 @@ fn parse_legacy_account_tree_report_json(raw: &[serde_json::Value]) -> ReportRes
                         amount: qty,
                         commodity: comm.clone(),
                         formatted: format_amount(qty, &comm, b),
-                        tint: tint(qty),
+                        tint: crate::tint(qty).to_string(),
                     });
                 }
             }
@@ -585,7 +575,7 @@ fn parse_legacy_account_tree_report_json(raw: &[serde_json::Value]) -> ReportRes
                             amount: qty,
                             commodity: comm.clone(),
                             formatted: format_amount(qty, &comm, t),
-                            tint: tint(qty),
+                            tint: crate::tint(qty).to_string(),
                         }
                     },
                 )
@@ -601,7 +591,7 @@ fn parse_legacy_account_tree_report_json(raw: &[serde_json::Value]) -> ReportRes
                     amount: qty,
                     commodity: comm.clone(),
                     formatted: format_amount(qty, &comm, &serde_json::Value::Null),
-                    tint: tint(qty),
+                    tint: crate::tint(qty).to_string(),
                 }
             };
 
@@ -947,7 +937,7 @@ mod tests {
             amount: value,
             commodity: commodity.to_string(),
             formatted: format!("{} {}", value, commodity),
-            tint: tint(value),
+            tint: crate::tint(value).to_string(),
         }
     }
 
@@ -962,7 +952,7 @@ mod tests {
                 amount: total,
                 commodity: "EUR".to_string(),
                 formatted: format!("{} EUR", total),
-                tint: tint(total),
+                    tint: crate::tint(total).to_string(),
             },
         }
     }
@@ -978,7 +968,7 @@ mod tests {
                 amount: total,
                 commodity: "EUR".to_string(),
                 formatted: format!("{} EUR", total),
-                tint: tint(total),
+                    tint: crate::tint(total).to_string(),
             },
         }
     }

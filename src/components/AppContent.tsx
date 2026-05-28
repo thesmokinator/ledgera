@@ -103,8 +103,8 @@ export function AppContent({
   }
 
   function renderActiveRoute(): ReactNode {
-    if (activeView === "settings") {
-      return (
+    const routeMap: Partial<Record<AppView, ReactNode>> = {
+      settings: (
         <SettingsRoute
           form={settingsForm}
           initialValues={activeSettings}
@@ -119,11 +119,8 @@ export function AppContent({
           onCheckForUpdates={onCheckForUpdates}
           onValuesChange={onSettingsValuesChange}
         />
-      );
-    }
-
-    if (activeView === "sync") {
-      return (
+      ),
+      sync: (
         <SyncRoute
           settings={activeSettings}
           status={gitSyncStatus}
@@ -134,26 +131,12 @@ export function AppContent({
           onPull={onPullGitSync}
           onCommitAndPush={onCommitAndPushGitSync}
         />
-      );
-    }
+      ),
+      logs: <LogsRoute />,
+      reports: <ReportsRoute showDetailedTable={activeSettings.modules.developerTools.enabled} />,
+    };
 
-    if (activeView === "logs") {
-      return <LogsRoute />;
-    }
-
-    if (activeView === "reports") {
-      return (
-        <ReportsRoute
-          showDetailedTable={activeSettings.modules.developerTools.enabled}
-        />
-      );
-    }
-
-    if (shouldShowCourtesy) {
-      return <CourtesyState reasons={courtesyReasons} details={courtesyDetails} />;
-    }
-
-    return renderJournalRoute();
+    return routeMap[activeView] ?? (shouldShowCourtesy ? <CourtesyState reasons={courtesyReasons} details={courtesyDetails} /> : renderJournalRoute());
   }
 
   return <Layout.Content className="app-content">{renderActiveRoute()}</Layout.Content>;

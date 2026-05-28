@@ -64,7 +64,7 @@ function App() {
     activeSettings,
     updateSettingsOnChange,
   } = useAppSettings({ messageApi, t });
-  const isDarkTheme = activeSettings.theme === "system" ? systemPrefersDark : activeSettings.theme === "dark";
+  const isDarkTheme = activeSettings.theme === "dark" || (activeSettings.theme === "system" && systemPrefersDark);
   const activeTitle = activeView === "settings" ? t("common.settings") : t(`common.${activeView}`);
 
   const hledgerQuery = useQuery({
@@ -149,11 +149,10 @@ function App() {
   }, [clearTransactionError, closeTransactionModal]);
 
   const hledgerUnavailable = hledgerQuery.isFetched && hledgerQuery.data?.available === false;
-  const courtesyReasons = [
-    !hasConfiguredJournal ? t("settings.no_journal_configured") : null,
-    journalLoadError ? t("settings.journal_read_failed") : null,
-    hledgerUnavailable ? t("settings.hledger_not_found") : null,
-  ].filter((reason): reason is string => Boolean(reason));
+  const courtesyReasons: string[] = [];
+  if (!hasConfiguredJournal) courtesyReasons.push(t("settings.no_journal_configured"));
+  if (journalLoadError) courtesyReasons.push(t("settings.journal_read_failed"));
+  if (hledgerUnavailable) courtesyReasons.push(t("settings.hledger_not_found"));
   const shouldShowCourtesy = courtesyReasons.length > 0;
 
   useEffect(() => {
@@ -257,7 +256,7 @@ function App() {
         },
       }}
     >
-      <Layout className={`app-shell ${isDarkTheme ? "theme-dark" : "theme-light"} ${isMacOs ? "platform-macos" : ""}`}>
+      <Layout className={`app-shell ${isDarkTheme ? "theme-dark" : "theme-light"}${isMacOs ? " platform-macos" : ""}`}>
         {contextHolder}
         <Layout.Sider className="app-sidebar" width={288}>
           <NavigationGroup

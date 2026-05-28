@@ -13,6 +13,20 @@ use crate::{
 };
 use tauri::AppHandle;
 
+fn log_command_result<T>(
+    app: &AppHandle,
+    result: &Result<T, String>,
+    ok_code: &str,
+    ok_msg: &str,
+    err_code: &str,
+    err_msg: &str,
+) {
+    match result {
+        Ok(_) => logs::log_event(app, "info", ok_code, ok_msg),
+        Err(error) => logs::log_error(app, err_code, err_msg, error),
+    }
+}
+
 /// Reads the configured journal and returns parsed transaction blocks
 /// along with autocomplete suggestions in a single pass.
 #[tauri::command]
@@ -30,20 +44,14 @@ pub(crate) fn create_transaction(
 ) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let result = create_transaction_for_settings(&settings, &input);
-    match &result {
-        Ok(_) => logs::log_event(
-            &app,
-            "info",
-            "transaction_created",
-            "Transaction created successfully.",
-        ),
-        Err(error) => logs::log_error(
-            &app,
-            "transaction_create_failed",
-            "Failed to create transaction.",
-            error,
-        ),
-    }
+    log_command_result(
+        &app,
+        &result,
+        "transaction_created",
+        "Transaction created successfully.",
+        "transaction_create_failed",
+        "Failed to create transaction.",
+    );
     result
 }
 
@@ -56,20 +64,14 @@ pub(crate) fn update_transaction(
 ) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let result = update_transaction_for_settings(&settings, &id, &input);
-    match &result {
-        Ok(_) => logs::log_event(
-            &app,
-            "info",
-            "transaction_updated",
-            "Transaction updated successfully.",
-        ),
-        Err(error) => logs::log_error(
-            &app,
-            "transaction_update_failed",
-            "Failed to update transaction.",
-            error,
-        ),
-    }
+    log_command_result(
+        &app,
+        &result,
+        "transaction_updated",
+        "Transaction updated successfully.",
+        "transaction_update_failed",
+        "Failed to update transaction.",
+    );
     result
 }
 
@@ -78,19 +80,13 @@ pub(crate) fn update_transaction(
 pub(crate) fn delete_transaction(app: AppHandle, id: String) -> Result<JournalSummary, String> {
     let settings = read_settings(&app)?;
     let result = delete_transaction_for_settings(&settings, &id);
-    match &result {
-        Ok(_) => logs::log_event(
-            &app,
-            "info",
-            "transaction_deleted",
-            "Transaction deleted successfully.",
-        ),
-        Err(error) => logs::log_error(
-            &app,
-            "transaction_delete_failed",
-            "Failed to delete transaction.",
-            error,
-        ),
-    }
+    log_command_result(
+        &app,
+        &result,
+        "transaction_deleted",
+        "Transaction deleted successfully.",
+        "transaction_delete_failed",
+        "Failed to delete transaction.",
+    );
     result
 }

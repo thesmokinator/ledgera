@@ -12,22 +12,18 @@ import styles from "./ReportsRoute.module.css";
 type ReportType = "is" | "bs" | "cf";
 type ReportInterval = "" | "-M" | "-Q" | "-Y";
 
-const reportTypeOptions: { value: ReportType; labelKey: string }[] = [
-  { value: "is", labelKey: "reports.income_statement" },
-  { value: "bs", labelKey: "reports.balance_sheet" },
-  { value: "cf", labelKey: "reports.cashflow" },
+const reportTypeOptions = [
+  { value: "is" as const, labelKey: "reports.income_statement" },
+  { value: "bs" as const, labelKey: "reports.balance_sheet" },
+  { value: "cf" as const, labelKey: "reports.cashflow" },
 ];
 
-const intervalOptions: { value: ReportInterval; labelKey: string }[] = [
-  { value: "", labelKey: "reports.no_interval" },
-  { value: "-M", labelKey: "reports.monthly" },
-  { value: "-Q", labelKey: "reports.quarterly" },
-  { value: "-Y", labelKey: "reports.yearly" },
+const intervalOptions = [
+  { value: "" as const, labelKey: "reports.no_interval" },
+  { value: "-M" as const, labelKey: "reports.monthly" },
+  { value: "-Q" as const, labelKey: "reports.quarterly" },
+  { value: "-Y" as const, labelKey: "reports.yearly" },
 ];
-
-function renderState(children: React.ReactNode) {
-  return <div className={styles.center_state}>{children}</div>;
-}
 
 export function ReportsRoute({
   showDetailedTable = false,
@@ -135,12 +131,10 @@ export function ReportsRoute({
 
       <Card className={styles.report_card}>
         {isLoading ? (
-          renderState(
-            <>
-              <Spin />
-              <span>{t("reports.generating")}</span>
-            </>,
-          )
+          <div className={styles.center_state}>
+            <Spin />
+            <span>{t("reports.generating")}</span>
+          </div>
         ) : hasError || isEmpty ? (
           <Empty
             className={styles.center_state}

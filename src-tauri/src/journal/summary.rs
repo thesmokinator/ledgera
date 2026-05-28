@@ -8,10 +8,11 @@ use crate::{
         files::load_journal_files,
         parser::load_transactions_from_journal_via_files,
         types::{DashboardSummary, JournalSummary, JournalTransaction},
+        util::parse_journal_date,
     },
     AMOUNT_STYLE, COMMODITY_STYLES,
 };
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local};
 use std::path::Path;
 
 pub(crate) fn read_journal_summary(
@@ -128,6 +129,3 @@ fn is_scheduled_this_month(transaction: &JournalTransaction) -> bool {
         .unwrap_or(false)
 }
 
-fn parse_journal_date(value: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
-}

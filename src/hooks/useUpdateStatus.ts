@@ -1,11 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UpdateStatus } from "../types";
+import type { Notifier, UpdateStatus } from "../types";
 import { callCommand } from "../utils/command";
-
-type Notifier = {
-  success: (content: string) => void;
-  error: (content: string) => void;
-};
 
 export function useUpdateStatus({
   enabled,

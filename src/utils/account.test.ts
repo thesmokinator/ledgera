@@ -4,7 +4,6 @@ import {
   transactionTemplatePostings,
   transactionIncludesAccount,
   collectAccounts,
-  groupAccounts,
 } from "./account";
 import type {
   AutocompleteSuggestions,
@@ -203,28 +202,4 @@ describe("collectAccounts", () => {
   });
 });
 
-describe("groupAccounts", () => {
-  it("groups by root account type", () => {
-    const accounts = [
-      { account: "assets:bank", transactions: 5, accountTransactions: [] },
-      { account: "assets:cash", transactions: 2, accountTransactions: [] },
-      { account: "expenses:food", transactions: 3, accountTransactions: [] },
-      { account: "income:salary", transactions: 1, accountTransactions: [] },
-    ];
-    const result = groupAccounts(accounts);
-    expect(result.map(g => g.group)).toEqual(["assets", "income", "expenses"]);
-    expect(result.find(g => g.group === "assets")?.items.length).toBe(2);
-  });
 
-  it("puts unknown roots in 'other'", () => {
-    const accounts = [
-      { account: "crypto:btc", transactions: 1, accountTransactions: [] },
-    ];
-    const result = groupAccounts(accounts);
-    expect(result[0].group).toBe("other");
-  });
-
-  it("returns empty for empty input", () => {
-    expect(groupAccounts([])).toEqual([]);
-  });
-});

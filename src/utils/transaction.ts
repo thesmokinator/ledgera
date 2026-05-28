@@ -1,6 +1,18 @@
 import type { JournalTransaction, PostingInput, TransactionInput } from "../types";
 import { todayJournalDate } from "./date";
 
+export function makeOutgoingAmount(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("-")) return trimmed;
+  return `-${trimmed}`;
+}
+
+export function makeMovementInputAmount(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("-")) return trimmed;
+  return trimmed.slice(1).trim();
+}
+
 export function createEmptyTransaction(): TransactionInput {
   return {
     mode: "movement",

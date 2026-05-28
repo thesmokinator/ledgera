@@ -2,16 +2,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
-import type { JournalSummary, JournalTransaction, TransactionInput, TransactionType } from "../types";
+import type { JournalSummary, JournalTransaction, Notifier, TransactionInput, TransactionType } from "../types";
 import { callCommand } from "../utils/command";
 import { journalDateFormat } from "../utils/date";
 import { formatAppError, parseAppError, parseError } from "../utils/error";
-import { autoCalculateBalancingAmounts } from "../utils/transaction";
-
-type Notifier = {
-  success: (content: string) => void;
-  error: (content: string) => void;
-};
+import { autoCalculateBalancingAmounts, makeOutgoingAmount } from "../utils/transaction";
 
 export function useTransactionActions({
   defaultCommodity,
@@ -93,12 +88,6 @@ export function useTransactionActions({
     },
     onError: (error) => messageApi.error(parseError(error, t)),
   });
-
-  function makeOutgoingAmount(value: string): string {
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.startsWith("-")) return trimmed;
-    return `-${trimmed}`;
-  }
 
   function submitTransaction(values: TransactionInput) {
     setTransactionError(null);

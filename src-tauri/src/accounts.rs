@@ -3,10 +3,11 @@ use crate::{
     balances::{load_balances_for_settings, Balance},
     journal::{
         files::require_journal_path, summary::read_journal_summary, types::JournalTransaction,
+        util::parse_journal_date,
     },
     settings::read_settings,
 };
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local};
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::AppHandle;
@@ -61,10 +62,6 @@ struct AccountOverviewRow {
     balance: Option<Balance>,
     activity_count: usize,
     transactions: Vec<JournalTransaction>,
-}
-
-fn parse_journal_date(value: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
 }
 
 fn is_in_account_activity_range(transaction: &JournalTransaction, range: &str) -> bool {

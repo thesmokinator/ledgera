@@ -1,5 +1,6 @@
 use crate::{
     app_error::{to_error_string, to_error_string_with_details},
+    journal::util::split_inline_comment,
     settings::AppSettings,
 };
 use std::{
@@ -185,10 +186,3 @@ fn wildcard_matches(pattern: &str, value: &str) -> bool {
     }
 }
 
-fn split_inline_comment(value: &str) -> (&str, &str) {
-    if let Some(index) = value.find(';') {
-        (&value[..index], value[index + 1..].trim())
-    } else {
-        (value, "")
-    }
-}

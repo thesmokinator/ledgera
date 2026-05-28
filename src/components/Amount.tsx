@@ -3,7 +3,7 @@ import styles from "./Amount.module.css";
 
 type AmountKind = "expense" | "income" | "transfer" | "investment" | "unknown" | string;
 
-function classSuffix(value: string): string {
+export function classSuffix(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 

@@ -316,6 +316,11 @@ export type GitSyncStatus = {
   error: string | null;
 };
 
+export type Notifier = {
+  success: (content: string) => void;
+  error: (content: string) => void;
+};
+
 export type NavigationItem = {
   key: AppView;
   label: string;
