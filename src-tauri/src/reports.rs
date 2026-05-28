@@ -123,8 +123,7 @@ fn account_at_level(account: &str, level: u32) -> String {
 fn account_display_label(account: &str) -> String {
     account
         .split(':')
-        .filter(|part| !part.is_empty())
-        .last()
+        .rfind(|part| !part.is_empty())
         .unwrap_or(account)
         .to_string()
 }
@@ -821,14 +820,13 @@ fn run_hledger_report(
     let mut cmd = Command::new(&executable);
     cmd.args(&args);
 
-    let output = run_command_with_timeout(cmd, REPORT_TIMEOUT).map_err(|error| {
+    let output = run_command_with_timeout(cmd, REPORT_TIMEOUT).inspect_err(|error| {
         logs::log_error(
             app,
             "report_failed",
             "hledger report command did not complete.",
-            &error,
+            error,
         );
-        error
     })?;
 
     logs::log_event(

@@ -30,6 +30,7 @@
   },
   "search": {
     "placeholder": "Search the journal…",
+    "trigger_label": "Search journal…",
     "start_typing": "Start typing to search transactions",
     "searching": "Searching…",
     "no_results": "No matching transactions",

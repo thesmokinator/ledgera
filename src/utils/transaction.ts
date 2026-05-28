@@ -1,17 +1,21 @@
 import type { JournalTransaction, PostingInput, TransactionInput } from "../types";
 import { todayJournalDate } from "./date";
 
-export const emptyTransaction: TransactionInput = {
-  mode: "movement",
-  date: todayJournalDate(),
-  status: "",
-  code: "",
-  description: "",
-  postings: [
-    { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
-    { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
-  ],
-};
+export function createEmptyTransaction(): TransactionInput {
+  return {
+    mode: "movement",
+    date: todayJournalDate(),
+    status: "",
+    code: "",
+    description: "",
+    postings: [
+      { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
+      { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
+    ],
+  };
+}
+
+export const emptyTransaction: TransactionInput = createEmptyTransaction();
 
 export function toTransactionInput(
   transaction: JournalTransaction,
@@ -32,7 +36,7 @@ export function toTransactionInput(
           unitPrice: posting.unitPrice,
           comment: posting.comment,
         }))
-        : withDefaultCommodity(emptyTransaction.postings, defaultCommodity),
+        : withDefaultCommodity(createEmptyTransaction().postings, defaultCommodity),
   };
 }
 

@@ -30,6 +30,7 @@
   },
   "search": {
     "placeholder": "Cerca nel journal…",
+    "trigger_label": "Cerca nel journal…",
     "start_typing": "Inizia a digitare per cercare transazioni",
     "searching": "Ricerca…",
     "no_results": "Nessuna transazione corrispondente",

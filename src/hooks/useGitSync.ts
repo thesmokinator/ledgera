@@ -37,7 +37,6 @@ export function useGitSync({
   async function invalidateGitAndJournal(status: GitSyncStatus) {
     queryClient.setQueryData(["git-sync-status"], status);
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     await queryClient.invalidateQueries({ queryKey: ["balances"] });
     await queryClient.invalidateQueries({ queryKey: ["investments"] });
   }

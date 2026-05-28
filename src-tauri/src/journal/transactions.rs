@@ -117,7 +117,8 @@ fn validate_transaction_input(input: &TransactionInput) -> Result<(), String> {
         "Code cannot contain line breaks.",
     );
     let code = input.code.trim();
-    if !code.is_empty() && !(code.starts_with('(') && code.ends_with(')') && code.len() > 2) {
+    let has_valid_hledger_code = code.starts_with('(') && code.ends_with(')') && code.len() > 2;
+    if !(code.is_empty() || has_valid_hledger_code) {
         errors.push(FieldError::new(
             ["code"],
             "Code must use hledger parentheses, for example (INV-001).",

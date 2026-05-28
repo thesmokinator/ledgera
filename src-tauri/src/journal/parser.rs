@@ -421,7 +421,7 @@ pub(crate) fn format_transaction(input: &TransactionInput) -> String {
         .postings
         .iter()
         .filter(|posting| !posting.account.trim().is_empty())
-        .map(|posting| format_posting(posting))
+        .map(format_posting)
         .collect::<Vec<_>>();
 
     std::iter::once(header)

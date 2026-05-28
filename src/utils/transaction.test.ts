@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  createEmptyTransaction,
   emptyTransaction,
   toTransactionInput,
   parseAmountValue,
@@ -13,12 +14,12 @@ describe("emptyTransaction", () => {
     vi.useRealTimers();
   });
 
-  it("has today's date", () => {
+  it("creates a transaction dated today", () => {
     const fakeToday = "2025-06-01";
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(fakeToday));
-    // Re-require to get fresh emptyTransaction with mocked date
-    // Since emptyTransaction is a module-level const, we test it structurally
+    vi.setSystemTime(new Date("2025-06-01T12:00:00"));
+
+    expect(createEmptyTransaction().date).toBe(fakeToday);
   });
 
   it("has movement mode with empty status, code, and description", () => {
