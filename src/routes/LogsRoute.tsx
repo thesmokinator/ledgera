@@ -13,7 +13,7 @@ import {
   CopyOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-import { invoke } from "@tauri-apps/api/core";
+import { callCommand } from "../utils/command";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -38,12 +38,12 @@ export function LogsRoute() {
 
   const logsQuery = useQuery({
     queryKey: ["logs"],
-    queryFn: () => invoke<LogEntry[]>("get_logs"),
+    queryFn: () => callCommand<LogEntry[]>("get_logs"),
     retry: false,
   });
 
   const clearLogsMutation = useMutation({
-    mutationFn: () => invoke<void>("clear_logs"),
+    mutationFn: () => callCommand<void>("clear_logs"),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["logs"] }),
   });
 

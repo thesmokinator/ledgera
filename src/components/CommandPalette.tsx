@@ -2,8 +2,8 @@ import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { Input, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
+import { callCommand } from "../utils/command";
 import type { JournalSearchMatch, JournalSearchResult, JournalTransaction, SearchMatchRange } from "../types";
 import styles from "./CommandPalette.module.css";
 
@@ -35,7 +35,7 @@ export function CommandPalette({
 
   const resultsQuery = useQuery({
     queryKey: ["journal-search", debouncedQuery],
-    queryFn: () => invoke<JournalSearchResult[]>("search_journal", { query: debouncedQuery, limit: 12 }),
+    queryFn: () => callCommand<JournalSearchResult[]>("search_journal", { query: debouncedQuery, limit: 12 }),
     enabled: open && debouncedQuery.trim().length > 0,
     retry: false,
     placeholderData: (previous) => previous,

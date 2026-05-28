@@ -12,7 +12,7 @@ use crate::{
     },
     AMOUNT_STYLE, COMMODITY_STYLES,
 };
-use chrono::{Datelike, Local};
+use chrono::{Datelike, Local, NaiveDate};
 use std::path::Path;
 
 pub(crate) fn read_journal_summary(
@@ -23,7 +23,7 @@ pub(crate) fn read_journal_summary(
     let file_count = files.len();
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
 
-    let amount_style = parse_amount_style(&files, "€");
+    let amount_style = parse_amount_style(&files);
     let _ = AMOUNT_STYLE.set(amount_style.clone());
     let commodity_styles = parse_commodity_styles(&files);
     let _ = COMMODITY_STYLES.set(commodity_styles);
@@ -115,17 +115,17 @@ pub(crate) fn build_dashboard_summary(transactions: &[JournalTransaction]) -> Da
 
 /// Returns whether a transaction belongs to the current month up to today.
 fn is_in_current_month_to_date(transaction: &JournalTransaction) -> bool {
-    let today = Local::now().date_naive();
-    parse_journal_date(&transaction.date)
-        .map(|date| date.year() == today.year() && date.month() == today.month() && date <= today)
-        .unwrap_or(false)
+    is_current_month(transaction, |date, today| date <= today)
 }
 
 /// Returns whether a transaction is scheduled later in the current month.
 fn is_scheduled_this_month(transaction: &JournalTransaction) -> bool {
+    is_current_month(transaction, |date, today| date > today)
+}
+
+fn is_current_month(transaction: &JournalTransaction, cmp: impl Fn(NaiveDate, NaiveDate) -> bool) -> bool {
     let today = Local::now().date_naive();
     parse_journal_date(&transaction.date)
-        .map(|date| date.year() == today.year() && date.month() == today.month() && date > today)
-        .unwrap_or(false)
+        .map_or(false, |date| date.year() == today.year() && date.month() == today.month() && cmp(date, today))
 }
 

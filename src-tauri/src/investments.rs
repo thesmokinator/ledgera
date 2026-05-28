@@ -50,7 +50,15 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
     cmd.arg("-O").arg("json");
 
     let output =
-        tauri::async_runtime::spawn_blocking(move || cmd.output().map_err(|e| e.to_string()))
+        tauri::async_runtime::spawn_blocking(move || {
+            cmd.output().map_err(|e| {
+                to_error_string_with_details(
+                    "hledger_balance_failed",
+                    "Unable to run hledger balance for investments.",
+                    e.to_string(),
+                )
+            })
+        })
             .await
             .map_err(|error| {
                 to_error_string_with_details(
@@ -61,7 +69,7 @@ async fn get_investments(app: AppHandle) -> Result<Vec<Balance>, String> {
             })??;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    parse_balance_output(&app, &stdout, &settings, false)
+    parse_balance_output(&stdout, &settings, false)
 }
 
 /// Aggregated investment row with price and market value pre-computed

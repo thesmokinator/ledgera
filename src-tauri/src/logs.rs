@@ -19,7 +19,13 @@ fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app
         .path()
         .app_config_dir()
-        .map_err(|error| error.to_string())?
+        .map_err(|error| {
+            to_error_string_with_details(
+                "app_config_dir_failed",
+                "Unable to resolve application config directory.",
+                error.to_string(),
+            )
+        })?
         .join("ledgera.log.jsonl"))
 }
 

@@ -314,7 +314,9 @@ fn append_transaction_routed(
     main_journal: &Path,
     input: &TransactionInput,
 ) -> Result<(), String> {
-    let content = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
+    let content = fs::read_to_string(main_journal).map_err(|error| {
+        to_error_string_with_details("journal_read_failed", "Unable to read journal file.", error.to_string())
+    })?;
     match detect_routing_strategy(&content) {
         RoutingStrategy::Fallback => {
             append_to_existing_file(settings, main_journal, main_journal, input)
@@ -371,17 +373,27 @@ fn append_to_new_flat_subjournal(
     target_name: &str,
     input: &TransactionInput,
 ) -> Result<(), String> {
-    let original_main = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
+    let original_main = fs::read_to_string(main_journal).map_err(|error| {
+        to_error_string_with_details("journal_read_failed", "Unable to read journal file.", error.to_string())
+    })?;
     let updated_main = insert_include_sorted(&original_main, target_name);
 
-    fs::write(main_journal, updated_main).map_err(|error| error.to_string())?;
-    fs::write(target_file, format!("{}\n", format_transaction(input)))
-        .map_err(|error| error.to_string())?;
+    fs::write(main_journal, &updated_main).map_err(|error| {
+        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    })?;
+    fs::write(target_file, format!("{}\n", format_transaction(input))).map_err(|error| {
+        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    })?;
 
     if let Err(error) = validate_journal(settings, main_journal) {
         let _ = fs::remove_file(target_file);
-        fs::write(main_journal, original_main)
-            .map_err(|rollback_error| rollback_error.to_string())?;
+        fs::write(main_journal, original_main).map_err(|rollback_error| {
+            to_error_string_with_details(
+                "journal_write_failed",
+                "Journal file may be corrupted - rollback failed.",
+                rollback_error.to_string(),
+            )
+        })?;
         return Err(error);
     }
 
@@ -395,10 +407,13 @@ fn append_to_new_glob_subjournal(
     input: &TransactionInput,
 ) -> Result<(), String> {
     if let Some(parent) = target_file.parent() {
-        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        fs::create_dir_all(parent).map_err(|error| {
+            to_error_string_with_details("journal_write_failed", "Unable to create journal directory.", error.to_string())
+        })?;
     }
-    fs::write(target_file, format!("{}\n", format_transaction(input)))
-        .map_err(|error| error.to_string())?;
+    fs::write(target_file, format!("{}\n", format_transaction(input))).map_err(|error| {
+        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    })?;
 
     if let Err(error) = validate_journal(settings, main_journal) {
         let _ = fs::remove_file(target_file);
@@ -415,25 +430,37 @@ fn append_to_new_glob_year(
     target_include: &str,
     input: &TransactionInput,
 ) -> Result<(), String> {
-    let original_main = fs::read_to_string(main_journal).map_err(|error| error.to_string())?;
+    let original_main = fs::read_to_string(main_journal).map_err(|error| {
+        to_error_string_with_details("journal_read_failed", "Unable to read journal file.", error.to_string())
+    })?;
     let year_dir = target_file
         .parent()
         .ok_or_else(|| "Unable to resolve target journal directory.".to_string())?;
     let year_dir_created = !year_dir.exists();
     let updated_main = insert_glob_include_sorted(&original_main, target_include);
 
-    fs::write(main_journal, updated_main).map_err(|error| error.to_string())?;
-    fs::create_dir_all(year_dir).map_err(|error| error.to_string())?;
-    fs::write(target_file, format!("{}\n", format_transaction(input)))
-        .map_err(|error| error.to_string())?;
+    fs::write(main_journal, &updated_main).map_err(|error| {
+        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    })?;
+    fs::create_dir_all(year_dir).map_err(|error| {
+        to_error_string_with_details("journal_write_failed", "Unable to create journal directory.", error.to_string())
+    })?;
+    fs::write(target_file, format!("{}\n", format_transaction(input))).map_err(|error| {
+        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    })?;
 
     if let Err(error) = validate_journal(settings, main_journal) {
         let _ = fs::remove_file(target_file);
         if year_dir_created {
             let _ = fs::remove_dir(year_dir);
         }
-        fs::write(main_journal, original_main)
-            .map_err(|rollback_error| rollback_error.to_string())?;
+        fs::write(main_journal, original_main).map_err(|rollback_error| {
+            to_error_string_with_details(
+                "journal_write_failed",
+                "Journal file may be corrupted - rollback failed.",
+                rollback_error.to_string(),
+            )
+        })?;
         return Err(error);
     }
 

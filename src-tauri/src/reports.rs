@@ -301,12 +301,10 @@ fn empty_visualization(report_type: &str) -> ReportVisualization {
 }
 
 fn format_amount(qty: f64, commodity: &str, raw_bal: &serde_json::Value) -> String {
-    let effective = if commodity.is_empty() {
-        "€"
-    } else {
-        commodity
-    };
-    format_hledger_display_amount(qty, effective, raw_bal)
+    if commodity.is_empty() {
+        return format!("{:.2}", qty);
+    }
+    format_hledger_display_amount(qty, commodity, raw_bal)
 }
 
 fn amount_quantity(raw_amount: &serde_json::Value) -> f64 {
@@ -317,7 +315,7 @@ fn amount_quantity(raw_amount: &serde_json::Value) -> f64 {
 }
 
 fn amount_commodity(raw_amount: &serde_json::Value) -> String {
-    raw_amount["acommodity"].as_str().unwrap_or("€").to_string()
+    raw_amount["acommodity"].as_str().unwrap_or("").to_string()
 }
 
 fn summarize_amounts(period: String, raw_amounts: &[serde_json::Value]) -> ReportPeriodAmount {

@@ -39,15 +39,12 @@ pub(crate) struct GitSyncStatus {
 #[tauri::command]
 pub(crate) async fn git_sync_status(app: AppHandle) -> Result<GitSyncStatus, String> {
     let task_app = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || git_sync_status_for_app(&task_app))
-        .await
-        .map_err(|error| {
-            to_error_string_with_details(
-                "git_command_failed",
-                "Git status task failed.",
-                error.to_string(),
-            )
-        })?;
+    let result = crate::run_blocking(
+        "git_command_failed",
+        "Git status task failed.",
+        move || git_sync_status_for_app(&task_app),
+    )
+    .await;
 
     match result {
         Ok(status) => Ok(status),
@@ -67,15 +64,12 @@ pub(crate) async fn git_sync_status(app: AppHandle) -> Result<GitSyncStatus, Str
 pub(crate) async fn git_pull_journal(app: AppHandle) -> Result<GitSyncStatus, String> {
     logs::log_event(&app, "info", "git_pull_started", "Git pull started.");
     let task_app = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || git_pull_journal_for_app(&task_app))
-        .await
-        .map_err(|error| {
-            to_error_string_with_details(
-                "git_command_failed",
-                "Git pull task failed.",
-                error.to_string(),
-            )
-        })?;
+    let result = crate::run_blocking(
+        "git_command_failed",
+        "Git pull task failed.",
+        move || git_pull_journal_for_app(&task_app),
+    )
+    .await;
 
     match &result {
         Ok(_) => logs::log_event(
@@ -101,17 +95,12 @@ pub(crate) async fn git_commit_and_push_journal(
         "Git commit and push started.",
     );
     let task_app = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        git_commit_and_push_journal_for_app(&task_app, &message)
-    })
-    .await
-    .map_err(|error| {
-        to_error_string_with_details(
-            "git_command_failed",
-            "Git commit and push task failed.",
-            error.to_string(),
-        )
-    })?;
+    let result = crate::run_blocking(
+        "git_command_failed",
+        "Git commit and push task failed.",
+        move || git_commit_and_push_journal_for_app(&task_app, &message),
+    )
+    .await;
 
     match &result {
         Ok(_) => logs::log_event(

@@ -54,7 +54,7 @@ export function useTransactionActions({
 
   const createTransactionMutation = useMutation({
     mutationFn: (input: TransactionInput) =>
-      callCommand<JournalSummary, { input: TransactionInput }>("create_transaction", { input }),
+      callCommand<JournalSummary>("create_transaction", { input }),
     onSuccess: async () => {
       setTransactionError(null);
       messageApi.success(t("transactions.transaction_created"));
@@ -66,7 +66,7 @@ export function useTransactionActions({
 
   const updateTransactionMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TransactionInput }) =>
-      callCommand<JournalSummary, { id: string; input: TransactionInput }>("update_transaction", {
+      callCommand<JournalSummary>("update_transaction", {
         id,
         input,
       }),
@@ -81,7 +81,7 @@ export function useTransactionActions({
 
   const deleteTransactionMutation = useMutation({
     mutationFn: (id: string) =>
-      callCommand<JournalSummary, { id: string }>("delete_transaction", { id }),
+      callCommand<JournalSummary>("delete_transaction", { id }),
     onSuccess: async () => {
       messageApi.success(t("transactions.transaction_deleted"));
       await invalidateJournalData();

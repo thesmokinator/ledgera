@@ -17,6 +17,7 @@ mod settings;
 mod sync;
 mod updates;
 
+use app_error::to_error_string_with_details;
 use amount_style::AmountStyle;
 #[cfg(test)]
 use amount_style::{format_hledger_amount, format_hledger_display_amount, parse_format_directive};
@@ -56,6 +57,17 @@ pub(crate) fn global_amount_style() -> &'static AmountStyle {
         static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
         DEFAULT.get_or_init(AmountStyle::default)
     })
+}
+
+/// Runs a blocking operation on a dedicated thread, translating join errors into structured errors.
+pub(crate) async fn run_blocking<F, T>(code: &'static str, message: &'static str, f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|error| to_error_string_with_details(code, message, error.to_string()))?
 }
 
 /// Returns a tint label for a numeric amount.

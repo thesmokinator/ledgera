@@ -130,7 +130,7 @@ pub(crate) fn format_hledger_display_amount(
 }
 
 /// Parses the display style from commodity/format directives in journal files.
-pub(crate) fn parse_amount_style(files: &[JournalFile], _default_commodity: &str) -> AmountStyle {
+pub(crate) fn parse_amount_style(files: &[JournalFile]) -> AmountStyle {
     for file in files {
         let mut in_commodity = false;
         for line in file.content.lines() {

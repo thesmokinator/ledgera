@@ -1,3 +1,4 @@
+use crate::app_error::to_error_string_with_details;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -105,7 +106,13 @@ fn update_status_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app
         .path()
         .app_config_dir()
-        .map_err(|error| error.to_string())?
+        .map_err(|error| {
+            to_error_string_with_details(
+                "app_config_dir_failed",
+                "Unable to resolve application config directory.",
+                error.to_string(),
+            )
+        })?
         .join("update-status.json"))
 }
 
@@ -120,10 +127,20 @@ fn read_cached_update_status(path: &Path) -> Option<UpdateStatus> {
 
 fn write_cached_update_status(path: &Path, status: &UpdateStatus) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        fs::create_dir_all(parent).map_err(|error| {
+            to_error_string_with_details(
+                "cache_write_failed",
+                "Unable to create cache directory.",
+                error.to_string(),
+            )
+        })?;
     }
-    let content = serde_json::to_string_pretty(status).map_err(|error| error.to_string())?;
-    fs::write(path, content).map_err(|error| error.to_string())
+    let content = serde_json::to_string_pretty(status).map_err(|error| {
+        to_error_string_with_details("cache_write_failed", "Unable to serialize update cache.", error.to_string())
+    })?;
+    fs::write(path, content).map_err(|error| {
+        to_error_string_with_details("cache_write_failed", "Unable to write update cache.", error.to_string())
+    })
 }
 
 fn update_cache_is_fresh(status: &UpdateStatus, current_version: &str) -> bool {
@@ -152,16 +169,24 @@ async fn fetch_latest_github_release(
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
         .send()
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| {
+            to_error_string_with_details("update_check_failed", "Unable to check for updates.", error.to_string())
+        })?;
 
     if !response.status().is_success() {
-        return Err(format!("GitHub returned {}", response.status()));
+        return Err(to_error_string_with_details(
+            "update_check_failed",
+            "GitHub API returned an error.",
+            format!("HTTP {}", response.status()),
+        ));
     }
 
     let releases = response
         .json::<Vec<GitHubRelease>>()
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| {
+            to_error_string_with_details("update_check_failed", "Unable to parse GitHub release data.", error.to_string())
+        })?;
 
     Ok(releases
         .into_iter()

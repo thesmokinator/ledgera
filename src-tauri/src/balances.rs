@@ -23,7 +23,6 @@ pub(crate) struct Balance {
 }
 
 pub(crate) fn parse_balance_output(
-    _app: &AppHandle,
     stdout: &str,
     settings: &AppSettings,
     apply_exclude: bool,
@@ -140,24 +139,17 @@ pub(crate) fn load_balances_for_settings(
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    parse_balance_output(app, &stdout, settings, apply_exclude)
+    parse_balance_output(&stdout, settings, apply_exclude)
 }
 
 #[tauri::command]
 pub(crate) async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     let settings = read_settings(&app)?;
-    let app_for_task = app.clone();
-    let settings_for_task = settings.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
-        load_balances_for_settings(&app_for_task, &settings_for_task, true)
-    })
+    crate::run_blocking(
+        "hledger_balance_failed",
+        "Unable to run hledger balance.",
+        move || load_balances_for_settings(&app, &settings, true),
+    )
     .await
-    .map_err(|error| {
-        to_error_string_with_details(
-            "hledger_balance_failed",
-            "Unable to run hledger balance.",
-            error.to_string(),
-        )
-    })?
 }

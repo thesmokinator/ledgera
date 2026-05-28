@@ -22,7 +22,7 @@ export function useAppSettings({
 
   const updateSettingsMutation = useMutation({
     mutationFn: (settings: AppSettings) =>
-      callCommand<AppSettings, { settings: AppSettings }>("update_app_settings", {
+      callCommand<AppSettings>("update_app_settings", {
         settings: normalizeSettings(settings),
       }),
     onSuccess: async (_, variables) => {

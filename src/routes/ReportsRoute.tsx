@@ -2,8 +2,8 @@ import { BarChartOutlined } from "@ant-design/icons";
 import { Button, Card, Collapse, Empty, Select, Space, Spin, Table } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
+import { callCommand } from "../utils/command";
 import { Amount } from "../components/Amount";
 import { ReportCharts } from "../components/ReportCharts";
 import type { ReportPeriodAmount, ReportResult, ReportRow } from "./types";
@@ -36,7 +36,7 @@ export function ReportsRoute({
 
   const reportQuery = useQuery({
     queryKey: ["report", reportType, interval],
-    queryFn: () => invoke<ReportResult>("run_report", { reportType, interval }),
+    queryFn: () => callCommand<ReportResult>("run_report", { reportType, interval }),
     enabled: false,
     retry: false,
   });
