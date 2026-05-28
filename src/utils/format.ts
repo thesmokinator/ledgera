@@ -8,11 +8,6 @@ export function toAutocompleteOptions(values: string[]): { value: string }[] {
   return values.map((value) => ({ value }));
 }
 
-export function formatJournalName(path: string): string {
-  const trimmedPath = path.trim();
-  return trimmedPath.split(/[\\/]/).filter(Boolean).pop() ?? trimmedPath;
-}
-
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const kb = bytes / 1024;

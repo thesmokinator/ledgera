@@ -3,7 +3,7 @@ import type { Dayjs } from "dayjs";
 export type ThemePreference = "system" | "dark" | "light";
 export type LanguagePreference = "system" | "en" | "it";
 
-export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs";
+export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs" | "reports";
 
 export type AppModuleSettings = {
   enabled: boolean;
@@ -203,6 +203,60 @@ export type Balance = {
   tint: AmountTint;
 };
 
+export type ReportResult = {
+  reportType: string;
+  interval: string;
+  periodColumns: string[];
+  rows: ReportRow[];
+  visualization: ReportVisualization;
+};
+
+export type ReportVisualizationKind = "allocation" | "breakdown" | "cashflow" | string;
+
+export type ReportVisualization = {
+  kind: ReportVisualizationKind;
+  entries: ReportChartEntry[];
+  periods: ReportPeriodSummary[];
+  accountLevel: number;
+};
+
+export type ReportChartEntry = {
+  account: string;
+  label: string;
+  amount: number;
+  chartAmount: number;
+  chartAmountFormatted: string;
+  commodity: string;
+  formatted: string;
+  tint: AmountTint;
+};
+
+export type ReportPeriodSummary = {
+  period: string;
+  amount: number;
+  chartAmount: number;
+  chartAmountFormatted: string;
+  commodity: string;
+  formatted: string;
+  tint: AmountTint;
+};
+
+export type ReportPeriodAmount = {
+  period: string;
+  amount: number;
+  commodity: string;
+  formatted: string;
+  tint: AmountTint;
+};
+
+export type ReportRow = {
+  account: string;
+  indent: number;
+  isTotal: boolean;
+  amounts: ReportPeriodAmount[];
+  total: ReportPeriodAmount;
+};
+
 export type AccountActivityRange = "current-month" | "30" | "60" | "90" | "180" | "365";
 
 export type AccountOverviewRow = {
@@ -260,6 +314,11 @@ export type GitSyncStatus = {
   files: GitSyncFileStatus[];
   lastCommit: string | null;
   error: string | null;
+};
+
+export type Notifier = {
+  success: (content: string) => void;
+  error: (content: string) => void;
 };
 
 export type NavigationItem = {

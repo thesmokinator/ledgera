@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
-import type { AccountActivityRange, JournalTransaction } from "../types";
+import type { JournalTransaction } from "../types";
 
 export const journalDateFormat = "YYYY-MM-DD";
 
@@ -32,18 +32,3 @@ export function isExecutedTransaction(transaction: JournalTransaction): boolean 
   return parsedDate.isValid() && !parsedDate.isAfter(dayjs(), "day");
 }
 
-export function isInAccountActivityRange(transaction: JournalTransaction, range: AccountActivityRange): boolean {
-  const parsedDate = dayjs(transaction.date, journalDateFormat, true);
-  if (!parsedDate.isValid()) {
-    return false;
-  }
-
-  const today = dayjs().startOf("day");
-  if (range === "current-month") {
-    return parsedDate.isSame(today, "month");
-  }
-
-  const days = Number(range);
-  const rangeStart = today.subtract(days - 1, "day");
-  return !parsedDate.isBefore(rangeStart, "day") && !parsedDate.isAfter(today, "day");
-}

@@ -34,6 +34,9 @@ function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+type ScoredAccount = { score: number; account: string };
+type ScoredTransaction = { score: number; transaction: JournalTransaction };
+
 function scoreMatch(haystack: string, needle: string): number {
   const normalizedHaystack = normalize(haystack);
   const normalizedNeedle = normalize(needle);
@@ -62,6 +65,33 @@ function scoreMatch(haystack: string, needle: string): number {
     haystackIndex++;
   }
   return 20;
+}
+
+function scoreAccounts(accounts: string[], normalizedQuery: string): ScoredAccount[] {
+  const scored: ScoredAccount[] = [];
+  for (const account of accounts) {
+    const accountScore = scoreMatch(account, normalizedQuery);
+    if (accountScore > 0) {
+      scored.push({ score: accountScore, account });
+    }
+  }
+  return scored;
+}
+
+function scoreTransactions(transactions: JournalTransaction[], normalizedQuery: string): ScoredTransaction[] {
+  const scored: ScoredTransaction[] = [];
+  for (const tx of transactions) {
+    const descScore = scoreMatch(tx.description, normalizedQuery);
+    let bestScore = descScore;
+    for (const posting of tx.postings) {
+      const postingScore = scoreMatch(posting.account, normalizedQuery);
+      if (postingScore > bestScore) bestScore = postingScore;
+    }
+    if (bestScore > 0) {
+      scored.push({ score: bestScore, transaction: tx });
+    }
+  }
+  return scored;
 }
 
 export function searchCommandPalette({
@@ -114,30 +144,16 @@ export function searchCommandPalette({
   }
 
   // Score accounts
-  for (const account of accounts) {
-    const accountScore = scoreMatch(account, normalizedQuery);
-    if (accountScore > 0) {
-      scored.push({
-        score: accountScore,
-        result: { type: "account", id: account, account },
-      });
-    }
+  for (const { score, account } of scoreAccounts(accounts, normalizedQuery)) {
+    scored.push({ score, result: { type: "account" as const, id: account, account } });
   }
 
   // Score transactions
-  for (const tx of transactions) {
-    const descScore = scoreMatch(tx.description, normalizedQuery);
-    let bestScore = descScore;
-    for (const posting of tx.postings) {
-      const postingScore = scoreMatch(posting.account, normalizedQuery);
-      if (postingScore > bestScore) bestScore = postingScore;
-    }
-    if (bestScore > 0) {
-      scored.push({
-        score: bestScore + 5, // Slight boost for transactions over accounts
-        result: { type: "transaction", id: tx.id, transaction: tx },
-      });
-    }
+  for (const { score, transaction } of scoreTransactions(transactions, normalizedQuery)) {
+    scored.push({
+      score: score + 5, // Slight boost for transactions over accounts
+      result: { type: "transaction" as const, id: transaction.id, transaction },
+    });
   }
 
   // Sort by score descending, then by type priority
@@ -178,29 +194,12 @@ export function searchJournalData({
 
   const scored: { score: number; result: SearchResult }[] = [];
 
-  for (const account of accounts) {
-    const accountScore = scoreMatch(account, normalizedQuery);
-    if (accountScore > 0) {
-      scored.push({
-        score: accountScore,
-        result: { type: "account", id: account, account },
-      });
-    }
+  for (const { score, account } of scoreAccounts(accounts, normalizedQuery)) {
+    scored.push({ score, result: { type: "account", id: account, account } });
   }
 
-  for (const tx of transactions) {
-    const descScore = scoreMatch(tx.description, normalizedQuery);
-    let bestScore = descScore;
-    for (const posting of tx.postings) {
-      const postingScore = scoreMatch(posting.account, normalizedQuery);
-      if (postingScore > bestScore) bestScore = postingScore;
-    }
-    if (bestScore > 0) {
-      scored.push({
-        score: bestScore,
-        result: { type: "transaction", id: tx.id, transaction: tx },
-      });
-    }
+  for (const { score, transaction } of scoreTransactions(transactions, normalizedQuery)) {
+    scored.push({ score, result: { type: "transaction", id: transaction.id, transaction } });
   }
 
   scored.sort((a, b) => b.score - a.score);

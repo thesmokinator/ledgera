@@ -1,5 +1,4 @@
 use crate::{
-    amount_style::AmountStyle,
     app_error::to_error_string_with_details,
     journal::{
         files::{load_journal_files, JournalFile},
@@ -7,10 +6,11 @@ use crate::{
             JournalPosting, JournalTransaction, PostingInput, TransactionBlock, TransactionDisplay,
             TransactionFlow, TransactionInput,
         },
+        util::{split_first_token, split_inline_comment},
     },
     AMOUNT_STYLE,
 };
-use std::{path::Path, sync::OnceLock};
+use std::path::Path;
 
 fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
     let files = load_journal_files(journal_path)?;
@@ -245,8 +245,8 @@ fn rate_token_pos(suffix: &str, token: &str) -> Option<usize> {
 /// Converts a total price (@@) to a unit price by dividing by the quantity.
 fn compute_unit_price_from_total(price_raw: &str, quantity: &str) -> String {
     let (price_qty, price_commodity) = parse_simple_amount(price_raw);
-    let q = parse_numeric_value(quantity);
-    let p = parse_numeric_value(&price_qty);
+    let q = parse_amount_value(quantity);
+    let p = parse_amount_value(&price_qty);
     if q != 0.0 && p != 0.0 {
         let unit = p / q.abs();
         let formatted = format!("{:.8}", unit);
@@ -296,11 +296,6 @@ fn parse_simple_amount(amount: &str) -> (String, String) {
     (quantity, commodity.to_string())
 }
 
-/// Parses a numeric value from an amount string, handling comma/dot decimal marks.
-fn parse_numeric_value(value: &str) -> f64 {
-    parse_amount_value(value)
-}
-
 /// Splits a posting into account and amount using hledger's common spacing convention.
 fn split_posting_account_amount(value: &str) -> (&str, &str) {
     let mut whitespace_start = None;
@@ -325,24 +320,6 @@ fn split_posting_account_amount(value: &str) -> (&str, &str) {
     }
 
     (value, "")
-}
-
-/// Splits an inline hledger comment from a posting line.
-fn split_inline_comment(value: &str) -> (&str, &str) {
-    if let Some(index) = value.find(';') {
-        (&value[..index], value[index + 1..].trim())
-    } else {
-        (value, "")
-    }
-}
-
-/// Splits the first token from a string.
-fn split_first_token(value: &str) -> (&str, &str) {
-    if let Some(index) = value.find(char::is_whitespace) {
-        (&value[..index], &value[index..])
-    } else {
-        (value, "")
-    }
 }
 
 /// Returns true when a line appears to start a ledger transaction.
@@ -375,24 +352,23 @@ pub(crate) fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlo
 }
 
 /// Splits content into normalized lines for range replacement.
-pub(crate) fn split_lines(content: &str) -> Vec<String> {
-    content.lines().map(ToString::to_string).collect()
+pub(crate) fn split_lines<'a>(content: &'a str) -> Vec<&'a str> {
+    content.lines().collect()
 }
 
 /// Replaces a one-based inclusive line range.
 pub(crate) fn replace_line_range(
-    lines: &[String],
+    lines: &[&str],
     start_line: usize,
     end_line: usize,
     replacement: &str,
 ) -> String {
-    let mut result = Vec::new();
     let start_index = start_line.saturating_sub(1);
     let end_index = end_line.min(lines.len());
 
-    result.extend_from_slice(&lines[..start_index]);
+    let mut result: Vec<&str> = lines[..start_index].to_vec();
     if !replacement.trim().is_empty() {
-        result.extend(replacement.lines().map(ToString::to_string));
+        result.extend(replacement.lines());
     }
     result.extend_from_slice(&lines[end_index..]);
 
@@ -421,7 +397,7 @@ pub(crate) fn format_transaction(input: &TransactionInput) -> String {
         .postings
         .iter()
         .filter(|posting| !posting.account.trim().is_empty())
-        .map(|posting| format_posting(posting))
+        .map(format_posting)
         .collect::<Vec<_>>();
 
     std::iter::once(header)
@@ -440,11 +416,7 @@ fn normalize_quantity(value: &str) -> String {
     let normalized = trimmed.replace(',', ".");
     match normalized.parse::<f64>() {
         Ok(val) => {
-            let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
-                static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
-                DEFAULT.get_or_init(AmountStyle::default)
-            });
-            style.format(val)
+            crate::global_amount_style().format(val)
         }
         Err(_) => trimmed.to_string(),
     }
@@ -618,19 +590,7 @@ pub(crate) fn summarize_transaction(postings: &[JournalPosting]) -> TransactionD
         } else {
             "transfer".to_string()
         };
-        let tint = match kind.as_str() {
-            "unknown" => "neutral".to_string(),
-            _ => {
-                let value = parse_amount_value(&posting.amount);
-                if value < 0.0 {
-                    "negative".to_string()
-                } else if value > 0.0 {
-                    "positive".to_string()
-                } else {
-                    "neutral".to_string()
-                }
-            }
-        };
+        let tint = crate::tint(parse_amount_value(&posting.amount)).to_string();
         return TransactionDisplay {
             account: posting.account.clone(),
             amount: display_amount.amount,
@@ -894,11 +854,7 @@ fn format_amount_part(value: f64, commodity: &str, styled: bool) -> String {
         if commodity.chars().all(|character| character.is_alphabetic()) {
             return format!("{} {}", format_commodity_quantity(value), commodity);
         }
-        let style_ref = AMOUNT_STYLE.get().unwrap_or_else(|| {
-            static DEFAULT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
-            DEFAULT_STYLE.get_or_init(AmountStyle::default)
-        });
-        return style_ref.format_amount(value, commodity);
+        return crate::global_amount_style().format_amount(value, commodity);
     }
 
     if commodity.is_empty() {
@@ -1014,11 +970,7 @@ fn format_commodity_quantity(value: f64) -> String {
 }
 
 fn format_amount_value_styled(value: f64) -> String {
-    let style_ref = AMOUNT_STYLE.get().unwrap_or_else(|| {
-        static DEFAULT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
-        DEFAULT_STYLE.get_or_init(AmountStyle::default)
-    });
-    style_ref.format(value)
+    crate::global_amount_style().format(value)
 }
 
 /// Formats a numeric string using the journal's display style.

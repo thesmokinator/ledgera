@@ -12,23 +12,13 @@ import { transactionTemplatePostings } from "../utils/account";
 import { todayJournalDate } from "../utils/date";
 import {
   emptyTransaction,
+  makeMovementInputAmount,
+  makeOutgoingAmount,
   toTransactionInput,
   withDefaultCommodity,
 } from "../utils/transaction";
 
 type SimpleTransactionType = Exclude<TransactionType, "advanced">;
-
-function makeOutgoingAmount(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.startsWith("-")) return trimmed;
-  return `-${trimmed}`;
-}
-
-function makeMovementInputAmount(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("-")) return trimmed;
-  return trimmed.slice(1).trim();
-}
 
 function normalizePosting(
   posting: Partial<PostingInput> | undefined,

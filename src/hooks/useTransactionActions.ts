@@ -2,16 +2,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
-import type { JournalSummary, JournalTransaction, TransactionInput, TransactionType } from "../types";
+import type { JournalSummary, JournalTransaction, Notifier, TransactionInput, TransactionType } from "../types";
 import { callCommand } from "../utils/command";
 import { journalDateFormat } from "../utils/date";
 import { formatAppError, parseAppError, parseError } from "../utils/error";
-import { autoCalculateBalancingAmounts } from "../utils/transaction";
-
-type Notifier = {
-  success: (content: string) => void;
-  error: (content: string) => void;
-};
+import { autoCalculateBalancingAmounts, makeOutgoingAmount } from "../utils/transaction";
 
 export function useTransactionActions({
   defaultCommodity,
@@ -59,7 +54,7 @@ export function useTransactionActions({
 
   const createTransactionMutation = useMutation({
     mutationFn: (input: TransactionInput) =>
-      callCommand<JournalSummary, { input: TransactionInput }>("create_transaction", { input }),
+      callCommand<JournalSummary>("create_transaction", { input }),
     onSuccess: async () => {
       setTransactionError(null);
       messageApi.success(t("transactions.transaction_created"));
@@ -71,7 +66,7 @@ export function useTransactionActions({
 
   const updateTransactionMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: TransactionInput }) =>
-      callCommand<JournalSummary, { id: string; input: TransactionInput }>("update_transaction", {
+      callCommand<JournalSummary>("update_transaction", {
         id,
         input,
       }),
@@ -86,19 +81,13 @@ export function useTransactionActions({
 
   const deleteTransactionMutation = useMutation({
     mutationFn: (id: string) =>
-      callCommand<JournalSummary, { id: string }>("delete_transaction", { id }),
+      callCommand<JournalSummary>("delete_transaction", { id }),
     onSuccess: async () => {
       messageApi.success(t("transactions.transaction_deleted"));
       await invalidateJournalData();
     },
     onError: (error) => messageApi.error(parseError(error, t)),
   });
-
-  function makeOutgoingAmount(value: string): string {
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.startsWith("-")) return trimmed;
-    return `-${trimmed}`;
-  }
 
   function submitTransaction(values: TransactionInput) {
     setTransactionError(null);

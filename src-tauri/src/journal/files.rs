@@ -1,5 +1,6 @@
 use crate::{
     app_error::{to_error_string, to_error_string_with_details},
+    journal::util::split_inline_comment,
     settings::AppSettings,
 };
 use std::{
@@ -134,7 +135,13 @@ fn expand_simple_glob(pattern: &Path) -> Result<Vec<PathBuf>, String> {
     }
 
     let mut matches = fs::read_dir(parent)
-        .map_err(|error| error.to_string())?
+        .map_err(|error| {
+            to_error_string_with_details(
+                "journal_read_failed",
+                "Unable to read journal directory.",
+                error.to_string(),
+            )
+        })?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| {
@@ -185,10 +192,3 @@ fn wildcard_matches(pattern: &str, value: &str) -> bool {
     }
 }
 
-fn split_inline_comment(value: &str) -> (&str, &str) {
-    if let Some(index) = value.find(';') {
-        (&value[..index], value[index + 1..].trim())
-    } else {
-        (value, "")
-    }
-}

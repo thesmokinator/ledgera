@@ -1,7 +1,7 @@
 import { LeftOutlined, RightOutlined } from "@ant-design/icons";
 import { Button, Card, Tabs, Typography } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
+import { callCommand } from "../utils/command";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -83,7 +83,7 @@ export function TransactionsRoute({
 
   const transactionsQuery = useQuery({
     queryKey: ["transactions"],
-    queryFn: () => invoke<JournalSummary>("list_transactions"),
+    queryFn: () => callCommand<JournalSummary>("list_transactions"),
     retry: false,
     refetchOnMount: true,
   });

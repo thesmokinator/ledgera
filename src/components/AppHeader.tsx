@@ -31,7 +31,7 @@ export function AppHeader({
           aria-label={t("common.search")}
         >
           <SearchOutlined className="search_trigger_icon" />
-          <span className="search_trigger_label">Search journal…</span>
+          <span className="search_trigger_label">{t("search.trigger_label")}</span>
           <span className="search_trigger_shortcut">{spotlightShortcut()}</span>
         </button>
         <Button type="primary" disabled={disableActions} onClick={onCreateTransaction}>

@@ -9,7 +9,6 @@ use crate::{
 };
 use serde::Serialize;
 use std::process::Command;
-use std::sync::OnceLock;
 use tauri::AppHandle;
 
 /// Returns account balances from hledger as a hierarchical tree.
@@ -24,7 +23,6 @@ pub(crate) struct Balance {
 }
 
 pub(crate) fn parse_balance_output(
-    _app: &AppHandle,
     stdout: &str,
     settings: &AppSettings,
     apply_exclude: bool,
@@ -66,7 +64,9 @@ pub(crate) fn parse_balance_output(
                 let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
                 if AMOUNT_STYLE.get().is_none() {
                     let style = AmountStyle::from_hledger_json(bal);
-                    let _ = AMOUNT_STYLE.set(style);
+                    if AMOUNT_STYLE.set(style).is_err() {
+                        eprintln!("[warn] AMOUNT_STYLE already set by another balance query");
+                    }
                 }
                 let qty = bal["aquantity"]
                     .get("floatingPoint")
@@ -87,21 +87,11 @@ pub(crate) fn parse_balance_output(
                 let fmt = if default_comm.is_empty() {
                     "0".to_string()
                 } else {
-                    let style = AMOUNT_STYLE.get().unwrap_or_else(|| {
-                        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
-                        DEFAULT.get_or_init(AmountStyle::default)
-                    });
-                    style.format_amount(0.0, &default_comm)
+                    crate::global_amount_style().format_amount(0.0, &default_comm)
                 };
                 (0.0, default_comm, fmt)
             };
-        let tint = if amount < 0.0 {
-            "negative".to_string()
-        } else if amount > 0.0 {
-            "positive".to_string()
-        } else {
-            "neutral".to_string()
-        };
+        let tint = crate::tint(amount).to_string();
         result.push(Balance {
             account,
             amount,
@@ -151,24 +141,17 @@ pub(crate) fn load_balances_for_settings(
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    parse_balance_output(app, &stdout, settings, apply_exclude)
+    parse_balance_output(&stdout, settings, apply_exclude)
 }
 
 #[tauri::command]
 pub(crate) async fn get_balances(app: AppHandle) -> Result<Vec<Balance>, String> {
     let settings = read_settings(&app)?;
-    let app_for_task = app.clone();
-    let settings_for_task = settings.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
-        load_balances_for_settings(&app_for_task, &settings_for_task, true)
-    })
+    crate::run_blocking(
+        "hledger_balance_failed",
+        "Unable to run hledger balance.",
+        move || load_balances_for_settings(&app, &settings, true),
+    )
     .await
-    .map_err(|error| {
-        to_error_string_with_details(
-            "hledger_balance_failed",
-            "Unable to run hledger balance.",
-            error.to_string(),
-        )
-    })?
 }

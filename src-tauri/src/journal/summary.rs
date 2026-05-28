@@ -8,6 +8,7 @@ use crate::{
         files::load_journal_files,
         parser::load_transactions_from_journal_via_files,
         types::{DashboardSummary, JournalSummary, JournalTransaction},
+        util::parse_journal_date,
     },
     AMOUNT_STYLE, COMMODITY_STYLES,
 };
@@ -22,8 +23,10 @@ pub(crate) fn read_journal_summary(
     let file_count = files.len();
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
 
-    let amount_style = parse_amount_style(&files, "€");
-    let _ = AMOUNT_STYLE.set(amount_style.clone());
+    let amount_style = parse_amount_style(&files);
+    if AMOUNT_STYLE.set(amount_style.clone()).is_err() {
+        eprintln!("[warn] AMOUNT_STYLE already set by another journal query");
+    }
     let commodity_styles = parse_commodity_styles(&files);
     let _ = COMMODITY_STYLES.set(commodity_styles);
 
@@ -114,20 +117,17 @@ pub(crate) fn build_dashboard_summary(transactions: &[JournalTransaction]) -> Da
 
 /// Returns whether a transaction belongs to the current month up to today.
 fn is_in_current_month_to_date(transaction: &JournalTransaction) -> bool {
-    let today = Local::now().date_naive();
-    parse_journal_date(&transaction.date)
-        .map(|date| date.year() == today.year() && date.month() == today.month() && date <= today)
-        .unwrap_or(false)
+    is_current_month(transaction, |date, today| date <= today)
 }
 
 /// Returns whether a transaction is scheduled later in the current month.
 fn is_scheduled_this_month(transaction: &JournalTransaction) -> bool {
-    let today = Local::now().date_naive();
-    parse_journal_date(&transaction.date)
-        .map(|date| date.year() == today.year() && date.month() == today.month() && date > today)
-        .unwrap_or(false)
+    is_current_month(transaction, |date, today| date > today)
 }
 
-fn parse_journal_date(value: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
+fn is_current_month(transaction: &JournalTransaction, cmp: impl Fn(NaiveDate, NaiveDate) -> bool) -> bool {
+    let today = Local::now().date_naive();
+    parse_journal_date(&transaction.date)
+        .map_or(false, |date| date.year() == today.year() && date.month() == today.month() && cmp(date, today))
 }
+

@@ -1,12 +1,12 @@
 use crate::{
-    app_error::to_error_string_with_details,
     balances::{load_balances_for_settings, Balance},
     journal::{
         files::require_journal_path, summary::read_journal_summary, types::JournalTransaction,
+        util::parse_journal_date,
     },
     settings::read_settings,
 };
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local};
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::AppHandle;
@@ -19,20 +19,12 @@ pub(crate) async fn get_accounts_overview(
     let settings = read_settings(&app)?;
     let journal_path = require_journal_path(&settings)?;
     let summary = read_journal_summary(&journal_path, settings.default_commodity.trim())?;
-    let app_for_task = app.clone();
-    let settings_for_task = settings.clone();
-
-    let balances = tauri::async_runtime::spawn_blocking(move || {
-        load_balances_for_settings(&app_for_task, &settings_for_task, true)
-    })
-    .await
-    .map_err(|error| {
-        to_error_string_with_details(
-            "hledger_balance_failed",
-            "Unable to run hledger balance for accounts overview.",
-            error.to_string(),
-        )
-    })??;
+    let balances = crate::run_blocking(
+        "hledger_balance_failed",
+        "Unable to run hledger balance for accounts overview.",
+        move || load_balances_for_settings(&app, &settings, true),
+    )
+    .await?;
 
     Ok(build_accounts_overview(
         &summary.transactions,
@@ -61,10 +53,6 @@ struct AccountOverviewRow {
     balance: Option<Balance>,
     activity_count: usize,
     transactions: Vec<JournalTransaction>,
-}
-
-fn parse_journal_date(value: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
 }
 
 fn is_in_account_activity_range(transaction: &JournalTransaction, range: &str) -> bool {
@@ -99,13 +87,6 @@ fn account_group(account: &str) -> &'static str {
         "expense" | "expenses" => "expenses",
         _ => "other",
     }
-}
-
-fn transaction_includes_account(transaction: &JournalTransaction, account: &str) -> bool {
-    transaction
-        .postings
-        .iter()
-        .any(|posting| posting.account.trim().eq_ignore_ascii_case(account))
 }
 
 pub(crate) fn build_accounts_overview(
@@ -145,14 +126,22 @@ pub(crate) fn build_accounts_overview(
         .map(|balance| (balance.account.to_lowercase(), balance))
         .collect::<HashMap<_, _>>();
 
+    let mut transactions_by_account: HashMap<String, Vec<JournalTransaction>> = HashMap::new();
+    for transaction in &visible_transactions {
+        for posting in &transaction.postings {
+            let account = posting.account.trim().to_lowercase();
+            if !account.is_empty() {
+                transactions_by_account
+                    .entry(account)
+                    .or_default()
+                    .push((*transaction).to_owned());
+            }
+        }
+    }
+
     let mut grouped = HashMap::<&'static str, Vec<AccountOverviewRow>>::new();
     for (account_key, account) in account_names {
-        let account_transactions = visible_transactions
-            .iter()
-            .filter(|transaction| transaction_includes_account(transaction, &account))
-            .map(|transaction| (*transaction).to_owned())
-            .collect::<Vec<_>>();
-
+        let account_transactions = transactions_by_account.remove(&account_key).unwrap_or_default();
         let group = account_group(&account);
         grouped.entry(group).or_default().push(AccountOverviewRow {
             account,

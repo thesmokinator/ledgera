@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager};
 
 const DEFAULT_GIT_COMMIT_MESSAGE: &str = "Update journal from Ledgera";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppModuleSettings {
     #[serde(default)]
@@ -67,12 +67,6 @@ pub(crate) struct AppSettings {
     pub(crate) prefill_postings: bool,
     #[serde(default)]
     pub(crate) modules: AppModulesSettings,
-}
-
-impl Default for AppModuleSettings {
-    fn default() -> Self {
-        Self { enabled: false }
-    }
 }
 
 impl Default for GitSyncModuleSettings {
@@ -196,6 +190,12 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app
         .path()
         .app_config_dir()
-        .map_err(|error| error.to_string())?
+        .map_err(|error| {
+            to_error_string_with_details(
+                "app_config_dir_failed",
+                "Unable to resolve application config directory.",
+                error.to_string(),
+            )
+        })?
         .join("settings.json"))
 }

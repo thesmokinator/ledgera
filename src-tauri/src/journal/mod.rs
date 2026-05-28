@@ -6,3 +6,4 @@ pub(crate) mod search;
 pub(crate) mod summary;
 pub(crate) mod transactions;
 pub(crate) mod types;
+pub(crate) mod util;

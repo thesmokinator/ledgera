@@ -26,15 +26,15 @@ export const defaultSettings: AppSettings = {
 
 export function normalizeModules(settings?: Partial<AppSettings>): AppModulesSettings {
   const modules = settings?.modules;
-  const marketPricesEnabled = modules?.marketPrices?.enabled ?? settings?.fetchPrices ?? false;
-  const developerToolsEnabled = modules?.developerTools?.enabled ?? settings?.powerUser ?? false;
+  const marketPricesEnabled = modules?.marketPrices?.enabled ?? settings?.fetchPrices ?? defaultModules.marketPrices.enabled;
+  const developerToolsEnabled = modules?.developerTools?.enabled ?? settings?.powerUser ?? defaultModules.developerTools.enabled;
 
   return {
     marketPrices: { enabled: marketPricesEnabled },
     developerTools: { enabled: developerToolsEnabled },
-    updateChecker: { enabled: modules?.updateChecker?.enabled ?? true },
+    updateChecker: { enabled: modules?.updateChecker?.enabled ?? defaultModules.updateChecker.enabled },
     gitSync: {
-      enabled: modules?.gitSync?.enabled ?? false,
+      enabled: modules?.gitSync?.enabled ?? defaultModules.gitSync.enabled,
       commitMessage: modules?.gitSync?.commitMessage?.trim() || defaultGitCommitMessage,
     },
   };

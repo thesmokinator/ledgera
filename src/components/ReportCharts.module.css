@@ -1,0 +1,104 @@
+.single_chart_card {
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-border-radius-lg);
+    background: var(--ant-color-bg-container);
+}
+
+.chart_title {
+    flex-shrink: 0;
+    margin: 0 0 14px 0;
+    color: var(--ant-color-text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.chart_container {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
+.chart_empty_state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 220px;
+    color: var(--ant-color-text-tertiary);
+}
+
+.chart_note {
+    margin: 10px 0 0;
+    color: var(--ant-color-text-tertiary);
+    font-size: 12px;
+    text-align: center;
+}
+
+.ranked_bars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    padding: 2px 4px 4px 0;
+}
+
+.ranked_bar_row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ranked_bar_header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: baseline;
+}
+
+.ranked_bar_account {
+    overflow: hidden;
+    color: var(--ant-color-text-secondary);
+    font-size: 12px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ranked_bar_amount {
+    color: var(--ant-color-text);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.ranked_bar_track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(
+        in srgb,
+        var(--ant-color-fill-secondary) 60%,
+        transparent
+    );
+}
+
+.ranked_bar_fill {
+    height: 100%;
+    min-width: 2px;
+    border-radius: inherit;
+}
+
+@media (max-width: 780px) {
+    .single_chart_card {
+        min-height: 300px;
+    }
+}

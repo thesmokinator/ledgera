@@ -6,10 +6,8 @@ import {
   isValidJournalDate,
   isSameJournalMonth,
   isExecutedTransaction,
-  isInAccountActivityRange,
 } from "./date";
 import type { JournalTransaction } from "../types";
-import type { JournalTransaction } from "../../types";
 
 function makeTx(date: string): JournalTransaction {
   return {
@@ -135,42 +133,4 @@ describe("isExecutedTransaction", () => {
   });
 });
 
-describe("isInAccountActivityRange", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
 
-  it('returns true for today within "current-month"', () => {
-    const today = dayjs().format(journalDateFormat);
-    expect(isInAccountActivityRange(makeTx(today), "current-month")).toBe(true);
-  });
-
-  it('returns false for a different month with "current-month"', () => {
-    const lastMonth = dayjs().subtract(2, "month").format(journalDateFormat);
-    expect(isInAccountActivityRange(makeTx(lastMonth), "current-month")).toBe(false);
-  });
-
-  it("returns true for a date within the last 30 days", () => {
-    const tenDaysAgo = dayjs().subtract(10, "day").format(journalDateFormat);
-    expect(isInAccountActivityRange(makeTx(tenDaysAgo), "30")).toBe(true);
-  });
-
-  it("returns false for a date older than 30 days", () => {
-    const fortyDaysAgo = dayjs().subtract(40, "day").format(journalDateFormat);
-    expect(isInAccountActivityRange(makeTx(fortyDaysAgo), "30")).toBe(false);
-  });
-
-  it("returns true for a date within 365 days", () => {
-    const hundredDaysAgo = dayjs().subtract(100, "day").format(journalDateFormat);
-    expect(isInAccountActivityRange(makeTx(hundredDaysAgo), "365")).toBe(true);
-  });
-
-  it("returns false for a date older than 365 days", () => {
-    const twoYearsAgo = dayjs().subtract(400, "day").format(journalDateFormat);
-    expect(isInAccountActivityRange(makeTx(twoYearsAgo), "365")).toBe(false);
-  });
-
-  it("returns false for an invalid date", () => {
-    expect(isInAccountActivityRange(makeTx("bad-date"), "30")).toBe(false);
-  });
-});

@@ -1,11 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UpdateStatus } from "../types";
+import type { Notifier, UpdateStatus } from "../types";
 import { callCommand } from "../utils/command";
-
-type Notifier = {
-  success: (content: string) => void;
-  error: (content: string) => void;
-};
 
 export function useUpdateStatus({
   enabled,
@@ -20,13 +15,13 @@ export function useUpdateStatus({
 
   const updateStatusQuery = useQuery({
     queryKey: ["update-status"],
-    queryFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: false }),
+    queryFn: () => callCommand<UpdateStatus>("check_for_updates", { force: false }),
     enabled,
     retry: false,
   });
 
   const checkForUpdatesMutation = useMutation({
-    mutationFn: () => callCommand<UpdateStatus, { force: boolean }>("check_for_updates", { force: true }),
+    mutationFn: () => callCommand<UpdateStatus>("check_for_updates", { force: true }),
     onSuccess: (status) => {
       queryClient.setQueryData(["update-status"], status);
       if (status.available) {

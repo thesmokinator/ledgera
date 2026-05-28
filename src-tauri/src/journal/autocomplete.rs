@@ -1,4 +1,8 @@
-use crate::journal::{files::JournalFile, types::JournalTransaction};
+use crate::journal::{
+    files::JournalFile,
+    types::JournalTransaction,
+    util::{split_first_token, split_inline_comment},
+};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -150,18 +154,3 @@ fn most_frequent(values: HashMap<String, usize>) -> String {
         .unwrap_or_default()
 }
 
-fn split_first_token(value: &str) -> (&str, &str) {
-    if let Some(index) = value.find(char::is_whitespace) {
-        (&value[..index], &value[index..])
-    } else {
-        (value, "")
-    }
-}
-
-fn split_inline_comment(value: &str) -> (&str, &str) {
-    if let Some(index) = value.find(';') {
-        (&value[..index], value[index + 1..].trim())
-    } else {
-        (value, "")
-    }
-}

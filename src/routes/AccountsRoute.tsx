@@ -1,6 +1,6 @@
 import { Card, Empty, Input, Select, Space, Table, Typography } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
+import { callCommand } from "../utils/command";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TransactionsTable } from "./TransactionsTable";
@@ -53,7 +53,7 @@ export function AccountsRoute({
 
   const accountsQuery = useQuery({
     queryKey: ["accounts-overview", activityRange],
-    queryFn: () => invoke<AccountsOverview>("get_accounts_overview", { activityRange }),
+    queryFn: () => callCommand<AccountsOverview>("get_accounts_overview", { activityRange }),
     retry: false,
     refetchOnMount: true,
   });

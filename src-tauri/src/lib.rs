@@ -12,10 +12,12 @@ mod hledger;
 mod investments;
 mod journal;
 mod logs;
+mod reports;
 mod settings;
 mod sync;
 mod updates;
 
+use app_error::to_error_string_with_details;
 use amount_style::AmountStyle;
 #[cfg(test)]
 use amount_style::{format_hledger_amount, format_hledger_display_amount, parse_format_directive};
@@ -50,6 +52,35 @@ use std::{
 static AMOUNT_STYLE: OnceLock<AmountStyle> = OnceLock::new();
 static COMMODITY_STYLES: OnceLock<std::collections::HashMap<String, AmountStyle>> = OnceLock::new();
 
+pub(crate) fn global_amount_style() -> &'static AmountStyle {
+    AMOUNT_STYLE.get().unwrap_or_else(|| {
+        static DEFAULT: OnceLock<AmountStyle> = OnceLock::new();
+        DEFAULT.get_or_init(AmountStyle::default)
+    })
+}
+
+/// Runs a blocking operation on a dedicated thread, translating join errors into structured errors.
+pub(crate) async fn run_blocking<F, T>(code: &'static str, message: &'static str, f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|error| to_error_string_with_details(code, message, error.to_string()))?
+}
+
+/// Returns a tint label for a numeric amount.
+pub(crate) fn tint(amount: f64) -> &'static str {
+    if amount < 0.0 {
+        "negative"
+    } else if amount > 0.0 {
+        "positive"
+    } else {
+        "neutral"
+    }
+}
+
 /// Starts the Tauri application and registers backend commands.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -57,7 +88,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            logs::cleanup_old_logs(&app.handle());
+            logs::cleanup_old_logs(app.handle());
 
             let win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
@@ -88,6 +119,7 @@ pub fn run() {
             logs::get_logs,
             logs::clear_logs,
             investments::get_investments_overview,
+            reports::run_report,
             balances::get_balances,
             accounts::get_accounts_overview,
         ])
@@ -755,5 +787,25 @@ mod tests {
         let result = format_posting(&posting);
         assert!(result.contains("@ 45000 USD"));
         assert!(result.contains("; limit order"));
+    }
+
+    #[test]
+    fn tint_returns_negative_for_negative_amount() {
+        assert_eq!(tint(-1.0), "negative");
+        assert_eq!(tint(-0.01), "negative");
+        assert_eq!(tint(f64::MIN), "negative");
+    }
+
+    #[test]
+    fn tint_returns_positive_for_positive_amount() {
+        assert_eq!(tint(1.0), "positive");
+        assert_eq!(tint(0.01), "positive");
+        assert_eq!(tint(f64::MAX), "positive");
+    }
+
+    #[test]
+    fn tint_returns_neutral_for_zero() {
+        assert_eq!(tint(0.0), "neutral");
+        assert_eq!(tint(-0.0), "neutral");
     }
 }

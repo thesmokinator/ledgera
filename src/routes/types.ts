@@ -27,4 +27,11 @@ export type {
   InvestmentOverview,
   MonthSetter,
   NavigationItem,
+  ReportResult,
+  ReportRow,
+  ReportPeriodAmount,
+  ReportVisualization,
+  ReportVisualizationKind,
+  ReportChartEntry,
+  ReportPeriodSummary,
 } from "../types";

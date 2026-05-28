@@ -1,6 +1,6 @@
 import { Card, Empty, Space, Table } from "antd";
-import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
+import { callCommand } from "../utils/command";
 import { useTranslation } from "react-i18next";
 import { Amount } from "../components/Amount";
 import type { Balance, InvestmentOverview } from "./types";
@@ -11,14 +11,14 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
 
   const balancesQuery = useQuery({
     queryKey: ["balances"],
-    queryFn: () => invoke<Balance[]>("get_balances"),
+    queryFn: () => callCommand<Balance[]>("get_balances"),
     retry: false,
     refetchOnMount: true,
   });
 
   const investmentsQuery = useQuery({
     queryKey: ["investments-overview"],
-    queryFn: () => invoke<InvestmentOverview[]>("get_investments_overview"),
+    queryFn: () => callCommand<InvestmentOverview[]>("get_investments_overview"),
     enabled: fetchPrices,
     retry: false,
     refetchOnMount: true,

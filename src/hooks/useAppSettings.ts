@@ -1,12 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AppSettings } from "../types";
+import type { AppSettings, Notifier } from "../types";
 import { callCommand } from "../utils/command";
 import { parseError } from "../utils/error";
 import { normalizeSettings } from "../utils/settings";
-
-type Notifier = {
-  error: (content: string) => void;
-};
 
 export function useAppSettings({
   messageApi,
@@ -26,7 +22,7 @@ export function useAppSettings({
 
   const updateSettingsMutation = useMutation({
     mutationFn: (settings: AppSettings) =>
-      callCommand<AppSettings, { settings: AppSettings }>("update_app_settings", {
+      callCommand<AppSettings>("update_app_settings", {
         settings: normalizeSettings(settings),
       }),
     onSuccess: async (_, variables) => {

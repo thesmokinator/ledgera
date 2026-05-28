@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  formatCount,
-  toAutocompleteOptions,
-  formatJournalName,
-  formatFileSize,
-} from "./format";
+import { formatCount, toAutocompleteOptions, formatFileSize } from "./format";
 
 describe("formatCount", () => {
   it("formats 0", () => {
@@ -45,36 +40,6 @@ describe("toAutocompleteOptions", () => {
       { value: "€" },
       { value: "$" },
     ]);
-  });
-});
-
-describe("formatJournalName", () => {
-  it("extracts filename from Unix path", () => {
-    expect(formatJournalName("/Users/name/accounting/main.journal")).toBe("main.journal");
-  });
-
-  it("extracts filename from Windows path", () => {
-    expect(formatJournalName("C:\\Users\\name\\accounting\\main.journal")).toBe("main.journal");
-  });
-
-  it("returns the name unchanged if no path separator", () => {
-    expect(formatJournalName("journal.ledger")).toBe("journal.ledger");
-  });
-
-  it("handles trailing slash", () => {
-    expect(formatJournalName("/path/to/journal/")).toBe("journal");
-  });
-
-  it("trims whitespace", () => {
-    expect(formatJournalName("  /path/to/file.journal  ")).toBe("file.journal");
-  });
-
-  it("returns empty string for empty input", () => {
-    expect(formatJournalName("")).toBe("");
-  });
-
-  it("returns whitespace-only input as empty", () => {
-    expect(formatJournalName("   ")).toBe("");
   });
 });
 

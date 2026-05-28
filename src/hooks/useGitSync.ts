@@ -1,12 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AppSettings, GitSyncStatus } from "../types";
+import type { AppSettings, GitSyncStatus, Notifier } from "../types";
 import { callCommand } from "../utils/command";
 import { parseError } from "../utils/error";
-
-type Notifier = {
-  success: (content: string) => void;
-  error: (content: string) => void;
-};
 
 export function gitSyncSummary(status: GitSyncStatus | undefined): {
   tone: "neutral" | "success" | "warning" | "danger";
@@ -37,7 +32,6 @@ export function useGitSync({
   async function invalidateGitAndJournal(status: GitSyncStatus) {
     queryClient.setQueryData(["git-sync-status"], status);
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     await queryClient.invalidateQueries({ queryKey: ["balances"] });
     await queryClient.invalidateQueries({ queryKey: ["investments"] });
   }
@@ -60,7 +54,7 @@ export function useGitSync({
 
   const commitAndPushMutation = useMutation({
     mutationFn: (message: string) =>
-      callCommand<GitSyncStatus, { message: string }>("git_commit_and_push_journal", { message }),
+      callCommand<GitSyncStatus>("git_commit_and_push_journal", { message }),
     onSuccess: async (status) => {
       messageApi.success(t("sync.commit_push_success"));
       await invalidateGitAndJournal(status);
