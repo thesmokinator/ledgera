@@ -7,16 +7,8 @@ export function classSuffix(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function cssModuleClass(camelCaseKey: string, snakeCaseKey: string): string {
-  return styles[camelCaseKey] ?? styles[snakeCaseKey] ?? "";
-}
-
 function amountClass({ tint, kind }: { tint: AmountTint; kind?: AmountKind }): string {
-  const kindClass = kind
-    ? cssModuleClass(`amountKind${classSuffix(kind)}`, `amount_kind_${kind}`)
-    : "";
-  const tintClass = cssModuleClass(`amount${classSuffix(tint)}`, `amount_${tint}`);
-  return kindClass || tintClass;
+  return styles[`amount_kind_${kind}`] ?? styles[`amount_${tint}`] ?? "";
 }
 
 export function Amount({
