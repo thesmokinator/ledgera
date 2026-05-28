@@ -158,8 +158,8 @@ export function ReportCharts({ data }: ReportChartsProps) {
                 title: (d: ReportPeriodSummary) => d.period,
                 items: [
                   {
-                    name: t("balances.value"),
-                    value: (d: ReportPeriodSummary) => d.formatted,
+                    field: "formatted",
+                    name: "",
                   },
                 ],
               }}

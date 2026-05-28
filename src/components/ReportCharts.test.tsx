@@ -3,10 +3,23 @@ import { describe, expect, it, vi } from "vitest";
 import { ReportCharts } from "./ReportCharts";
 import type { ReportResult } from "../types";
 
+type ColumnProps = {
+  data: unknown[];
+  tooltip?: {
+    title?: (datum: { period: string }) => string;
+    items?: Array<{ field?: string; name?: string }>;
+  };
+};
+
+const chartMocks = vi.hoisted(() => ({
+  lastColumnProps: undefined as ColumnProps | undefined,
+}));
+
 vi.mock("@ant-design/charts", () => ({
-  Column: ({ data }: { data: unknown[] }) => (
-    <div data-testid="cashflow-column-chart" data-count={data.length} />
-  ),
+  Column: (props: ColumnProps) => {
+    chartMocks.lastColumnProps = props;
+    return <div data-testid="cashflow-column-chart" data-count={props.data.length} />;
+  },
   Pie: () => null,
 }));
 
@@ -77,5 +90,11 @@ describe("ReportCharts", () => {
         "Cashflow by period will appear here once the selected report contains cash movements.",
       ),
     ).toBeNull();
+    expect(chartMocks.lastColumnProps?.tooltip?.title?.({ period: "2026-01" })).toBe(
+      "2026-01",
+    );
+    expect(chartMocks.lastColumnProps?.tooltip?.items).toEqual([
+      { field: "formatted", name: "" },
+    ]);
   });
 });
