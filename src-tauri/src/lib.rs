@@ -788,4 +788,24 @@ mod tests {
         assert!(result.contains("@ 45000 USD"));
         assert!(result.contains("; limit order"));
     }
+
+    #[test]
+    fn tint_returns_negative_for_negative_amount() {
+        assert_eq!(tint(-1.0), "negative");
+        assert_eq!(tint(-0.01), "negative");
+        assert_eq!(tint(f64::MIN), "negative");
+    }
+
+    #[test]
+    fn tint_returns_positive_for_positive_amount() {
+        assert_eq!(tint(1.0), "positive");
+        assert_eq!(tint(0.01), "positive");
+        assert_eq!(tint(f64::MAX), "positive");
+    }
+
+    #[test]
+    fn tint_returns_neutral_for_zero() {
+        assert_eq!(tint(0.0), "neutral");
+        assert_eq!(tint(-0.0), "neutral");
+    }
 }

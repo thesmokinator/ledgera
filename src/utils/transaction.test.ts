@@ -6,7 +6,10 @@ import {
   parseAmountValue,
   parseUnitPrice,
   autoCalculateBalancingAmounts,
+  makeOutgoingAmount,
+  makeMovementInputAmount,
 } from "./transaction";
+import { classSuffix } from "../components/Amount";
 import type { JournalTransaction } from "../types";
 
 describe("emptyTransaction", () => {
@@ -178,6 +181,61 @@ describe("parseUnitPrice", () => {
     const result = parseUnitPrice("150");
     expect(result.value).toBe(150);
     expect(result.commodity).toBe("");
+  });
+});
+
+describe("makeOutgoingAmount", () => {
+  it("prepends minus sign to a plain number", () => {
+    expect(makeOutgoingAmount("100")).toBe("-100");
+  });
+
+  it("trims whitespace", () => {
+    expect(makeOutgoingAmount("  100  ")).toBe("-100");
+  });
+
+  it("keeps already negative value unchanged", () => {
+    expect(makeOutgoingAmount("-100")).toBe("-100");
+    expect(makeOutgoingAmount("-0")).toBe("-0");
+  });
+
+  it("returns empty string as-is", () => {
+    expect(makeOutgoingAmount("")).toBe("");
+    expect(makeOutgoingAmount("   ")).toBe("");
+  });
+});
+
+describe("classSuffix", () => {
+  it("capitalizes first letter", () => {
+    expect(classSuffix("expense")).toBe("Expense");
+    expect(classSuffix("income")).toBe("Income");
+    expect(classSuffix("transfer")).toBe("Transfer");
+  });
+
+  it("handles single character", () => {
+    expect(classSuffix("a")).toBe("A");
+  });
+
+  it("handles empty string", () => {
+    expect(classSuffix("")).toBe("");
+  });
+});
+
+describe("makeMovementInputAmount", () => {
+  it("removes leading minus sign", () => {
+    expect(makeMovementInputAmount("-100")).toBe("100");
+  });
+
+  it("keeps positive value unchanged", () => {
+    expect(makeMovementInputAmount("100")).toBe("100");
+  });
+
+  it("trims whitespace", () => {
+    expect(makeMovementInputAmount("  -50  ")).toBe("50");
+  });
+
+  it("handles zero", () => {
+    expect(makeMovementInputAmount("0")).toBe("0");
+    expect(makeMovementInputAmount("-0")).toBe("0");
   });
 });
 
