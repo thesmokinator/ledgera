@@ -352,24 +352,23 @@ pub(crate) fn find_block(journal_path: &Path, id: &str) -> Result<TransactionBlo
 }
 
 /// Splits content into normalized lines for range replacement.
-pub(crate) fn split_lines(content: &str) -> Vec<String> {
-    content.lines().map(ToString::to_string).collect()
+pub(crate) fn split_lines<'a>(content: &'a str) -> Vec<&'a str> {
+    content.lines().collect()
 }
 
 /// Replaces a one-based inclusive line range.
 pub(crate) fn replace_line_range(
-    lines: &[String],
+    lines: &[&str],
     start_line: usize,
     end_line: usize,
     replacement: &str,
 ) -> String {
-    let mut result = Vec::new();
     let start_index = start_line.saturating_sub(1);
     let end_index = end_line.min(lines.len());
 
-    result.extend_from_slice(&lines[..start_index]);
+    let mut result: Vec<&str> = lines[..start_index].to_vec();
     if !replacement.trim().is_empty() {
-        result.extend(replacement.lines().map(ToString::to_string));
+        result.extend(replacement.lines());
     }
     result.extend_from_slice(&lines[end_index..]);
 

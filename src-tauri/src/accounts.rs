@@ -89,13 +89,6 @@ fn account_group(account: &str) -> &'static str {
     }
 }
 
-fn transaction_includes_account(transaction: &JournalTransaction, account: &str) -> bool {
-    transaction
-        .postings
-        .iter()
-        .any(|posting| posting.account.trim().eq_ignore_ascii_case(account))
-}
-
 pub(crate) fn build_accounts_overview(
     transactions: &[JournalTransaction],
     balances: Vec<Balance>,
@@ -133,14 +126,22 @@ pub(crate) fn build_accounts_overview(
         .map(|balance| (balance.account.to_lowercase(), balance))
         .collect::<HashMap<_, _>>();
 
+    let mut transactions_by_account: HashMap<String, Vec<JournalTransaction>> = HashMap::new();
+    for transaction in &visible_transactions {
+        for posting in &transaction.postings {
+            let account = posting.account.trim().to_lowercase();
+            if !account.is_empty() {
+                transactions_by_account
+                    .entry(account)
+                    .or_default()
+                    .push((*transaction).to_owned());
+            }
+        }
+    }
+
     let mut grouped = HashMap::<&'static str, Vec<AccountOverviewRow>>::new();
     for (account_key, account) in account_names {
-        let account_transactions = visible_transactions
-            .iter()
-            .filter(|transaction| transaction_includes_account(transaction, &account))
-            .map(|transaction| (*transaction).to_owned())
-            .collect::<Vec<_>>();
-
+        let account_transactions = transactions_by_account.remove(&account_key).unwrap_or_default();
         let group = account_group(&account);
         grouped.entry(group).or_default().push(AccountOverviewRow {
             account,
