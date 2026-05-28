@@ -15,8 +15,10 @@ export function useHotkeys(shortcuts: Shortcut[]) {
     // Allow hotkeys everywhere, including inside form fields
     hotkeys.filter = () => true;
 
+    const boundKeys: string[] = [];
     for (const shortcut of shortcutsRef.current) {
       if (!shortcut.disabled) {
+        boundKeys.push(shortcut.keys);
         hotkeys(shortcut.keys, (event, handler) => {
           event.preventDefault();
           shortcut.action(event, handler);
@@ -25,7 +27,9 @@ export function useHotkeys(shortcuts: Shortcut[]) {
     }
 
     return () => {
-      hotkeys.unbind();
+      for (const keys of boundKeys) {
+        hotkeys.unbind(keys);
+      }
     };
   }, [shortcuts]);
 }
