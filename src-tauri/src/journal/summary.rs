@@ -24,7 +24,9 @@ pub(crate) fn read_journal_summary(
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
 
     let amount_style = parse_amount_style(&files);
-    let _ = AMOUNT_STYLE.set(amount_style.clone());
+    if AMOUNT_STYLE.set(amount_style.clone()).is_err() {
+        eprintln!("[warn] AMOUNT_STYLE already set by another journal query");
+    }
     let commodity_styles = parse_commodity_styles(&files);
     let _ = COMMODITY_STYLES.set(commodity_styles);
 

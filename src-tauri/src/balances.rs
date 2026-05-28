@@ -64,7 +64,9 @@ pub(crate) fn parse_balance_output(
                 let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
                 if AMOUNT_STYLE.get().is_none() {
                     let style = AmountStyle::from_hledger_json(bal);
-                    let _ = AMOUNT_STYLE.set(style);
+                    if AMOUNT_STYLE.set(style).is_err() {
+                        eprintln!("[warn] AMOUNT_STYLE already set by another balance query");
+                    }
                 }
                 let qty = bal["aquantity"]
                     .get("floatingPoint")
