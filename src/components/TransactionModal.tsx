@@ -12,12 +12,12 @@ import {
 import type { FormInstance } from "antd";
 import type { NamePath } from "antd/es/form/interface";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction, TransactionInput, TransactionType } from "../types";
 import { isValidJournalDate, journalDateFormat } from "../utils/date";
 import { MovementFields, InvestmentFields, AdvancedPostings, singleLineRule } from "./TransactionPostings";
-import type { PostingRowLabels } from "./PostingRow";
+import { usePostingRowLabels } from "./PostingRow";
 import styles from "./TransactionModal.module.css";
 
 export function TransactionModal({
@@ -58,19 +58,7 @@ export function TransactionModal({
   const { t } = useTranslation();
   const [isFormValid, setFormValid] = useState(false);
 
-  const postingLabels = useMemo<PostingRowLabels>(() => ({
-    account: t("transactions.account"),
-    commodity: t("transactions.commodity"),
-    amount: t("transactions.amount"),
-    unitPrice: t("transactions.unit_price"),
-    removeAriaLabel: t("transactions.remove_posting"),
-    commentPlaceholder: t("transactions.comment_placeholder"),
-    singleLineField: t("transactions.single_line_field"),
-    commodityRequired: t("transactions.commodity_required"),
-    amountInvalid: t("transactions.amount_invalid"),
-    unitPriceInvalid: t("transactions.unit_price_invalid"),
-    accountRequired: t("transactions.account_required"),
-  }), [t]);
+  const postingLabels = usePostingRowLabels(t);
 
   function currentValidationFields(): NamePath[] {
     const baseFields: NamePath[] = ["date", "code", "description"];

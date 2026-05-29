@@ -9,12 +9,12 @@ import {
   Select,
   Space,
 } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { callCommand } from "../utils/command";
 import type { PeriodicRule, PeriodicRuleInput, PeriodicRulesSummary } from "../types";
 import { MovementFields, InvestmentFields, AdvancedPostings } from "./TransactionPostings";
-import type { PostingRowLabels } from "./PostingRow";
+import { usePostingRowLabels } from "./PostingRow";
 import styles from "./RecurringRuleModal.module.css";
 
 type RecurringFormValues = PeriodicRuleInput & { _customPeriod?: string };
@@ -101,19 +101,7 @@ export function RecurringRuleModal({
   const selectedPeriod = Form.useWatch("periodExpr", form);
   const showCustomPeriod = selectedPeriod === "custom";
 
-  const postingLabels = useMemo<PostingRowLabels>(() => ({
-    account: t("transactions.account"),
-    commodity: t("transactions.commodity"),
-    amount: t("transactions.amount"),
-    unitPrice: t("transactions.unit_price"),
-    removeAriaLabel: t("transactions.remove_posting"),
-    commentPlaceholder: t("transactions.comment_placeholder"),
-    singleLineField: t("transactions.single_line_field"),
-    commodityRequired: t("transactions.commodity_required"),
-    amountInvalid: t("transactions.amount_invalid"),
-    unitPriceInvalid: t("transactions.unit_price_invalid"),
-    accountRequired: t("transactions.account_required"),
-  }), [t]);
+  const postingLabels = usePostingRowLabels(t);
 
   useEffect(() => {
     if (open) {
@@ -176,7 +164,7 @@ export function RecurringRuleModal({
         setSaving(false);
       }
     },
-    [isEditing, rule, onSaved, postingMode],
+    [isEditing, rule, onSaved],
   );
 
   const isAdvancedMode = postingMode === "advanced" || isEditing;
@@ -275,10 +263,6 @@ export function RecurringRuleModal({
           <AutoComplete options={[]} placeholder={t("recurring.description_placeholder")} />
         </Form.Item>
 
-        <Form.Item name="comment" hidden>
-          <Input />
-        </Form.Item>
-
         {!isEditing && (
           <Segmented<PostingMode>
             className={styles.transaction_type_selector}
@@ -316,7 +300,6 @@ export function RecurringRuleModal({
             commentOptions={commentOptions}
             defaultCommodity={defaultCommodity}
             labels={postingLabels}
-            validateFormSilently={() => {}}
           />
         ) : null}
       </Form>

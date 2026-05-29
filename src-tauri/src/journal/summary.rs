@@ -10,7 +10,7 @@ use crate::{
         types::{DashboardSummary, JournalSummary, JournalTransaction},
         util::parse_journal_date,
     },
-    AMOUNT_STYLE, COMMODITY_STYLES,
+    COMMODITY_STYLES,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use std::path::Path;
@@ -24,9 +24,6 @@ pub(crate) fn read_journal_summary(
     let total_size_bytes: u64 = files.iter().map(|f| f.content.len() as u64).sum();
 
     let amount_style = parse_amount_style(&files);
-    if AMOUNT_STYLE.set(amount_style.clone()).is_err() {
-        eprintln!("[warn] AMOUNT_STYLE already set by another journal query");
-    }
     let commodity_styles = parse_commodity_styles(&files);
     let _ = COMMODITY_STYLES.set(commodity_styles);
 
@@ -125,9 +122,12 @@ fn is_scheduled_this_month(transaction: &JournalTransaction) -> bool {
     is_current_month(transaction, |date, today| date > today)
 }
 
-fn is_current_month(transaction: &JournalTransaction, cmp: impl Fn(NaiveDate, NaiveDate) -> bool) -> bool {
+fn is_current_month(
+    transaction: &JournalTransaction,
+    cmp: impl Fn(NaiveDate, NaiveDate) -> bool,
+) -> bool {
     let today = Local::now().date_naive();
-    parse_journal_date(&transaction.date)
-        .map_or(false, |date| date.year() == today.year() && date.month() == today.month() && cmp(date, today))
+    parse_journal_date(&transaction.date).map_or(false, |date| {
+        date.year() == today.year() && date.month() == today.month() && cmp(date, today)
+    })
 }
-

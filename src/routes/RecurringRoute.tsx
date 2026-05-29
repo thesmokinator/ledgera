@@ -1,5 +1,5 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, ThunderboltOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, Modal, Space, Table, Tag, Typography } from "antd";
+import { Button, Card, Empty, message, Modal, Space, Table, Tag, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -61,15 +61,21 @@ export function RecurringRoute({
       setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ["periodic-rules"] });
     },
+    onError: (err) => {
+      message.error(String(err));
+    },
   });
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
+    setGenerateResult(null);
     try {
       const result = await callCommand<GenerateResult>("generate_recurring_transactions", { ruleIdFilter: null });
       setGenerateResult(result);
       queryClient.invalidateQueries({ queryKey: ["periodic-rules"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    } catch (err) {
+      message.error(String(err));
     } finally {
       setGenerating(false);
     }

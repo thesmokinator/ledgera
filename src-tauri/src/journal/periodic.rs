@@ -623,7 +623,6 @@ fn custom_period_occurrences(
     let _ = fs::remove_file(&tmp);
 
     if !output.status.success() {
-        let _stderr = String::from_utf8_lossy(&output.stderr);
         return Ok(Vec::new());
     }
 

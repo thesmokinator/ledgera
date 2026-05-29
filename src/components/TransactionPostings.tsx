@@ -219,7 +219,7 @@ export function AdvancedPostings({
   commentOptions: { value: string }[];
   defaultCommodity: string;
   labels: PostingRowLabels;
-  validateFormSilently: () => void;
+  validateFormSilently?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -260,7 +260,7 @@ export function AdvancedPostings({
             icon={<PlusOutlined />}
             onClick={() => {
               add({ account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" });
-              window.setTimeout(validateFormSilently, 0);
+              window.setTimeout(() => validateFormSilently?.(), 0);
             }}
           >
             {t("transactions.add_posting")}

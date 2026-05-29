@@ -1,6 +1,7 @@
 import { AutoComplete, Button, Form, Input } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
-import type { Rule } from "antd/es/form";
+import { useMemo } from "react";
+import { singleLineRule, numberRule } from "./TransactionPostings";
 import styles from "./PostingRow.module.css";
 
 export type PostingRowLabels = {
@@ -17,22 +18,20 @@ export type PostingRowLabels = {
   accountRequired: string;
 };
 
-function singleLineRule(message: string): Rule {
-  return {
-    validator: (_: unknown, value: string) =>
-      !value || !/[\r\n]/.test(value)
-        ? Promise.resolve()
-        : Promise.reject(new Error(message)),
-  };
-}
-
-function numberRule(message: string): Rule {
-  return {
-    validator: (_: unknown, value: string) =>
-      !value || /\d/.test(value)
-        ? Promise.resolve()
-        : Promise.reject(new Error(message)),
-  };
+export function usePostingRowLabels(t: (key: string) => string): PostingRowLabels {
+  return useMemo(() => ({
+    account: t("transactions.account"),
+    commodity: t("transactions.commodity"),
+    amount: t("transactions.amount"),
+    unitPrice: t("transactions.unit_price"),
+    removeAriaLabel: t("transactions.remove_posting"),
+    commentPlaceholder: t("transactions.comment_placeholder"),
+    singleLineField: t("transactions.single_line_field"),
+    commodityRequired: t("transactions.commodity_required"),
+    amountInvalid: t("transactions.amount_invalid"),
+    unitPriceInvalid: t("transactions.unit_price_invalid"),
+    accountRequired: t("transactions.account_required"),
+  }), [t]);
 }
 
 export function PostingRow({

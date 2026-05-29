@@ -83,6 +83,7 @@ pub(crate) struct TransactionInput {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PostingInput {
     pub(crate) account: String,
+    #[serde(default)]
     pub(crate) amount: String,
     #[serde(default)]
     pub(crate) commodity: String,
@@ -137,7 +138,9 @@ pub(crate) struct PeriodicRuleInput {
     pub(crate) period_expr: String,
     pub(crate) description: String,
     pub(crate) postings: Vec<PostingInput>,
+    #[allow(dead_code)]
     pub(crate) status: String,
+    #[allow(dead_code)]
     pub(crate) code: String,
     #[serde(default)]
     pub(crate) start_date: Option<String>,

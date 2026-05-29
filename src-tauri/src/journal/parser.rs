@@ -573,7 +573,13 @@ pub(crate) fn format_periodic_rule_text(input: &PeriodicRuleInput) -> String {
     }
     let mut comment_parts: Vec<String> = Vec::new();
     if !input.rule_id.trim().is_empty() {
-        comment_parts.push(format!("rule-id:{}", input.rule_id.trim()));
+        let mut rule_part = format!("rule-id:{}", input.rule_id.trim());
+        let desc = input.description.trim();
+        if !desc.is_empty() {
+            rule_part.push(' ');
+            rule_part.push_str(desc);
+        }
+        comment_parts.push(rule_part);
     }
     if !input.comment.trim().is_empty() {
         comment_parts.push(input.comment.trim().to_string());
