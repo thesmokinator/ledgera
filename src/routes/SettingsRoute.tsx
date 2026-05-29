@@ -478,6 +478,17 @@ export function SettingsRoute({
                 ) : null
               }
             </Form.Item>
+            <div className={styles.developer_settings}>
+              <div>
+                <Typography.Text strong>{t("settings.module_auto_generate_recurring")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.module_auto_generate_recurring_help")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name={["modules", "autoGenerateRecurring"]} valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
           </div>
         </Card>
 

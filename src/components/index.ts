@@ -5,5 +5,7 @@ export { AppLoader } from "./AppLoader";
 export { CommandPalette } from "./CommandPalette";
 export { CourtesyState } from "./CourtesyState";
 export { NavigationGroup } from "./NavigationGroup";
+export { PostingRow } from "./PostingRow";
+export { RecurringRuleModal } from "./RecurringRuleModal";
 export { ReportCharts } from "./ReportCharts";
 export { TransactionModal } from "./TransactionModal";

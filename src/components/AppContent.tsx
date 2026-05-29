@@ -6,6 +6,7 @@ import {
   AccountsRoute,
   BalancesRoute,
   LogsRoute,
+  RecurringRoute,
   ReportsRoute,
   SettingsRoute,
   SyncRoute,
@@ -27,6 +28,8 @@ type AppContentProps = {
   activeSettings: AppSettings;
   commodityOptions: { value: string }[];
   accountOptions: { value: string }[];
+  commentOptions: { value: string }[];
+  defaultCommodity: string;
   hledgerStatus: HledgerStatus | undefined;
   journalSummary: JournalSummary | undefined;
   journalError: string | null;
@@ -55,6 +58,8 @@ export function AppContent({
   activeSettings,
   commodityOptions,
   accountOptions,
+  commentOptions,
+  defaultCommodity,
   hledgerStatus,
   journalSummary,
   journalError,
@@ -134,6 +139,14 @@ export function AppContent({
       ),
       logs: <LogsRoute />,
       reports: <ReportsRoute showDetailedTable={activeSettings.modules.developerTools.enabled} />,
+      recurring: (
+        <RecurringRoute
+          accountOptions={accountOptions}
+          commodityOptions={commodityOptions}
+          commentOptions={commentOptions}
+          defaultCommodity={defaultCommodity}
+        />
+      ),
     };
 
     return routeMap[activeView] ?? (shouldShowCourtesy ? <CourtesyState reasons={courtesyReasons} details={courtesyDetails} /> : renderJournalRoute());

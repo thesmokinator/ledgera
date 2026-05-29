@@ -309,7 +309,7 @@ where
     Ok(())
 }
 
-fn append_transaction_routed(
+pub(crate) fn append_transaction_routed(
     settings: &AppSettings,
     main_journal: &Path,
     input: &TransactionInput,

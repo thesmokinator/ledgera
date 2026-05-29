@@ -34,4 +34,9 @@ export type {
   ReportVisualizationKind,
   ReportChartEntry,
   ReportPeriodSummary,
+  PeriodicRule,
+  PeriodicRulesSummary,
+  PeriodicRuleInput,
+  PendingRecurringDates,
+  GenerateResult,
 } from "../types";

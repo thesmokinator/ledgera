@@ -103,3 +103,61 @@ pub(crate) enum RoutingStrategy {
     Flat(Vec<String>),
     Fallback,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PeriodicRule {
+    pub(crate) id: String,
+    pub(crate) rule_id: String,
+    pub(crate) source_file: String,
+    pub(crate) period_expr: String,
+    pub(crate) description: String,
+    pub(crate) postings: Vec<JournalPosting>,
+    pub(crate) status: String,
+    pub(crate) code: String,
+    pub(crate) start_date: Option<String>,
+    pub(crate) end_date: Option<String>,
+    pub(crate) comment: String,
+    pub(crate) raw: String,
+    pub(crate) start_line: usize,
+    pub(crate) end_line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PeriodicRulesSummary {
+    pub(crate) rules: Vec<PeriodicRule>,
+    pub(crate) rule_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PeriodicRuleInput {
+    pub(crate) rule_id: String,
+    pub(crate) period_expr: String,
+    pub(crate) description: String,
+    pub(crate) postings: Vec<PostingInput>,
+    pub(crate) status: String,
+    pub(crate) code: String,
+    #[serde(default)]
+    pub(crate) start_date: Option<String>,
+    #[serde(default)]
+    pub(crate) end_date: Option<String>,
+    #[serde(default)]
+    pub(crate) comment: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PendingRecurringDates {
+    pub(crate) rule_id: String,
+    pub(crate) description: String,
+    pub(crate) dates: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GenerateResult {
+    pub(crate) generated: usize,
+    pub(crate) rules: Vec<String>,
+}

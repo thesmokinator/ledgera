@@ -3,8 +3,8 @@ use crate::{
     journal::{
         files::{load_journal_files, JournalFile},
         types::{
-            JournalPosting, JournalTransaction, PostingInput, TransactionBlock, TransactionDisplay,
-            TransactionFlow, TransactionInput,
+            JournalPosting, JournalTransaction, PeriodicRule, PeriodicRuleInput, PostingInput,
+            TransactionBlock, TransactionDisplay, TransactionFlow, TransactionInput,
         },
         util::{split_first_token, split_inline_comment},
     },
@@ -379,6 +379,11 @@ pub(crate) fn replace_line_range(
 
 /// Formats a transaction from structured form input.
 pub(crate) fn format_transaction(input: &TransactionInput) -> String {
+    format_transaction_with_comment(input, "")
+}
+
+/// Formats a transaction with an optional header comment (e.g. "rule-id:salary").
+pub(crate) fn format_transaction_with_comment(input: &TransactionInput, comment: &str) -> String {
     let mut header = input.date.trim().to_string();
     if !input.status.trim().is_empty() {
         header.push(' ');
@@ -392,11 +397,196 @@ pub(crate) fn format_transaction(input: &TransactionInput) -> String {
         header.push(' ');
         header.push_str(input.description.trim());
     }
+    if !comment.trim().is_empty() {
+        header.push_str("  ; ");
+        header.push_str(comment.trim());
+    }
 
     let postings = input
         .postings
         .iter()
         .filter(|posting| !posting.account.trim().is_empty())
+        .map(format_posting)
+        .collect::<Vec<_>>();
+
+    std::iter::once(header)
+        .chain(postings)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Returns true when a line starts a periodic transaction rule (tilde syntax).
+pub(crate) fn is_periodic_rule_header(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with("~ ") || trimmed.starts_with("~\t")
+}
+
+/// Parses periodic transaction rules from journal content.
+pub(crate) fn parse_periodic_rules(
+    content: &str,
+    source_path: &Path,
+) -> Vec<PeriodicRule> {
+    let lines = split_lines(content);
+    let mut rules = Vec::new();
+    let mut index = 0;
+
+    while index < lines.len() {
+        if !is_periodic_rule_header(lines[index]) {
+            index += 1;
+            continue;
+        }
+
+        let start_line = index + 1;
+        let mut end_index = index + 1;
+        while end_index < lines.len()
+            && !is_periodic_rule_header(lines[end_index])
+            && !is_transaction_header(lines[end_index])
+            && (lines[end_index].starts_with(char::is_whitespace)
+                || lines[end_index].trim().is_empty()
+                || lines[end_index].trim().starts_with(';')
+                || lines[end_index].trim().starts_with('#'))
+        {
+            end_index += 1;
+        }
+
+        let block_lines = &lines[index..end_index];
+        let raw = block_lines.join("\n");
+        if let Some(rule) = parse_periodic_rule_block(source_path, start_line, end_index, &raw) {
+            rules.push(rule);
+        }
+        index = end_index;
+    }
+
+    rules
+}
+
+fn parse_periodic_rule_block(
+    source_path: &Path,
+    start_line: usize,
+    end_line: usize,
+    raw: &str,
+) -> Option<PeriodicRule> {
+    let mut lines_iter = raw.lines();
+    let header = lines_iter.next()?.trim();
+    let (period_expr, start_date, end_date, comment) = parse_periodic_header(header)?;
+
+    let (rule_id, description) = extract_rule_id_from_comment(&comment);
+
+    let status = String::new();
+    let code = String::new();
+
+    let postings = raw
+        .lines()
+        .skip(1)
+        .filter_map(parse_posting)
+        .collect::<Vec<_>>();
+
+    let source_file = source_path.to_string_lossy().to_string();
+    Some(PeriodicRule {
+        id: format!("{}:{}", source_file, start_line),
+        rule_id,
+        source_file,
+        period_expr,
+        description,
+        postings,
+        status,
+        code,
+        start_date,
+        end_date,
+        comment,
+        raw: raw.to_string(),
+        start_line,
+        end_line,
+    })
+}
+
+fn parse_periodic_header(
+    line: &str,
+) -> Option<(String, Option<String>, Option<String>, String)> {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix('~')?.trim_start();
+
+    let (body, comment) = split_inline_comment(rest);
+    let body = body.trim();
+
+    let mut remaining = body;
+    let mut end_date = None;
+    let mut start_date = None;
+
+    if let Some(idx) = remaining.rfind(" to ") {
+        let potential_date = remaining[idx + 4..].trim();
+        if is_date_literal(potential_date) {
+            end_date = Some(potential_date.to_string());
+            remaining = remaining[..idx].trim();
+        }
+    }
+
+    if let Some(idx) = remaining.rfind(" from ") {
+        let potential_date = remaining[idx + 6..].trim();
+        if is_date_literal(potential_date) {
+            start_date = Some(potential_date.to_string());
+            remaining = remaining[..idx].trim();
+        }
+    }
+
+    let period_expr = remaining.to_string();
+    if period_expr.is_empty() {
+        return None;
+    }
+
+    Some((period_expr, start_date, end_date, comment.to_string()))
+}
+
+fn is_date_literal(s: &str) -> bool {
+    s.len() == 10
+        && s.as_bytes().get(4) == Some(&b'-')
+        && s.as_bytes().get(7) == Some(&b'-')
+        && s[..4].chars().all(|c| c.is_ascii_digit())
+        && s[5..7].chars().all(|c| c.is_ascii_digit())
+        && s[8..].chars().all(|c| c.is_ascii_digit())
+}
+
+fn extract_rule_id_from_comment(comment: &str) -> (String, String) {
+    let trimmed = comment.trim();
+    if let Some(rest) = trimmed.strip_prefix("rule-id:") {
+        let parts: Vec<&str> = rest.splitn(2, char::is_whitespace).collect();
+        let id = parts.first().map(|s| s.to_string()).unwrap_or_default();
+        let desc = parts.get(1).map(|s| s.to_string()).unwrap_or_default();
+        (id, desc)
+    } else {
+        (String::new(), trimmed.to_string())
+    }
+}
+
+/// Formats a periodic rule into its journal text representation.
+pub(crate) fn format_periodic_rule_text(input: &PeriodicRuleInput) -> String {
+    let mut header = format!("~ {}", input.period_expr.trim());
+    if let Some(ref start) = input.start_date {
+        if !start.trim().is_empty() {
+            header.push_str(&format!(" from {}", start.trim()));
+        }
+    }
+    if let Some(ref end) = input.end_date {
+        if !end.trim().is_empty() {
+            header.push_str(&format!(" to {}", end.trim()));
+        }
+    }
+    let mut comment_parts: Vec<String> = Vec::new();
+    if !input.rule_id.trim().is_empty() {
+        comment_parts.push(format!("rule-id:{}", input.rule_id.trim()));
+    }
+    if !input.comment.trim().is_empty() {
+        comment_parts.push(input.comment.trim().to_string());
+    }
+    if !comment_parts.is_empty() {
+        header.push_str("  ; ");
+        header.push_str(&comment_parts.join(" "));
+    }
+
+    let postings = input
+        .postings
+        .iter()
+        .filter(|p| !p.account.trim().is_empty())
         .map(format_posting)
         .collect::<Vec<_>>();
 
