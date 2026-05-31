@@ -317,34 +317,28 @@ fn ahead_behind(repo_root: &Path) -> Option<(u32, u32)> {
 }
 
 fn status_files(context: &GitContext) -> Vec<GitSyncFileStatus> {
-    let mut args = vec!["status", "--porcelain", "--"];
-    let journal_files = context
-        .journal_files
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
-    args.extend(journal_files.iter().copied());
-
-    run_git(&context.repo_root, &args)
-        .ok()
-        .filter(|output| output.status == 0)
-        .map(|output| {
-            output
-                .stdout
-                .lines()
-                .filter_map(parse_status_line)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
-}
-
-fn parse_status_line(line: &str) -> Option<GitSyncFileStatus> {
-    if line.len() < 4 {
-        return None;
+    let mut result = Vec::new();
+    for file in &context.journal_files {
+        let args = ["status", "--porcelain=v1", "--", file.as_str()];
+        let output = match run_git(&context.repo_root, &args) {
+            Ok(output) if output.status == 0 => output,
+            _ => continue,
+        };
+        let status = output
+            .stdout
+            .lines()
+            .next()
+            .filter(|line| line.len() >= 2)
+            .map(|line| line[..2].trim().to_string())
+            .filter(|s| !s.is_empty());
+        if let Some(status) = status {
+            result.push(GitSyncFileStatus {
+                status,
+                path: file.clone(),
+            });
+        }
     }
-    let status = line.get(0..2)?.trim().to_string();
-    let path = line.get(3..)?.trim().to_string();
-    Some(GitSyncFileStatus { path, status })
+    result
 }
 
 fn run_git_text(cwd: &Path, args: &[&str]) -> Option<String> {
