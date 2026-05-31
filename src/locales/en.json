@@ -11,6 +11,7 @@
     "search": "Search",
     "refresh": "Refresh",
     "save": "Save",
+    "delete": "Delete",
     "cancel": "Cancel",
     "back": "Back",
     "available": "Available",
@@ -177,7 +178,6 @@
     "edit_transaction_action": "Edit transaction",
     "delete_transaction_action": "Delete transaction",
     "delete_transaction_description": "This removes the transaction block from the journal.",
-    "delete": "Delete",
     "enter_transaction_date": "Enter a transaction date",
     "invalid_date": "Use a valid date in YYYY-MM-DD format",
     "description_required": "Enter a description",
@@ -370,6 +370,7 @@
     "save_failed": "Failed to save recurring rule.",
     "table_description": "Description",
     "table_period": "Period",
+    "not_set": "Not set",
     "table_period_from": "from",
     "table_period_to": "to"
   }

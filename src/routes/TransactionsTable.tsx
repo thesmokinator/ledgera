@@ -1,8 +1,10 @@
 import { DeleteOutlined, EditOutlined, ArrowRightOutlined, SwapOutlined } from "@ant-design/icons";
-import { Button, Modal, Popover, Space, Table, Typography } from "antd";
+import { Button, Popover, Space, Table, Typography } from "antd";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { JournalTransaction } from "./types";
 import { Amount, classSuffix } from "../components/Amount";
+import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import type { TransactionDisplay } from "./types";
 import styles from "./TransactionsTable.module.css";
 
@@ -57,23 +59,22 @@ export function TransactionsTable({
   onDelete: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const [modal, modalContextHolder] = Modal.useModal();
-
-  function confirmDelete(transaction: JournalTransaction) {
-    modal.confirm({
-      title: t("transactions.delete_transaction_action"),
-      content: t("transactions.delete_transaction_description"),
-      okText: t("transactions.delete"),
-      cancelText: t("common.cancel"),
-      okButtonProps: { danger: true },
-      centered: true,
-      onOk: () => onDelete(transaction.id),
-    });
-  }
+  const [deleteTarget, setDeleteTarget] = useState<JournalTransaction | null>(null);
 
   return (
     <>
-      {modalContextHolder}
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        title={t("transactions.delete_transaction_action")}
+        message={t("transactions.delete_transaction_description")}
+        onConfirm={() => {
+          if (deleteTarget) {
+            onDelete(deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
       <Table<JournalTransaction>
         rowKey="id"
         loading={loading}
@@ -143,7 +144,7 @@ export function TransactionsTable({
                   danger
                   aria-label={t("transactions.delete_transaction_action")}
                   icon={<DeleteOutlined />}
-                  onClick={() => confirmDelete(transaction)}
+                  onClick={() => setDeleteTarget(transaction)}
                 />
               </Space>
             ),

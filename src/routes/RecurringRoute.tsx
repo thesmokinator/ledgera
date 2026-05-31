@@ -1,11 +1,12 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, ThunderboltOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, message, Modal, Space, Table, Tag, Typography } from "antd";
+import { Button, Card, Empty, message, Space, Table, Tag, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { callCommand } from "../utils/command";
 import type { GenerateResult, PeriodicRule, PeriodicRulesSummary } from "./types";
 import { RecurringRuleModal } from "../components/RecurringRuleModal";
+import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import styles from "./RecurringRoute.module.css";
 
 export function RecurringRoute({
@@ -129,13 +130,20 @@ export function RecurringRoute({
             pagination={{ pageSize: 12 }}
             columns={[
               {
-                title: t("recurring.table_description"),
-                dataIndex: "description",
-                key: "description",
-                render: (desc: string, rule) => (
+                title: t("recurring.rule_name"),
+                dataIndex: "ruleId",
+                key: "ruleId",
+                render: (ruleId: string, rule) => (
                   <Space>
                     {rule.status && <Tag color={rule.status === "*" ? "green" : "orange"}>{rule.status}</Tag>}
-                    <span>{desc}</span>
+                    <Space direction="vertical" size={0}>
+                      <span>{ruleId}</span>
+                      {rule.description && (
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          {rule.description}
+                        </Typography.Text>
+                      )}
+                    </Space>
                   </Space>
                 ),
               },
@@ -143,19 +151,26 @@ export function RecurringRoute({
                 title: t("recurring.table_period"),
                 dataIndex: "periodExpr",
                 key: "periodExpr",
-                width: 180,
-                render: (expr: string, rule) => (
-                  <Space direction="vertical" size={0}>
-                    <Tag className={styles.period_tag}>{expr}</Tag>
-                    {(rule.startDate || rule.endDate) && (
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {rule.startDate ? `${t("recurring.table_period_from")} ${rule.startDate}` : ""}
-                        {rule.startDate && rule.endDate ? " " : ""}
-                        {rule.endDate ? `${t("recurring.table_period_to")} ${rule.endDate}` : ""}
-                      </Typography.Text>
-                    )}
-                  </Space>
+                width: 130,
+                render: (expr: string) => (
+                  <Tag className={styles.period_tag}>{expr}</Tag>
                 ),
+              },
+              {
+                title: t("recurring.start_date"),
+                dataIndex: "startDate",
+                key: "startDate",
+                width: 120,
+                render: (date: string | null) =>
+                  date ? <Typography.Text type="secondary">{date}</Typography.Text> : <Typography.Text type="secondary">{t("recurring.not_set")}</Typography.Text>,
+              },
+              {
+                title: t("recurring.end_date"),
+                dataIndex: "endDate",
+                key: "endDate",
+                width: 120,
+                render: (date: string | null) =>
+                  date ? <Typography.Text type="secondary">{date}</Typography.Text> : <Typography.Text type="secondary">{t("recurring.not_set")}</Typography.Text>,
               },
               {
                 title: "",
@@ -186,17 +201,14 @@ export function RecurringRoute({
         )}
       </Card>
 
-      <Modal
-        title={t("recurring.delete_title")}
+      <ConfirmDeleteModal
         open={!!deleteTarget}
+        title={t("recurring.delete_title")}
+        message={deleteTarget ? t("recurring.delete_message", { description: deleteTarget.ruleId }) : ""}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.ruleId)}
         onCancel={() => setDeleteTarget(null)}
-        onOk={() => deleteTarget && deleteMutation.mutate(deleteTarget.ruleId)}
-        okButtonProps={{ danger: true, loading: deleteMutation.isPending }}
-        okText={t("common.delete")}
-        cancelText={t("common.cancel")}
-      >
-        {deleteTarget && t("recurring.delete_message", { description: deleteTarget.description })}
-      </Modal>
+      />
 
       <RecurringRuleModal
         open={modalOpen}

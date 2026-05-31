@@ -9,15 +9,21 @@ import {
   Select,
   Space,
 } from "antd";
+import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { callCommand } from "../utils/command";
-import type { PeriodicRule, PeriodicRuleInput, PeriodicRulesSummary } from "../types";
+import { useRecurringRuleActions } from "../hooks/useRecurringRuleActions";
+import type { PeriodicRule, PeriodicRuleInput } from "../types";
 import { MovementFields, InvestmentFields, AdvancedPostings } from "./TransactionPostings";
 import { usePostingRowLabels } from "./PostingRow";
 import styles from "./RecurringRuleModal.module.css";
 
-type RecurringFormValues = PeriodicRuleInput & { _customPeriod?: string };
+type RecurringFormValues = Omit<PeriodicRuleInput, 'startDate' | 'endDate'> & {
+  _customPeriod?: string;
+  startDate?: dayjs.Dayjs;
+  endDate?: dayjs.Dayjs;
+};
 type PostingMode = "movement" | "investment" | "advanced";
 
 const PERIOD_OPTIONS = [
@@ -65,8 +71,8 @@ function ruleToForm(rule: PeriodicRule): RecurringFormValues {
     })),
     status: rule.status,
     code: rule.code,
-    startDate: rule.startDate ?? undefined,
-    endDate: rule.endDate ?? undefined,
+    startDate: rule.startDate ? dayjs(rule.startDate) : undefined,
+    endDate: rule.endDate ? dayjs(rule.endDate) : undefined,
   };
 }
 
@@ -91,8 +97,10 @@ export function RecurringRuleModal({
 }) {
   const { t } = useTranslation();
   const [form] = Form.useForm<RecurringFormValues>();
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const { submitRule, isSaving, saveError, clearSaveError } = useRecurringRuleActions({
+    editingRule: rule,
+    onSaved,
+  });
   const [postingMode, setPostingMode] = useState<PostingMode>("movement");
   const [periodError, setPeriodError] = useState<string | null>(null);
 
@@ -114,10 +122,10 @@ export function RecurringRuleModal({
         form.setFieldsValue({ periodExpr: "monthly" });
         setPostingMode("movement");
       }
-      setSaveError(null);
+      clearSaveError();
       setPeriodError(null);
     }
-  }, [open, rule, form]);
+  }, [open, rule, form, clearSaveError]);
 
   const handleCustomPeriodBlur = useCallback(async () => {
     const expr = form.getFieldValue("_customPeriod")?.trim();
@@ -136,36 +144,9 @@ export function RecurringRuleModal({
     }
   }, [form, t]);
 
-  const handleFinish = useCallback(
-    async (values: RecurringFormValues) => {
-        const { _customPeriod, ...ruleValues } = values;
-        const customPeriod = _customPeriod?.trim();
-        const periodExpr = customPeriod || values.periodExpr;
-
-      setSaving(true);
-      setSaveError(null);
-      try {
-        const input: PeriodicRuleInput = {
-          ...ruleValues,
-          periodExpr,
-        };
-        if (isEditing && rule) {
-          await callCommand<PeriodicRulesSummary>("update_periodic_rule", {
-            ruleIdParam: rule.ruleId,
-            input,
-          });
-        } else {
-          await callCommand<PeriodicRulesSummary>("create_periodic_rule", { input });
-        }
-        onSaved();
-      } catch (err) {
-        setSaveError(String(err));
-      } finally {
-        setSaving(false);
-      }
-    },
-    [isEditing, rule, onSaved],
-  );
+  const handleFinish = (values: RecurringFormValues) => {
+    submitRule(values);
+  };
 
   const isAdvancedMode = postingMode === "advanced" || isEditing;
   const modalWidth = postingMode === "movement" && !isEditing ? 620 : 780;
@@ -176,7 +157,7 @@ export function RecurringRuleModal({
       open={open}
       width={modalWidth}
       okText={isEditing ? t("common.save") : t("recurring.new_rule")}
-      confirmLoading={saving}
+      confirmLoading={isSaving}
       destroyOnHidden
       onCancel={onClose}
       onOk={() => form.submit()}

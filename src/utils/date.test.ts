@@ -6,6 +6,7 @@ import {
   isValidJournalDate,
   isSameJournalMonth,
   isExecutedTransaction,
+  normalizeDate,
 } from "./date";
 import type { JournalTransaction } from "../types";
 
@@ -130,6 +131,40 @@ describe("isExecutedTransaction", () => {
 
   it("returns false for an invalid date", () => {
     expect(isExecutedTransaction(makeTx("not-a-date"))).toBe(false);
+  });
+});
+
+describe("normalizeDate", () => {
+  it("converts a Dayjs object to YYYY-MM-DD", () => {
+    expect(normalizeDate(dayjs("2026-05-31"))).toBe("2026-05-31");
+  });
+
+  it("passes through a valid date string", () => {
+    expect(normalizeDate("2024-01-15")).toBe("2024-01-15");
+  });
+
+  it("passes through a non-date string unchanged", () => {
+    expect(normalizeDate("hello")).toBe("hello");
+  });
+
+  it("returns undefined for null", () => {
+    expect(normalizeDate(null)).toBeUndefined();
+  });
+
+  it("returns undefined for undefined", () => {
+    expect(normalizeDate(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined for an empty string", () => {
+    expect(normalizeDate("")).toBeUndefined();
+  });
+
+  it("returns undefined for whitespace-only string", () => {
+    expect(normalizeDate("   ")).toBeUndefined();
+  });
+
+  it("trims whitespace from a string value", () => {
+    expect(normalizeDate("  2026-05-31  ")).toBe("2026-05-31");
   });
 });
 

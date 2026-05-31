@@ -11,6 +11,7 @@
     "search": "Cerca",
     "refresh": "Aggiorna",
     "save": "Salva",
+    "delete": "Elimina",
     "cancel": "Annulla",
     "back": "Indietro",
     "available": "Disponibile",
@@ -370,6 +371,7 @@
     "save_failed": "Salvataggio regola periodica fallito.",
     "table_description": "Descrizione",
     "table_period": "Periodo",
+    "not_set": "Non impostata",
     "table_period_from": "dal",
     "table_period_to": "al"
   }

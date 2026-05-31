@@ -1,5 +1,6 @@
 use crate::{
     app_error::to_error_string_with_details,
+    logs,
     hledger::hledger_executable,
     journal::{
         files::{parse_include_directive, require_journal_path},
@@ -26,17 +27,25 @@ const RECURRING_FILENAME: &str = "recurring.journal";
 
 #[tauri::command]
 pub(crate) fn list_periodic_rules(app: AppHandle) -> Result<PeriodicRulesSummary, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
+    let journal_path = require_journal_path(&settings).map_err(|e| {
+        logs::log_error(&app, "journal_path_missing", "Journal path not configured.", &e);
+        e
+    })?;
     let recurring_path = journal_path.with_file_name(RECURRING_FILENAME);
     let rules = if recurring_path.exists() {
         let content =
             fs::read_to_string(&recurring_path).map_err(|error| {
-                to_error_string_with_details(
+                let err = to_error_string_with_details(
                     "journal_read_failed",
                     "Unable to read recurring rules file.",
                     error.to_string(),
-                )
+                );
+                logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+                err
             })?;
         parse_periodic_rules(&content, &recurring_path)
     } else {
@@ -53,19 +62,33 @@ pub(crate) fn create_periodic_rule(
     app: AppHandle,
     input: PeriodicRuleInput,
 ) -> Result<PeriodicRulesSummary, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let recurring_path = ensure_recurring_file(&settings, &journal_path)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
+    let journal_path = require_journal_path(&settings).map_err(|e| {
+        logs::log_error(&app, "journal_path_missing", "Journal path not configured.", &e);
+        e
+    })?;
+    let recurring_path = ensure_recurring_file(&settings, &journal_path).map_err(|e| {
+        logs::log_error(&app, "periodic_rule_operation", "Failed to ensure recurring file.", &e);
+        e
+    })?;
 
     let formatted = format_periodic_rule_text(&input);
-    append_to_recurring_file(&settings, &journal_path, &recurring_path, &formatted)?;
+    append_to_recurring_file(&settings, &journal_path, &recurring_path, &formatted).map_err(|e| {
+        logs::log_error(&app, "periodic_rule_operation", "Failed to append to recurring file.", &e);
+        e
+    })?;
 
     let content = fs::read_to_string(&recurring_path).map_err(|error| {
-        to_error_string_with_details(
+        let err = to_error_string_with_details(
             "journal_read_failed",
             "Unable to read recurring rules file.",
             error.to_string(),
-        )
+        );
+        logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+        err
     })?;
     let rules = parse_periodic_rules(&content, &recurring_path);
     Ok(PeriodicRulesSummary {
@@ -80,42 +103,60 @@ pub(crate) fn update_periodic_rule(
     rule_id_param: String,
     input: PeriodicRuleInput,
 ) -> Result<PeriodicRulesSummary, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let recurring_path = ensure_recurring_file(&settings, &journal_path)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
+    let journal_path = require_journal_path(&settings).map_err(|e| {
+        logs::log_error(&app, "journal_path_missing", "Journal path not configured.", &e);
+        e
+    })?;
+    let recurring_path = ensure_recurring_file(&settings, &journal_path).map_err(|e| {
+        logs::log_error(&app, "periodic_rule_operation", "Failed to ensure recurring file.", &e);
+        e
+    })?;
 
     let content =
         fs::read_to_string(&recurring_path).map_err(|error| {
-            to_error_string_with_details(
+            let err = to_error_string_with_details(
                 "journal_read_failed",
                 "Unable to read recurring rules file.",
                 error.to_string(),
-            )
+            );
+            logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+            err
         })?;
     let rules = parse_periodic_rules(&content, &recurring_path);
     let target = rules
         .iter()
         .find(|r| r.rule_id == rule_id_param)
         .ok_or_else(|| {
-            to_error_string_with_details(
+            let err = to_error_string_with_details(
                 "periodic_rule_not_found",
                 "Periodic rule not found.",
                 format!("Rule id: {}", rule_id_param),
-            )
+            );
+            logs::log_error(&app, "periodic_rule_not_found", "Periodic rule not found.", &err);
+            err
         })?;
 
     let new_text = format_periodic_rule_text(&input);
     let file_lines = split_lines(&content);
     let updated = replace_line_range(&file_lines, target.start_line, target.end_line, &new_text);
 
-    mutate_recurring_file(&settings, &journal_path, &recurring_path, &updated)?;
+    mutate_recurring_file(&settings, &journal_path, &recurring_path, &updated).map_err(|e| {
+        logs::log_error(&app, "journal_validation_failed", "Failed to mutate recurring file.", &e);
+        e
+    })?;
 
     let new_content = fs::read_to_string(&recurring_path).map_err(|error| {
-        to_error_string_with_details(
+        let err = to_error_string_with_details(
             "journal_read_failed",
             "Unable to read recurring rules file.",
             error.to_string(),
-        )
+        );
+        logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+        err
     })?;
     let updated_rules = parse_periodic_rules(&new_content, &recurring_path);
     Ok(PeriodicRulesSummary {
@@ -129,8 +170,14 @@ pub(crate) fn delete_periodic_rule(
     app: AppHandle,
     rule_id_param: String,
 ) -> Result<PeriodicRulesSummary, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
+    let journal_path = require_journal_path(&settings).map_err(|e| {
+        logs::log_error(&app, "journal_path_missing", "Journal path not configured.", &e);
+        e
+    })?;
     let recurring_path = recurring_path_for(&journal_path);
     if !recurring_path.exists() {
         return Ok(PeriodicRulesSummary {
@@ -141,35 +188,44 @@ pub(crate) fn delete_periodic_rule(
 
     let content =
         fs::read_to_string(&recurring_path).map_err(|error| {
-            to_error_string_with_details(
+            let err = to_error_string_with_details(
                 "journal_read_failed",
                 "Unable to read recurring rules file.",
                 error.to_string(),
-            )
+            );
+            logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+            err
         })?;
     let rules = parse_periodic_rules(&content, &recurring_path);
     let target = rules
         .iter()
         .find(|r| r.rule_id == rule_id_param)
         .ok_or_else(|| {
-            to_error_string_with_details(
+            let err = to_error_string_with_details(
                 "periodic_rule_not_found",
                 "Periodic rule not found.",
                 format!("Rule id: {}", rule_id_param),
-            )
+            );
+            logs::log_error(&app, "periodic_rule_not_found", "Periodic rule not found.", &err);
+            err
         })?;
 
     let file_lines = split_lines(&content);
     let updated = replace_line_range(&file_lines, target.start_line, target.end_line, "");
 
-    mutate_recurring_file(&settings, &journal_path, &recurring_path, &updated)?;
+    mutate_recurring_file(&settings, &journal_path, &recurring_path, &updated).map_err(|e| {
+        logs::log_error(&app, "journal_validation_failed", "Failed to mutate recurring file.", &e);
+        e
+    })?;
 
     let new_content = fs::read_to_string(&recurring_path).map_err(|error| {
-        to_error_string_with_details(
+        let err = to_error_string_with_details(
             "journal_read_failed",
             "Unable to read recurring rules file.",
             error.to_string(),
-        )
+        );
+        logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+        err
     })?;
     let updated_rules = parse_periodic_rules(&new_content, &recurring_path);
     Ok(PeriodicRulesSummary {
@@ -183,7 +239,10 @@ pub(crate) fn validate_period_expression(
     app: AppHandle,
     expr: String,
 ) -> Result<bool, String> {
-    let settings = read_settings(&app)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
     let executable = hledger_executable(&settings);
     let tmp = std::env::temp_dir().join(format!(
         "ledgera-periodic-validate-{}.journal",
@@ -197,7 +256,11 @@ pub(crate) fn validate_period_expression(
         "~ {} from 2000-01-01\n    assets:test  1\n    equity:test\n",
         expr.trim()
     );
-    fs::write(&tmp, &test_rule).map_err(|e| e.to_string())?;
+    fs::write(&tmp, &test_rule).map_err(|e| {
+        let err = format!("Failed to write temp journal: {}", e);
+        logs::log_error(&app, "periodic_rule_operation", "Failed to write temporary journal file.", &err);
+        err
+    })?;
 
     let result = Command::new(&executable)
         .arg("print")
@@ -221,17 +284,25 @@ pub(crate) fn compute_pending_recurring(
     app: AppHandle,
     rule_id_filter: Option<String>,
 ) -> Result<Vec<PendingRecurringDates>, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
+    let journal_path = require_journal_path(&settings).map_err(|e| {
+        logs::log_error(&app, "journal_path_missing", "Journal path not configured.", &e);
+        e
+    })?;
     let recurring_path = journal_path.with_file_name(RECURRING_FILENAME);
     let rules = if recurring_path.exists() {
         let content =
             fs::read_to_string(&recurring_path).map_err(|error| {
-                to_error_string_with_details(
+                let err = to_error_string_with_details(
                     "journal_read_failed",
                     "Unable to read recurring rules file.",
                     error.to_string(),
-                )
+                );
+                logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+                err
             })?;
         parse_periodic_rules(&content, &recurring_path)
     } else {
@@ -249,7 +320,10 @@ pub(crate) fn compute_pending_recurring(
     let mut result = Vec::new();
 
     for rule in rules {
-        let pending = compute_pending_dates(rule, &journal_path, &executable, today)?;
+        let pending = compute_pending_dates(rule, &journal_path, &executable, today).map_err(|e| {
+            logs::log_error(&app, "periodic_rule_operation", &format!("Failed to compute pending dates for rule '{}'.", rule.rule_id), &e);
+            e
+        })?;
         if !pending.is_empty() {
             result.push(PendingRecurringDates {
                 rule_id: rule.rule_id.clone(),
@@ -267,17 +341,25 @@ pub(crate) fn generate_recurring_transactions(
     app: AppHandle,
     rule_id_filter: Option<String>,
 ) -> Result<GenerateResult, String> {
-    let settings = read_settings(&app)?;
-    let journal_path = require_journal_path(&settings)?;
+    let settings = read_settings(&app).map_err(|e| {
+        logs::log_error(&app, "settings_read_failed", "Failed to read settings.", &e);
+        e
+    })?;
+    let journal_path = require_journal_path(&settings).map_err(|e| {
+        logs::log_error(&app, "journal_path_missing", "Journal path not configured.", &e);
+        e
+    })?;
     let recurring_path = journal_path.with_file_name(RECURRING_FILENAME);
     let rules = if recurring_path.exists() {
         let content =
             fs::read_to_string(&recurring_path).map_err(|error| {
-                to_error_string_with_details(
+                let err = to_error_string_with_details(
                     "journal_read_failed",
                     "Unable to read recurring rules file.",
                     error.to_string(),
-                )
+                );
+                logs::log_error(&app, "journal_read_failed", "Unable to read recurring rules file.", &err);
+                err
             })?;
         parse_periodic_rules(&content, &recurring_path)
     } else {
@@ -299,13 +381,19 @@ pub(crate) fn generate_recurring_transactions(
     let mut affected_rules = Vec::new();
 
     for rule in rules {
-        let pending = compute_pending_dates(rule, &journal_path, &executable, today)?;
+        let pending = compute_pending_dates(rule, &journal_path, &executable, today).map_err(|e| {
+            logs::log_error(&app, "periodic_rule_operation", &format!("Failed to compute pending dates for rule '{}'.", rule.rule_id), &e);
+            e
+        })?;
         if pending.is_empty() {
             continue;
         }
         for date_str in &pending {
             let txn_input = rule_to_transaction_input(rule, date_str);
-            append_transaction_routed(&settings, &journal_path, &txn_input)?;
+            append_transaction_routed(&settings, &journal_path, &txn_input).map_err(|e| {
+                logs::log_error(&app, "journal_write_failed", &format!("Failed to append transaction for rule '{}' on date '{}'.", rule.rule_id, date_str), &e);
+                e
+            })?;
             generated += 1;
         }
         affected_rules.push(rule.rule_id.clone());

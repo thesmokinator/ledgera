@@ -1,10 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { FormInstance } from "antd";
-import dayjs from "dayjs";
 import { useState } from "react";
 import type { JournalSummary, JournalTransaction, Notifier, TransactionInput, TransactionType } from "../types";
 import { callCommand } from "../utils/command";
-import { journalDateFormat } from "../utils/date";
+import { normalizeDate } from "../utils/date";
 import { formatAppError, parseAppError, parseError } from "../utils/error";
 import { autoCalculateBalancingAmounts, makeOutgoingAmount } from "../utils/transaction";
 
@@ -113,7 +112,7 @@ export function useTransactionActions({
 
     const normalizedValues: TransactionInput = {
       mode: editingTransaction ? "advanced" : transactionType,
-      date: dayjs.isDayjs(values.date) ? values.date.format(journalDateFormat) : values.date,
+      date: normalizeDate(values.date) ?? values.date,
       status: values.status ?? "",
       code: values.code ?? "",
       description: values.description ?? "",
