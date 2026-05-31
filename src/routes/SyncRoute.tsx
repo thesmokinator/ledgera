@@ -65,6 +65,7 @@ export function SyncRoute({
   const statusErrorHelpKey = statusError ? `sync.error_help.${statusError.code}` : "";
   const statusErrorHelp = statusError ? t(statusErrorHelpKey) : "";
   const hasStatusErrorHelp = Boolean(statusError && statusErrorHelp !== statusErrorHelpKey);
+  const lastCommit = status?.lastCommit;
   const statusErrorMessage = status?.error
     ? statusError
       ? formatAppError(statusError, t, { includeDetails: false })
@@ -123,16 +124,35 @@ export function SyncRoute({
 
           <div>
             <Typography.Text strong>{t("sync.repository")}</Typography.Text>
-            <Typography.Paragraph type="secondary" copyable={Boolean(status?.repoRoot)}>
+            <Typography.Paragraph
+              type="secondary"
+              className={styles.white_copy}
+              copyable={Boolean(status?.repoRoot)}
+            >
               {status?.repoRoot ?? t("sync.repository_unknown")}
             </Typography.Paragraph>
           </div>
 
           <div>
             <Typography.Text strong>{t("sync.last_commit")}</Typography.Text>
-            <Typography.Paragraph type="secondary">
-              {status?.lastCommit ?? "-"}
-            </Typography.Paragraph>
+            {lastCommit ? (
+              <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
+                <Space>
+                  <Tag style={{ fontFamily: "monospace" }}>
+                    <Typography.Text
+                      className={styles.white_copy}
+                      copyable={{ text: lastCommit.fullHash }}
+                      style={{ color: "inherit" }}
+                    >
+                      {lastCommit.hash}
+                    </Typography.Text>
+                  </Tag>
+                  <Typography.Text type="secondary">{lastCommit.subject}</Typography.Text>
+                </Space>
+              </Typography.Paragraph>
+            ) : (
+              <Typography.Paragraph type="secondary">-</Typography.Paragraph>
+            )}
           </div>
 
           <div>

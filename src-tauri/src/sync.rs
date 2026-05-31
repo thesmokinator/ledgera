@@ -21,6 +21,14 @@ pub(crate) struct GitSyncFileStatus {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct GitCommitInfo {
+    hash: String,
+    full_hash: String,
+    subject: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GitSyncStatus {
     available: bool,
     repo_found: bool,
@@ -32,7 +40,7 @@ pub(crate) struct GitSyncStatus {
     behind: u32,
     dirty: bool,
     files: Vec<GitSyncFileStatus>,
-    last_commit: Option<String>,
+    last_commit: Option<GitCommitInfo>,
     error: Option<String>,
 }
 
@@ -278,7 +286,23 @@ fn build_git_status(context: &GitContext) -> GitSyncStatus {
         .as_deref()
         .and_then(|value| value.split('/').next())
         .map(ToString::to_string);
-    let last_commit = run_git_text(&context.repo_root, &["log", "-1", "--pretty=%h %s"]);
+    let last_commit = run_git(&context.repo_root, &["log", "-1", "--pretty=format:%h%n%H%n%s"])
+        .ok()
+        .filter(|output| output.status == 0 && !output.stdout.is_empty())
+        .and_then(|output| {
+            let mut lines = output.stdout.lines();
+            let hash = lines.next()?;
+            let full_hash = lines.next()?;
+            let subject = lines.next()?;
+            if hash.is_empty() || full_hash.is_empty() {
+                return None;
+            }
+            Some(GitCommitInfo {
+                hash: hash.to_string(),
+                full_hash: full_hash.to_string(),
+                subject: subject.to_string(),
+            })
+        });
     let (ahead, behind) = upstream
         .as_ref()
         .and_then(|_| ahead_behind(&context.repo_root))

@@ -302,6 +302,12 @@ export type GitSyncFileStatus = {
   status: string;
 };
 
+export type GitCommitInfo = {
+  hash: string;
+  fullHash: string;
+  subject: string;
+};
+
 export type GitSyncStatus = {
   available: boolean;
   repoFound: boolean;
@@ -313,7 +319,7 @@ export type GitSyncStatus = {
   behind: number;
   dirty: boolean;
   files: GitSyncFileStatus[];
-  lastCommit: string | null;
+  lastCommit: GitCommitInfo | null;
   error: string | null;
 };
 
