@@ -135,10 +135,18 @@
 
 .footer {
     display: flex;
+    flex-wrap: wrap;
     gap: 16px;
     align-items: center;
     justify-content: space-between;
-    padding: 0 4px;
+    padding: 0 4px 24px;
+}
+
+.footer_links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .footer :global(.ant-typography) {

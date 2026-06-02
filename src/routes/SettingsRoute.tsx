@@ -19,10 +19,12 @@ import {
   FolderOutlined,
   InfoCircleOutlined,
   PlusOutlined,
+  ReadOutlined,
   SettingOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import packageJson from "../../package.json";
@@ -33,6 +35,7 @@ import type { AppSettings, HledgerStatus, JournalSummary, UpdateStatus } from ".
 import styles from "./SettingsRoute.module.css";
 
 const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
+const projectWikiUrl = `${projectRepositoryUrl}/wiki`;
 
 function CardTitle({ icon, label }: { icon: ReactNode; label: string }) {
   return (
@@ -550,14 +553,21 @@ export function SettingsRoute({
 
         {/* ── Footer ───────────────────────────────── */}
         <div className={styles.footer}>
-          <Space wrap>
-            <Button size="small" href={projectRepositoryUrl} target="_blank">
+          <Button
+            size="small"
+            icon={<ReadOutlined />}
+            onClick={() => { void openUrl(projectWikiUrl); }}
+          >
+            {t("settings.documentation")}
+          </Button>
+          <div className={styles.footer_links}>
+            <Button size="small" onClick={() => { void openUrl(projectRepositoryUrl); }}>
               {t("settings.repository")}
             </Button>
-            <Button size="small" href={licenseUrl} target="_blank">
+            <Button size="small" onClick={() => { void openUrl(licenseUrl); }}>
               {t("settings.license", { license: packageJson.license })}
             </Button>
-          </Space>
+          </div>
         </div>
       </Space>
     </Form>
