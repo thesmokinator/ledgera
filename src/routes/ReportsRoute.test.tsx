@@ -21,10 +21,18 @@ vi.mock("react-i18next", () => ({
         "reports.income_statement": "Income Statement",
         "reports.balance_sheet": "Balance Sheet",
         "reports.cashflow": "Cashflow",
-        "reports.no_interval": "No interval",
-        "reports.monthly": "Monthly",
-        "reports.quarterly": "Quarterly",
-        "reports.yearly": "Yearly",
+        "reports.scope": "Scope",
+        "reports.scope_current_month": "Current month",
+        "reports.scope_current_year": "Current year",
+        "reports.scope_all_time": "All time",
+        "reports.scope_custom": "Custom range",
+        "reports.begin_date": "Start date",
+        "reports.end_date": "End date",
+        "reports.grouping": "Grouping",
+        "reports.grouping_none": "No grouping",
+        "reports.grouping_month": "By month",
+        "reports.grouping_quarter": "By quarter",
+        "reports.grouping_year": "By year",
         "reports.generate": "Generate",
         "reports.generating": "Generating report…",
         "reports.select_and_generate":
@@ -84,15 +92,20 @@ describe("ReportsRoute", () => {
     expect(screen.getByTitle("Income Statement")).toBeTruthy();
   });
 
-  it('shows "Monthly" as default interval', () => {
+  it('shows "Current month" as default scope', () => {
     renderWithProviders();
-    expect(screen.getByTitle("Monthly")).toBeTruthy();
+    expect(screen.getByTitle("Current month")).toBeTruthy();
+  });
+
+  it('shows "No grouping" as default grouping', () => {
+    renderWithProviders();
+    expect(screen.getByTitle("No grouping")).toBeTruthy();
   });
 
   it("calls run_report when generate is clicked", async () => {
     mockedInvoke.mockResolvedValueOnce({
       reportType: "is",
-      interval: "-M",
+      interval: "",
       periodColumns: ["2026-01", "2026-02"],
       rows: [],
       visualization: emptyVisualization,
@@ -104,7 +117,10 @@ describe("ReportsRoute", () => {
     await waitFor(() => {
       expect(mockedInvoke).toHaveBeenCalledWith("run_report", {
         reportType: "is",
-        interval: "-M",
+        interval: "",
+        scope: "current_month",
+        beginDate: null,
+        endDate: null,
       });
     });
   });
@@ -173,7 +189,7 @@ describe("ReportsRoute", () => {
     expect(screen.queryByText("Detailed hledger table")).toBeNull();
   });
 
-  it("shows the detailed table collapse when enabled", async () => {
+  it("shows the detailed table expanded when enabled", async () => {
     mockedInvoke.mockResolvedValueOnce({
       reportType: "is",
       interval: "-M",
@@ -233,6 +249,9 @@ describe("ReportsRoute", () => {
     await waitFor(() => {
       expect(screen.getByText("Detailed hledger table")).toBeTruthy();
     });
+
+    expect(screen.getAllByText("Account").length).toBeGreaterThan(0);
+    expect(screen.getByText("Revenues")).toBeTruthy();
   });
 
   it("shows error state when generation fails", async () => {

@@ -7,10 +7,12 @@ use crate::{
     settings::read_settings,
     AMOUNT_STYLE,
 };
+use chrono::{Datelike, Local, NaiveDate};
 use serde::Serialize;
 use std::{
     collections::{HashMap, HashSet},
     io::Read,
+    path::Path,
     process::{Command, Output, Stdio},
     thread,
     time::{Duration, Instant},
@@ -760,27 +762,149 @@ fn run_command_with_timeout(mut cmd: Command, timeout: Duration) -> Result<Outpu
     }
 }
 
-fn run_hledger_report(
-    app: &AppHandle,
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReportDateRange {
+    begin: Option<String>,
+    end: Option<String>,
+}
+
+fn report_error(message: &str, details: impl Into<String>) -> String {
+    to_error_string_with_details("report_failed", message, details.into())
+}
+
+fn validate_report_type(report_type: &str) -> Result<(), String> {
+    match report_type {
+        "is" | "bs" | "cf" => Ok(()),
+        _ => Err(report_error(
+            "Invalid report type.",
+            format!("Unsupported report type '{}'.", report_type),
+        )),
+    }
+}
+
+fn validate_grouping(interval: &str) -> Result<(), String> {
+    match interval {
+        "" | "-M" | "-Q" | "-Y" => Ok(()),
+        _ => Err(report_error(
+            "Invalid report grouping.",
+            format!("Unsupported report grouping '{}'.", interval),
+        )),
+    }
+}
+
+fn format_scope_date(date: NaiveDate) -> String {
+    date.format("%Y-%m-%d").to_string()
+}
+
+fn month_start(date: NaiveDate) -> NaiveDate {
+    NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap_or(date)
+}
+
+fn next_month_start(date: NaiveDate) -> NaiveDate {
+    if date.month() == 12 {
+        NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap_or(date)
+    } else {
+        NaiveDate::from_ymd_opt(date.year(), date.month() + 1, 1).unwrap_or(date)
+    }
+}
+
+fn year_start(date: NaiveDate) -> NaiveDate {
+    NaiveDate::from_ymd_opt(date.year(), 1, 1).unwrap_or(date)
+}
+
+fn next_year_start(date: NaiveDate) -> NaiveDate {
+    NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap_or(date)
+}
+
+fn parse_scope_date(field: &str, value: Option<&str>) -> Result<NaiveDate, String> {
+    let value = value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            report_error(
+                "Invalid report date range.",
+                format!("{} is required.", field),
+            )
+        })?;
+
+    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|error| {
+        report_error(
+            "Invalid report date range.",
+            format!("{} must use YYYY-MM-DD format: {}", field, error),
+        )
+    })
+}
+
+fn resolve_report_date_range(
+    scope: &str,
+    begin_date: Option<&str>,
+    end_date: Option<&str>,
+    today: NaiveDate,
+) -> Result<ReportDateRange, String> {
+    match scope {
+        "" | "current_month" => Ok(ReportDateRange {
+            begin: Some(format_scope_date(month_start(today))),
+            end: Some(format_scope_date(next_month_start(today))),
+        }),
+        "current_year" => Ok(ReportDateRange {
+            begin: Some(format_scope_date(year_start(today))),
+            end: Some(format_scope_date(next_year_start(today))),
+        }),
+        "all_time" => Ok(ReportDateRange {
+            begin: None,
+            end: None,
+        }),
+        "custom" => {
+            let begin = parse_scope_date("beginDate", begin_date)?;
+            let end = parse_scope_date("endDate", end_date)?;
+            if end < begin {
+                return Err(report_error(
+                    "Invalid report date range.",
+                    "endDate must be on or after beginDate.",
+                ));
+            }
+            let end_exclusive = end
+                .checked_add_signed(chrono::Duration::days(1))
+                .ok_or_else(|| {
+                    report_error("Invalid report date range.", "endDate is out of range.")
+                })?;
+
+            Ok(ReportDateRange {
+                begin: Some(format_scope_date(begin)),
+                end: Some(format_scope_date(end_exclusive)),
+            })
+        }
+        _ => Err(report_error(
+            "Invalid report scope.",
+            format!("Unsupported report scope '{}'.", scope),
+        )),
+    }
+}
+
+fn hledger_report_args(
+    journal_path: &Path,
     report_type: &str,
     interval: &str,
-) -> Result<ReportResult, String> {
-    let settings = read_settings(app)?;
-    let journal_path = require_journal_path(&settings)?;
-    let executable = hledger_executable(&settings);
-
+    date_range: &ReportDateRange,
+) -> Vec<String> {
     let mut args = vec![
         "-f".to_string(),
         journal_path.display().to_string(),
         report_type.to_string(),
     ];
 
+    if let Some(begin) = &date_range.begin {
+        args.extend(["-b".to_string(), begin.clone()]);
+    }
+    if let Some(end) = &date_range.end {
+        args.extend(["-e".to_string(), end.clone()]);
+    }
     if !interval.is_empty() {
         args.push(interval.to_string());
     }
 
-    // Use --valuechange for balance sheet, which is the default for bs/cf
-    // For is, hledger already shows period changes
+    // Use --valuechange for balance sheet, which is the default for bs/cf.
+    // For is, hledger already shows period changes.
     if report_type == "bs" || report_type == "cf" {
         args.push("--valuechange".to_string());
     }
@@ -791,6 +915,27 @@ fn run_hledger_report(
         "-O".to_string(),
         "json".to_string(),
     ]);
+
+    args
+}
+
+fn run_hledger_report(
+    app: &AppHandle,
+    report_type: &str,
+    interval: &str,
+    scope: &str,
+    begin_date: Option<&str>,
+    end_date: Option<&str>,
+) -> Result<ReportResult, String> {
+    validate_report_type(report_type)?;
+    validate_grouping(interval)?;
+
+    let settings = read_settings(app)?;
+    let journal_path = require_journal_path(&settings)?;
+    let executable = hledger_executable(&settings);
+    let date_range =
+        resolve_report_date_range(scope, begin_date, end_date, Local::now().date_naive())?;
+    let args = hledger_report_args(&journal_path, report_type, interval, &date_range);
 
     logs::log_event(
         app,
@@ -875,23 +1020,36 @@ pub(crate) async fn run_report(
     app: AppHandle,
     report_type: String,
     interval: String,
+    scope: String,
+    begin_date: Option<String>,
+    end_date: Option<String>,
 ) -> Result<ReportResult, String> {
     logs::log_event(
         &app,
         "info",
         "report_request_received",
         format!(
-            "Report request received: report_type='{}', interval='{}'.",
-            report_type, interval
+            "Report request received: report_type='{}', scope='{}', interval='{}', begin_date={:?}, end_date={:?}.",
+            report_type, scope, interval, begin_date, end_date
         ),
     );
 
     let app_for_task = app.clone();
     let report_type_for_task = report_type.clone();
     let interval_for_task = interval.clone();
+    let scope_for_task = scope.clone();
+    let begin_date_for_task = begin_date.clone();
+    let end_date_for_task = end_date.clone();
 
     let result = tauri::async_runtime::spawn_blocking(move || {
-        run_hledger_report(&app_for_task, &report_type_for_task, &interval_for_task)
+        run_hledger_report(
+            &app_for_task,
+            &report_type_for_task,
+            &interval_for_task,
+            &scope_for_task,
+            begin_date_for_task.as_deref(),
+            end_date_for_task.as_deref(),
+        )
     })
     .await
     .map_err(|error| {
@@ -914,8 +1072,9 @@ pub(crate) async fn run_report(
         "info",
         "report_request_done",
         format!(
-            "Report request completed: report_type='{}', interval='{}', rows={}, period_columns={}.",
+            "Report request completed: report_type='{}', scope='{}', interval='{}', rows={}, period_columns={}.",
             result.report_type,
+            scope,
             result.interval,
             result.rows.len(),
             result.period_columns.len()
@@ -950,7 +1109,7 @@ mod tests {
                 amount: total,
                 commodity: "EUR".to_string(),
                 formatted: format!("{} EUR", total),
-                    tint: crate::tint(total).to_string(),
+                tint: crate::tint(total).to_string(),
             },
         }
     }
@@ -966,9 +1125,86 @@ mod tests {
                 amount: total,
                 commodity: "EUR".to_string(),
                 formatted: format!("{} EUR", total),
-                    tint: crate::tint(total).to_string(),
+                tint: crate::tint(total).to_string(),
             },
         }
+    }
+
+    #[test]
+    fn current_month_scope_uses_month_boundaries() {
+        let today = NaiveDate::from_ymd_opt(2026, 6, 2).unwrap();
+
+        let range = resolve_report_date_range("current_month", None, None, today)
+            .expect("current month should resolve");
+
+        assert_eq!(
+            range,
+            ReportDateRange {
+                begin: Some("2026-06-01".to_string()),
+                end: Some("2026-07-01".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn current_year_scope_uses_year_boundaries() {
+        let today = NaiveDate::from_ymd_opt(2026, 6, 2).unwrap();
+
+        let range = resolve_report_date_range("current_year", None, None, today)
+            .expect("current year should resolve");
+
+        assert_eq!(
+            range,
+            ReportDateRange {
+                begin: Some("2026-01-01".to_string()),
+                end: Some("2027-01-01".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn custom_scope_treats_selected_end_date_as_inclusive() {
+        let today = NaiveDate::from_ymd_opt(2026, 6, 2).unwrap();
+
+        let range =
+            resolve_report_date_range("custom", Some("2026-05-10"), Some("2026-05-31"), today)
+                .expect("custom range should resolve");
+
+        assert_eq!(
+            range,
+            ReportDateRange {
+                begin: Some("2026-05-10".to_string()),
+                end: Some("2026-06-01".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn hledger_report_args_apply_scope_and_grouping_independently() {
+        let range = ReportDateRange {
+            begin: Some("2026-06-01".to_string()),
+            end: Some("2026-07-01".to_string()),
+        };
+
+        let args = hledger_report_args(Path::new("/ledger/main.journal"), "is", "-M", &range);
+
+        assert_eq!(
+            args,
+            vec![
+                "-f",
+                "/ledger/main.journal",
+                "is",
+                "-b",
+                "2026-06-01",
+                "-e",
+                "2026-07-01",
+                "-M",
+                "-V",
+                "--infer-market-prices",
+                "-O",
+                "json",
+            ]
+        );
     }
 
     #[test]

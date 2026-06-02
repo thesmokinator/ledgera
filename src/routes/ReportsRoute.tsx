@@ -1,5 +1,5 @@
 import { BarChartOutlined } from "@ant-design/icons";
-import { Button, Card, Collapse, Empty, Select, Space, Spin, Table } from "antd";
+import { Button, Card, Collapse, DatePicker, Empty, Select, Space, Spin, Table } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -10,7 +10,8 @@ import type { ReportPeriodAmount, ReportResult, ReportRow } from "./types";
 import styles from "./ReportsRoute.module.css";
 
 type ReportType = "is" | "bs" | "cf";
-type ReportInterval = "" | "-M" | "-Q" | "-Y";
+type ReportScope = "current_month" | "current_year" | "all_time" | "custom";
+type ReportGrouping = "" | "-M" | "-Q" | "-Y";
 
 const reportTypeOptions = [
   { value: "is" as const, labelKey: "reports.income_statement" },
@@ -18,11 +19,18 @@ const reportTypeOptions = [
   { value: "cf" as const, labelKey: "reports.cashflow" },
 ];
 
-const intervalOptions = [
-  { value: "" as const, labelKey: "reports.no_interval" },
-  { value: "-M" as const, labelKey: "reports.monthly" },
-  { value: "-Q" as const, labelKey: "reports.quarterly" },
-  { value: "-Y" as const, labelKey: "reports.yearly" },
+const scopeOptions = [
+  { value: "current_month" as const, labelKey: "reports.scope_current_month" },
+  { value: "current_year" as const, labelKey: "reports.scope_current_year" },
+  { value: "all_time" as const, labelKey: "reports.scope_all_time" },
+  { value: "custom" as const, labelKey: "reports.scope_custom" },
+];
+
+const groupingOptions = [
+  { value: "" as const, labelKey: "reports.grouping_none" },
+  { value: "-M" as const, labelKey: "reports.grouping_month" },
+  { value: "-Q" as const, labelKey: "reports.grouping_quarter" },
+  { value: "-Y" as const, labelKey: "reports.grouping_year" },
 ];
 
 export function ReportsRoute({
@@ -32,11 +40,20 @@ export function ReportsRoute({
 }) {
   const { t } = useTranslation();
   const [reportType, setReportType] = useState<ReportType>("is");
-  const [interval, setInterval] = useState<ReportInterval>("-M");
+  const [scope, setScope] = useState<ReportScope>("current_month");
+  const [grouping, setGrouping] = useState<ReportGrouping>("");
+  const [customBeginDate, setCustomBeginDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
 
   const reportQuery = useQuery({
-    queryKey: ["report", reportType, interval],
-    queryFn: () => callCommand<ReportResult>("run_report", { reportType, interval }),
+    queryKey: ["report", reportType, scope, grouping, customBeginDate, customEndDate],
+    queryFn: () => callCommand<ReportResult>("run_report", {
+      reportType,
+      interval: grouping,
+      scope,
+      beginDate: scope === "custom" ? customBeginDate || null : null,
+      endDate: scope === "custom" ? customEndDate || null : null,
+    }),
     enabled: false,
     retry: false,
   });
@@ -46,8 +63,13 @@ export function ReportsRoute({
     [t],
   );
 
-  const localizedIntervals = useMemo(
-    () => intervalOptions.map((opt) => ({ value: opt.value, label: t(opt.labelKey) })),
+  const localizedScopes = useMemo(
+    () => scopeOptions.map((opt) => ({ value: opt.value, label: t(opt.labelKey) })),
+    [t],
+  );
+
+  const localizedGroupings = useMemo(
+    () => groupingOptions.map((opt) => ({ value: opt.value, label: t(opt.labelKey) })),
     [t],
   );
 
@@ -94,6 +116,7 @@ export function ReportsRoute({
   }, [reportQuery.data?.periodColumns, t]);
 
   const isLoading = reportQuery.isFetching;
+  const canGenerate = scope !== "custom" || Boolean(customBeginDate && customEndDate);
   const data = reportQuery.data?.rows ?? [];
   const hasError = reportQuery.isError;
   const isEmpty =
@@ -113,15 +136,38 @@ export function ReportsRoute({
             style={{ minWidth: 180 }}
           />
           <Select
-            value={interval}
-            onChange={setInterval}
-            options={localizedIntervals}
-            style={{ minWidth: 140 }}
+            aria-label={t("reports.scope")}
+            value={scope}
+            onChange={setScope}
+            options={localizedScopes}
+            style={{ minWidth: 160 }}
+          />
+          {scope === "custom" ? (
+            <>
+              <DatePicker
+                format="YYYY-MM-DD"
+                placeholder={t("reports.begin_date")}
+                onChange={(_, dateString) => setCustomBeginDate(String(dateString))}
+              />
+              <DatePicker
+                format="YYYY-MM-DD"
+                placeholder={t("reports.end_date")}
+                onChange={(_, dateString) => setCustomEndDate(String(dateString))}
+              />
+            </>
+          ) : null}
+          <Select
+            aria-label={t("reports.grouping")}
+            value={grouping}
+            onChange={setGrouping}
+            options={localizedGroupings}
+            style={{ minWidth: 150 }}
           />
           <Button
             type="primary"
             icon={<BarChartOutlined />}
             loading={isLoading}
+            disabled={!canGenerate}
             onClick={() => reportQuery.refetch()}
           >
             {t("reports.generate")}
@@ -151,6 +197,7 @@ export function ReportsRoute({
             {showDetailedTable ? (
               <Collapse
                 className={styles.detailed_table_collapse}
+                defaultActiveKey={["detailed-table"]}
                 items={[
                   {
                     key: "detailed-table",
