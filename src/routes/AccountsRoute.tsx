@@ -117,7 +117,7 @@ export function AccountsRoute({
             columns={columns}
           />
         ) : grouped.length === 0 ? (
-          <Empty description={t(search ? "accounts.noSearchResults" : "accounts.empty")} />
+          <Empty description={t(search ? "accounts.no_search_results" : "accounts.empty")} />
         ) : grouped.map(({ group, accounts }) => (
           <div key={group} className={styles.group}>
             <Typography.Title level={5} className={styles.group_title}>

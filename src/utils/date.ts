@@ -32,3 +32,12 @@ export function isExecutedTransaction(transaction: JournalTransaction): boolean 
   return parsedDate.isValid() && !parsedDate.isAfter(dayjs(), "day");
 }
 
+export function normalizeDate(
+  value: dayjs.Dayjs | string | null | undefined,
+): string | undefined {
+  if (value == null) return undefined;
+  if (dayjs.isDayjs(value)) return value.format(journalDateFormat);
+  if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  return undefined;
+}
+

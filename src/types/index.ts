@@ -3,7 +3,7 @@ import type { Dayjs } from "dayjs";
 export type ThemePreference = "system" | "dark" | "light";
 export type LanguagePreference = "system" | "en" | "it";
 
-export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs" | "reports";
+export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs" | "reports" | "recurring";
 
 export type AppModuleSettings = {
   enabled: boolean;
@@ -18,6 +18,7 @@ export type AppModulesSettings = {
   developerTools: AppModuleSettings;
   updateChecker: AppModuleSettings;
   gitSync: GitSyncModuleSettings;
+  autoGenerateRecurring: boolean;
 };
 
 export type CommoditySymbolMapping = {
@@ -301,6 +302,12 @@ export type GitSyncFileStatus = {
   status: string;
 };
 
+export type GitCommitInfo = {
+  hash: string;
+  fullHash: string;
+  subject: string;
+};
+
 export type GitSyncStatus = {
   available: boolean;
   repoFound: boolean;
@@ -312,7 +319,7 @@ export type GitSyncStatus = {
   behind: number;
   dirty: boolean;
   files: GitSyncFileStatus[];
-  lastCommit: string | null;
+  lastCommit: GitCommitInfo | null;
   error: string | null;
 };
 
@@ -329,4 +336,49 @@ export type NavigationItem = {
   shortcut?: string;
   badge?: string;
   badgeTone?: "warning" | "danger";
+};
+
+export type PeriodicRule = {
+  id: string;
+  ruleId: string;
+  sourceFile: string;
+  periodExpr: string;
+  description: string;
+  postings: JournalPosting[];
+  status: string;
+  code: string;
+  startDate: string | null;
+  endDate: string | null;
+  comment: string;
+  raw: string;
+  startLine: number;
+  endLine: number;
+};
+
+export type PeriodicRulesSummary = {
+  rules: PeriodicRule[];
+  ruleCount: number;
+};
+
+export type PeriodicRuleInput = {
+  ruleId: string;
+  periodExpr: string;
+  description: string;
+  postings: PostingInput[];
+  status: string;
+  code: string;
+  startDate?: string;
+  endDate?: string;
+  comment?: string;
+};
+
+export type PendingRecurringDates = {
+  ruleId: string;
+  description: string;
+  dates: string[];
+};
+
+export type GenerateResult = {
+  generated: number;
+  rules: string[];
 };

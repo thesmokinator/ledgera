@@ -7,6 +7,7 @@ export const defaultModules: AppModulesSettings = {
   developerTools: { enabled: false },
   updateChecker: { enabled: true },
   gitSync: { enabled: false, commitMessage: defaultGitCommitMessage },
+  autoGenerateRecurring: false,
 };
 
 export const defaultSettings: AppSettings = {
@@ -37,6 +38,7 @@ export function normalizeModules(settings?: Partial<AppSettings>): AppModulesSet
       enabled: modules?.gitSync?.enabled ?? defaultModules.gitSync.enabled,
       commitMessage: modules?.gitSync?.commitMessage?.trim() || defaultGitCommitMessage,
     },
+    autoGenerateRecurring: modules?.autoGenerateRecurring ?? defaultModules.autoGenerateRecurring,
   };
 }
 

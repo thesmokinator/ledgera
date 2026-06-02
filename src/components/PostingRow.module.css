@@ -1,0 +1,28 @@
+.advanced_posting_row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(112px, 0.5fr) minmax(
+            0,
+            0.65fr
+        ) minmax(0, 0.75fr) auto;
+    column-gap: 8px;
+    width: 100%;
+}
+
+.advanced_posting_row :global(.ant-form-item) {
+    margin-bottom: 12px;
+}
+
+.advanced_posting_row :global(.ant-input),
+.advanced_posting_row :global(.ant-select) {
+    width: 100%;
+}
+
+.posting_comment_field {
+    grid-column: 1 / -1;
+    margin-top: -6px;
+}
+
+.posting_delete_button {
+    align-self: start;
+    margin-top: 30px;
+}

@@ -32,6 +32,8 @@ pub(crate) struct AppModulesSettings {
     pub(crate) update_checker: AppModuleSettings,
     #[serde(default)]
     pub(crate) git_sync: GitSyncModuleSettings,
+    #[serde(default)]
+    pub(crate) auto_generate_recurring: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +87,7 @@ impl Default for AppModulesSettings {
             developer_tools: AppModuleSettings::default(),
             update_checker: default_update_checker(),
             git_sync: GitSyncModuleSettings::default(),
+            auto_generate_recurring: false,
         }
     }
 }

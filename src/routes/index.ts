@@ -1,6 +1,7 @@
 export { AccountsRoute } from "./AccountsRoute";
 export { BalancesRoute } from "./BalancesRoute";
 export { LogsRoute } from "./LogsRoute";
+export { RecurringRoute } from "./RecurringRoute";
 export { ReportsRoute } from "./ReportsRoute";
 export { SettingsRoute } from "./SettingsRoute";
 export { SyncRoute } from "./SyncRoute";

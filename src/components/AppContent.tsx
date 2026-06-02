@@ -6,6 +6,7 @@ import {
   AccountsRoute,
   BalancesRoute,
   LogsRoute,
+  RecurringRoute,
   ReportsRoute,
   SettingsRoute,
   SyncRoute,
@@ -25,8 +26,12 @@ type AppContentProps = {
   activeView: AppView;
   settingsForm: FormInstance<AppSettings>;
   activeSettings: AppSettings;
+  codeOptions: { value: string }[];
+  descriptionOptions: { value: string }[];
   commodityOptions: { value: string }[];
   accountOptions: { value: string }[];
+  commentOptions: { value: string }[];
+  defaultCommodity: string;
   hledgerStatus: HledgerStatus | undefined;
   journalSummary: JournalSummary | undefined;
   journalError: string | null;
@@ -53,8 +58,12 @@ export function AppContent({
   activeView,
   settingsForm,
   activeSettings,
+  codeOptions,
+  descriptionOptions,
   commodityOptions,
   accountOptions,
+  commentOptions,
+  defaultCommodity,
   hledgerStatus,
   journalSummary,
   journalError,
@@ -134,6 +143,16 @@ export function AppContent({
       ),
       logs: <LogsRoute />,
       reports: <ReportsRoute showDetailedTable={activeSettings.modules.developerTools.enabled} />,
+      recurring: (
+        <RecurringRoute
+          accountOptions={accountOptions}
+          codeOptions={codeOptions}
+          descriptionOptions={descriptionOptions}
+          commodityOptions={commodityOptions}
+          commentOptions={commentOptions}
+          defaultCommodity={defaultCommodity}
+        />
+      ),
     };
 
     return routeMap[activeView] ?? (shouldShowCourtesy ? <CourtesyState reasons={courtesyReasons} details={courtesyDetails} /> : renderJournalRoute());

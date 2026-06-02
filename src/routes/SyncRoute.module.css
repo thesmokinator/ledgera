@@ -11,3 +11,7 @@
 .file_list {
   margin-top: 8px;
 }
+
+.white_copy :global(.ant-typography-copy) {
+  color: white !important;
+}

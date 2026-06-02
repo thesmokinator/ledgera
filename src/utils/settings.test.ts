@@ -32,6 +32,7 @@ describe("normalizeModules", () => {
       developerTools: { enabled: true },
       updateChecker: { enabled: true },
       gitSync: { enabled: false, commitMessage: defaultGitCommitMessage },
+      autoGenerateRecurring: false,
     });
   });
 
@@ -49,6 +50,7 @@ describe("normalizeModules", () => {
       developerTools: { enabled: false },
       updateChecker: { enabled: true },
       gitSync: { enabled: true, commitMessage: "My journal update" },
+      autoGenerateRecurring: false,
     });
   });
 });
@@ -145,6 +147,7 @@ describe("normalizeSettings", () => {
         developerTools: { enabled: true },
         updateChecker: { enabled: true },
         gitSync: { enabled: true, commitMessage: "Sync journal" },
+        autoGenerateRecurring: false,
       },
     };
     expect(normalizeSettings(full)).toEqual(full);
