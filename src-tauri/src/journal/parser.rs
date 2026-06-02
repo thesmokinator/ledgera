@@ -1,4 +1,5 @@
 use crate::{
+    amount_style::{explicit_style_for_commodity, AmountStyle},
     app_error::to_error_string_with_details,
     journal::{
         files::{load_journal_files, JournalFile},
@@ -382,8 +383,21 @@ pub(crate) fn format_transaction(input: &TransactionInput) -> String {
     format_transaction_with_comment(input, "")
 }
 
+/// Formats a transaction without normalizing posting quantities.
+pub(crate) fn format_transaction_preserving_quantities(input: &TransactionInput) -> String {
+    format_transaction_with_comment_and_quantity_mode(input, "", QuantityFormat::Preserve)
+}
+
 /// Formats a transaction with an optional header comment (e.g. "rule-id:salary").
 pub(crate) fn format_transaction_with_comment(input: &TransactionInput, comment: &str) -> String {
+    format_transaction_with_comment_and_quantity_mode(input, comment, QuantityFormat::Normalize)
+}
+
+fn format_transaction_with_comment_and_quantity_mode(
+    input: &TransactionInput,
+    comment: &str,
+    quantity_format: QuantityFormat,
+) -> String {
     let mut header = input.date.trim().to_string();
     if !input.status.trim().is_empty() {
         header.push(' ');
@@ -406,7 +420,10 @@ pub(crate) fn format_transaction_with_comment(input: &TransactionInput, comment:
         .postings
         .iter()
         .filter(|posting| !posting.account.trim().is_empty())
-        .map(format_posting)
+        .map(|posting| match quantity_format {
+            QuantityFormat::Normalize => format_posting(posting),
+            QuantityFormat::Preserve => format_posting_preserving_quantity(posting),
+        })
         .collect::<Vec<_>>();
 
     std::iter::once(header)
@@ -422,10 +439,7 @@ pub(crate) fn is_periodic_rule_header(line: &str) -> bool {
 }
 
 /// Parses periodic transaction rules from journal content.
-pub(crate) fn parse_periodic_rules(
-    content: &str,
-    source_path: &Path,
-) -> Vec<PeriodicRule> {
+pub(crate) fn parse_periodic_rules(content: &str, source_path: &Path) -> Vec<PeriodicRule> {
     let lines = split_lines(content);
     let mut rules = Vec::new();
     let mut index = 0;
@@ -500,9 +514,7 @@ fn parse_periodic_rule_block(
     })
 }
 
-fn parse_periodic_header(
-    line: &str,
-) -> Option<(String, Option<String>, Option<String>, String)> {
+fn parse_periodic_header(line: &str) -> Option<(String, Option<String>, Option<String>, String)> {
     let trimmed = line.trim_start();
     let rest = trimmed.strip_prefix('~')?.trim_start();
 
@@ -593,7 +605,7 @@ pub(crate) fn format_periodic_rule_text(input: &PeriodicRuleInput) -> String {
         .postings
         .iter()
         .filter(|p| !p.account.trim().is_empty())
-        .map(format_posting)
+        .map(format_posting_preserving_quantity)
         .collect::<Vec<_>>();
 
     std::iter::once(header)
@@ -602,8 +614,14 @@ pub(crate) fn format_periodic_rule_text(input: &PeriodicRuleInput) -> String {
         .join("\n")
 }
 
-/// Normalizes a numeric quantity to two decimals when possible.
-fn normalize_quantity(value: &str) -> String {
+#[derive(Clone, Copy)]
+enum QuantityFormat {
+    Normalize,
+    Preserve,
+}
+
+/// Normalizes a numeric quantity using the commodity style when possible.
+fn normalize_quantity(value: &str, commodity: &str) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return String::new();
@@ -611,22 +629,37 @@ fn normalize_quantity(value: &str) -> String {
 
     let normalized = trimmed.replace(',', ".");
     match normalized.parse::<f64>() {
-        Ok(val) => {
-            crate::global_amount_style().format(val)
-        }
+        Ok(val) => explicit_style_for_commodity(commodity)
+            .unwrap_or_else(|| crate::global_amount_style().clone())
+            .format(val),
         Err(_) => trimmed.to_string(),
     }
 }
 
 /// Formats a quantity and commodity into hledger amount syntax.
 fn format_posting_amount(amount: &str, commodity: &str) -> String {
+    format_posting_amount_with_quantity_mode(amount, commodity, QuantityFormat::Normalize)
+}
+
+fn format_posting_amount_preserving_quantity(amount: &str, commodity: &str) -> String {
+    format_posting_amount_with_quantity_mode(amount, commodity, QuantityFormat::Preserve)
+}
+
+fn format_posting_amount_with_quantity_mode(
+    amount: &str,
+    commodity: &str,
+    quantity_format: QuantityFormat,
+) -> String {
     let parsed = parse_posting_amount(amount);
     let selected_commodity = if parsed.commodity.trim().is_empty() {
         commodity.trim()
     } else {
         parsed.commodity.trim()
     };
-    let quantity = normalize_quantity(&parsed.quantity);
+    let quantity = match quantity_format {
+        QuantityFormat::Normalize => normalize_quantity(&parsed.quantity, selected_commodity),
+        QuantityFormat::Preserve => parsed.quantity.trim().to_string(),
+    };
 
     if quantity.is_empty() {
         return String::new();
@@ -635,21 +668,58 @@ fn format_posting_amount(amount: &str, commodity: &str) -> String {
         return quantity;
     }
 
+    format_quantity_and_commodity(&quantity, selected_commodity)
+}
+
+fn format_quantity_and_commodity(quantity: &str, commodity: &str) -> String {
+    if let Some(style) = explicit_style_for_commodity(commodity) {
+        return format_quantity_and_commodity_with_style(quantity, commodity, &style);
+    }
+
     let sign = if quantity.starts_with('-') { "-" } else { "" };
     let absolute_quantity = quantity.trim_start_matches('-');
-    if selected_commodity
-        .chars()
-        .all(|character| character.is_alphabetic())
-    {
-        format!("{}{} {}", sign, absolute_quantity, selected_commodity)
+    if commodity.chars().all(|character| character.is_alphabetic()) {
+        format!("{}{} {}", sign, absolute_quantity, commodity)
     } else {
-        format!("{}{}{}", sign, selected_commodity, absolute_quantity)
+        format!("{}{}{}", sign, commodity, absolute_quantity)
+    }
+}
+
+fn format_quantity_and_commodity_with_style(
+    quantity: &str,
+    commodity: &str,
+    style: &AmountStyle,
+) -> String {
+    let sign = if quantity.starts_with('-') { "-" } else { "" };
+    let absolute_quantity = quantity.trim_start_matches('-');
+    let separator = if style.commodity_spaced { " " } else { "" };
+
+    if style.commodity_position == "right" {
+        format!("{}{}{}{}", sign, absolute_quantity, separator, commodity)
+    } else {
+        format!("{}{}{}{}", sign, commodity, separator, absolute_quantity)
     }
 }
 
 /// Formats a posting, including an optional hledger inline comment.
 pub(crate) fn format_posting(posting: &PostingInput) -> String {
-    let mut amount = format_posting_amount(&posting.amount, &posting.commodity);
+    format_posting_with_quantity_mode(posting, QuantityFormat::Normalize)
+}
+
+fn format_posting_preserving_quantity(posting: &PostingInput) -> String {
+    format_posting_with_quantity_mode(posting, QuantityFormat::Preserve)
+}
+
+fn format_posting_with_quantity_mode(
+    posting: &PostingInput,
+    quantity_format: QuantityFormat,
+) -> String {
+    let mut amount = match quantity_format {
+        QuantityFormat::Normalize => format_posting_amount(&posting.amount, &posting.commodity),
+        QuantityFormat::Preserve => {
+            format_posting_amount_preserving_quantity(&posting.amount, &posting.commodity)
+        }
+    };
     if !posting.unit_price.trim().is_empty() && !amount.trim().is_empty() {
         amount.push_str(" @ ");
         amount.push_str(posting.unit_price.trim());
@@ -1427,5 +1497,72 @@ mod tests {
         // 92 / 100 = 0.92 EUR per USD
         assert!(first.unit_price.contains("0.92"));
         assert!(first.unit_price.contains("EUR"));
+    }
+
+    #[test]
+    fn formats_periodic_rule_preserving_amount_quantity() {
+        let input = PeriodicRuleInput {
+            rule_id: "insurance".to_string(),
+            period_expr: "monthly".to_string(),
+            description: "Insurance".to_string(),
+            postings: vec![
+                PostingInput {
+                    account: "assets:bank:fineco".to_string(),
+                    amount: "50,00".to_string(),
+                    commodity: "EUR".to_string(),
+                    unit_price: String::new(),
+                    comment: String::new(),
+                },
+                PostingInput {
+                    account: "expenses:insurance:life".to_string(),
+                    amount: String::new(),
+                    commodity: String::new(),
+                    unit_price: String::new(),
+                    comment: String::new(),
+                },
+            ],
+            status: String::new(),
+            code: String::new(),
+            start_date: Some("2026-06-05".to_string()),
+            end_date: None,
+            comment: String::new(),
+        };
+
+        let result = format_periodic_rule_text(&input);
+
+        assert!(result.contains("50,00 EUR"));
+        assert!(!result.contains("50.00 EUR"));
+    }
+
+    #[test]
+    fn formats_generated_recurring_transaction_preserving_amount_quantity() {
+        let input = TransactionInput {
+            mode: String::new(),
+            date: "2026-06-05".to_string(),
+            status: String::new(),
+            code: String::new(),
+            description: "Insurance".to_string(),
+            postings: vec![
+                PostingInput {
+                    account: "assets:bank:fineco".to_string(),
+                    amount: "50,00".to_string(),
+                    commodity: "EUR".to_string(),
+                    unit_price: String::new(),
+                    comment: "rule-id:insurance".to_string(),
+                },
+                PostingInput {
+                    account: "expenses:insurance:life".to_string(),
+                    amount: String::new(),
+                    commodity: String::new(),
+                    unit_price: String::new(),
+                    comment: String::new(),
+                },
+            ],
+        };
+
+        let result = format_transaction_preserving_quantities(&input);
+
+        assert!(result.contains("50,00 EUR"));
+        assert!(!result.contains("50.00 EUR"));
     }
 }

@@ -300,6 +300,8 @@ function App() {
             activeView={activeView}
             settingsForm={settingsForm}
             activeSettings={activeSettings}
+            codeOptions={codeOptions}
+            descriptionOptions={descriptionOptions}
             commodityOptions={commodityOptions}
             accountOptions={accountOptions}
             commentOptions={commentOptions}

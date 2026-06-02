@@ -1,11 +1,9 @@
 import {
   Alert,
-  AutoComplete,
   DatePicker,
   Form,
   Input,
   Modal,
-  Segmented,
   Select,
   Space,
 } from "antd";
@@ -14,17 +12,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { callCommand } from "../utils/command";
 import { useRecurringRuleActions } from "../hooks/useRecurringRuleActions";
-import type { PeriodicRule, PeriodicRuleInput } from "../types";
-import { MovementFields, InvestmentFields, AdvancedPostings } from "./TransactionPostings";
-import { usePostingRowLabels } from "./PostingRow";
-import styles from "./RecurringRuleModal.module.css";
+import type { PeriodicRule, PeriodicRuleInput, TransactionType } from "../types";
+import { TransactionTemplateFields } from "./TransactionTemplateFields";
+import styles from "./TransactionModal.module.css";
 
 type RecurringFormValues = Omit<PeriodicRuleInput, 'startDate' | 'endDate'> & {
   _customPeriod?: string;
   startDate?: dayjs.Dayjs;
   endDate?: dayjs.Dayjs;
 };
-type PostingMode = "movement" | "investment" | "advanced";
 
 const PERIOD_OPTIONS = [
   { value: "daily", label: "recurring.period_daily" },
@@ -80,6 +76,8 @@ export function RecurringRuleModal({
   open,
   rule,
   accountOptions,
+  codeOptions,
+  descriptionOptions,
   commodityOptions,
   commentOptions,
   defaultCommodity,
@@ -89,6 +87,8 @@ export function RecurringRuleModal({
   open: boolean;
   rule: PeriodicRule | null;
   accountOptions: { value: string }[];
+  codeOptions: { value: string }[];
+  descriptionOptions: { value: string }[];
   commodityOptions: { value: string }[];
   commentOptions: { value: string }[];
   defaultCommodity: string;
@@ -101,16 +101,13 @@ export function RecurringRuleModal({
     editingRule: rule,
     onSaved,
   });
-  const [postingMode, setPostingMode] = useState<PostingMode>("movement");
+  const [postingMode, setPostingMode] = useState<TransactionType>("movement");
   const [periodError, setPeriodError] = useState<string | null>(null);
 
   const isEditing = rule !== null;
   const title = isEditing ? t("recurring.edit_rule_title") : t("recurring.new_rule_title");
   const selectedPeriod = Form.useWatch("periodExpr", form);
   const showCustomPeriod = selectedPeriod === "custom";
-
-  const postingLabels = usePostingRowLabels(t);
-
   useEffect(() => {
     if (open) {
       if (rule) {
@@ -148,7 +145,6 @@ export function RecurringRuleModal({
     submitRule(values);
   };
 
-  const isAdvancedMode = postingMode === "advanced" || isEditing;
   const modalWidth = postingMode === "movement" && !isEditing ? 620 : 780;
 
   return (
@@ -186,31 +182,19 @@ export function RecurringRuleModal({
           <Input placeholder={t("recurring.rule_name_placeholder")} autoFocus={!isEditing} />
         </Form.Item>
 
-        <Form.Item
-          name="periodExpr"
-          label={t("recurring.period_expr")}
-          rules={[{ required: true, message: t("recurring.period_required") }]}
-        >
-          <Select
-            options={PERIOD_OPTIONS.map((o) => ({
-              value: o.value,
-              label: t(o.label),
-            }))}
-          />
-        </Form.Item>
-
-        {showCustomPeriod && (
-          <Form.Item name="_customPeriod" label={t("recurring.period_custom_label")}>
-            <Input
-              placeholder={t("recurring.custom_period_placeholder")}
-              onBlur={handleCustomPeriodBlur}
-              autoFocus
+        <Space className={styles.schedule_row} size="middle">
+          <Form.Item
+            name="periodExpr"
+            label={t("recurring.period_expr")}
+            rules={[{ required: true, message: t("recurring.period_required") }]}
+          >
+            <Select
+              options={PERIOD_OPTIONS.map((o) => ({
+                value: o.value,
+                label: t(o.label),
+              }))}
             />
           </Form.Item>
-        )}
-        {periodError && <Alert type="error" message={periodError} style={{ marginBottom: 12 }} />}
-
-        <Space className={styles.date_row} size="middle">
           <Form.Item
             label={t("recurring.start_date")}
             name="startDate"
@@ -223,66 +207,32 @@ export function RecurringRuleModal({
           </Form.Item>
         </Space>
 
-        <Space className={styles.form_row} size="middle">
-          <Form.Item label={t("transactions.status")} name="status">
-            <Select
-              allowClear
-              className={styles.full_width_control}
-              placeholder={t("transactions.status_placeholder")}
-              options={[
-                { value: "*", label: t("transactions.status_cleared") },
-                { value: "!", label: t("transactions.status_pending") },
-              ]}
+        {showCustomPeriod && (
+          <Form.Item name="_customPeriod" label={t("recurring.period_custom_label")}>
+            <Input
+              placeholder={t("recurring.custom_period_placeholder")}
+              onBlur={handleCustomPeriodBlur}
+              autoFocus
             />
           </Form.Item>
-          <Form.Item label={t("transactions.code")} name="code">
-            <AutoComplete className={styles.full_width_control} placeholder="(INV-001)" />
-          </Form.Item>
-        </Space>
-
-        <Form.Item name="description" label={t("transactions.description")}>
-          <AutoComplete options={[]} placeholder={t("recurring.description_placeholder")} />
-        </Form.Item>
-
-        {!isEditing && (
-          <Segmented<PostingMode>
-            className={styles.transaction_type_selector}
-            block
-            value={postingMode}
-            onChange={setPostingMode}
-            options={[
-              { value: "movement", label: t("transactions.types.movement") },
-              { value: "investment", label: t("transactions.types.investment") },
-              { value: "advanced", label: t("transactions.types.advanced") },
-            ]}
-          />
         )}
+        {periodError && <Alert type="error" message={periodError} style={{ marginBottom: 12 }} />}
 
-        {postingMode === "movement" && !isEditing ? (
-          <MovementFields
-            accountOptions={accountOptions}
-            commodityOptions={commodityOptions}
-            commentOptions={commentOptions}
-            defaultCommodity={defaultCommodity}
-          />
-        ) : null}
-        {postingMode === "investment" && !isEditing ? (
-          <InvestmentFields
-            accountOptions={accountOptions}
-            commodityOptions={commodityOptions}
-            commentOptions={commentOptions}
-            defaultCommodity={defaultCommodity}
-          />
-        ) : null}
-        {isAdvancedMode ? (
-          <AdvancedPostings
-            accountOptions={accountOptions}
-            commodityOptions={commodityOptions}
-            commentOptions={commentOptions}
-            defaultCommodity={defaultCommodity}
-            labels={postingLabels}
-          />
-        ) : null}
+        <TransactionTemplateFields
+          transactionType={postingMode}
+          isEditing={isEditing}
+          includeDate={false}
+          showModeSelector={!isEditing}
+          advancedEditNotice={isEditing ? t("recurring.advanced_edit_notice") : undefined}
+          codeOptions={codeOptions}
+          descriptionOptions={descriptionOptions}
+          accountOptions={accountOptions}
+          commodityOptions={commodityOptions}
+          commentOptions={commentOptions}
+          defaultCommodity={defaultCommodity}
+          descriptionPlaceholder={t("recurring.description_placeholder")}
+          onTransactionTypeChange={setPostingMode}
+        />
       </Form>
     </Modal>
   );

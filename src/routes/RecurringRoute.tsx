@@ -1,5 +1,5 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, ThunderboltOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, message, Space, Table, Tag, Typography } from "antd";
+import { Button, Card, Empty, message, Modal, Space, Table, Tag, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,11 +11,15 @@ import styles from "./RecurringRoute.module.css";
 
 export function RecurringRoute({
   accountOptions,
+  codeOptions,
+  descriptionOptions,
   commodityOptions,
   commentOptions,
   defaultCommodity,
 }: {
   accountOptions: { value: string }[];
+  codeOptions: { value: string }[];
+  descriptionOptions: { value: string }[];
   commodityOptions: { value: string }[];
   commentOptions: { value: string }[];
   defaultCommodity: string;
@@ -26,6 +30,7 @@ export function RecurringRoute({
   const [editingRule, setEditingRule] = useState<PeriodicRule | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PeriodicRule | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
   const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null);
 
   const rulesQuery = useQuery({
@@ -73,6 +78,7 @@ export function RecurringRoute({
     try {
       const result = await callCommand<GenerateResult>("generate_recurring_transactions", { ruleIdFilter: null });
       setGenerateResult(result);
+      setGenerateConfirmOpen(false);
       queryClient.invalidateQueries({ queryKey: ["periodic-rules"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
     } catch (err) {
@@ -94,7 +100,7 @@ export function RecurringRoute({
             </Button>
             <Button
               icon={<ThunderboltOutlined />}
-              onClick={handleGenerate}
+              onClick={() => setGenerateConfirmOpen(true)}
               loading={generating}
               disabled={rules.length === 0}
             >
@@ -210,10 +216,28 @@ export function RecurringRoute({
         onCancel={() => setDeleteTarget(null)}
       />
 
+      <Modal
+        open={generateConfirmOpen}
+        title={t("recurring.generate_confirm_title")}
+        okText={t("recurring.generate_confirm_ok")}
+        cancelText={t("common.cancel")}
+        onOk={handleGenerate}
+        onCancel={() => setGenerateConfirmOpen(false)}
+        okButtonProps={{ loading: generating }}
+        cancelButtonProps={{ disabled: generating }}
+        closable={!generating}
+        keyboard={!generating}
+        maskClosable={!generating}
+      >
+        <p>{t("recurring.generate_confirm_message")}</p>
+      </Modal>
+
       <RecurringRuleModal
         open={modalOpen}
         rule={editingRule}
         accountOptions={accountOptions}
+        codeOptions={codeOptions}
+        descriptionOptions={descriptionOptions}
         commodityOptions={commodityOptions}
         commentOptions={commentOptions}
         defaultCommodity={defaultCommodity}

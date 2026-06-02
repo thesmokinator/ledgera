@@ -286,12 +286,18 @@ pub(crate) fn parse_format_directive(fmt: &str) -> Option<AmountStyle> {
 
 /// Returns the AmountStyle for a specific commodity, falling back to the global style.
 pub(crate) fn style_for_commodity(commodity: &str) -> AmountStyle {
+    explicit_style_for_commodity(commodity)
+        .unwrap_or_else(|| crate::AMOUNT_STYLE.get().cloned().unwrap_or_default())
+}
+
+/// Returns the explicitly declared AmountStyle for a commodity, when present.
+pub(crate) fn explicit_style_for_commodity(commodity: &str) -> Option<AmountStyle> {
     if let Some(styles) = COMMODITY_STYLES.get() {
         if let Some(style) = styles.get(commodity) {
-            return style.clone();
+            return Some(style.clone());
         }
     }
-    crate::AMOUNT_STYLE.get().cloned().unwrap_or_default()
+    None
 }
 
 /// ISO 4217 currency codes to common display symbols.

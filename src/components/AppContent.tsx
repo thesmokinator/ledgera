@@ -26,6 +26,8 @@ type AppContentProps = {
   activeView: AppView;
   settingsForm: FormInstance<AppSettings>;
   activeSettings: AppSettings;
+  codeOptions: { value: string }[];
+  descriptionOptions: { value: string }[];
   commodityOptions: { value: string }[];
   accountOptions: { value: string }[];
   commentOptions: { value: string }[];
@@ -56,6 +58,8 @@ export function AppContent({
   activeView,
   settingsForm,
   activeSettings,
+  codeOptions,
+  descriptionOptions,
   commodityOptions,
   accountOptions,
   commentOptions,
@@ -142,6 +146,8 @@ export function AppContent({
       recurring: (
         <RecurringRoute
           accountOptions={accountOptions}
+          codeOptions={codeOptions}
+          descriptionOptions={descriptionOptions}
           commodityOptions={commodityOptions}
           commentOptions={commentOptions}
           defaultCommodity={defaultCommodity}

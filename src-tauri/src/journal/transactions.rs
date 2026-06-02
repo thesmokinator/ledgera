@@ -3,7 +3,10 @@ use crate::{
     hledger::hledger_executable,
     journal::{
         files::{parse_include_directive, require_journal_path},
-        parser::{find_block, format_transaction, replace_line_range, split_lines},
+        parser::{
+            find_block, format_transaction, format_transaction_preserving_quantities,
+            replace_line_range, split_lines,
+        },
         summary::read_journal_summary,
         types::{JournalSummary, RoutingStrategy, TransactionInput},
     },
@@ -314,18 +317,44 @@ pub(crate) fn append_transaction_routed(
     main_journal: &Path,
     input: &TransactionInput,
 ) -> Result<(), String> {
+    append_transaction_routed_with_formatter(settings, main_journal, input, format_transaction)
+}
+
+pub(crate) fn append_transaction_routed_preserving_quantities(
+    settings: &AppSettings,
+    main_journal: &Path,
+    input: &TransactionInput,
+) -> Result<(), String> {
+    append_transaction_routed_with_formatter(
+        settings,
+        main_journal,
+        input,
+        format_transaction_preserving_quantities,
+    )
+}
+
+fn append_transaction_routed_with_formatter(
+    settings: &AppSettings,
+    main_journal: &Path,
+    input: &TransactionInput,
+    format: fn(&TransactionInput) -> String,
+) -> Result<(), String> {
     let content = fs::read_to_string(main_journal).map_err(|error| {
-        to_error_string_with_details("journal_read_failed", "Unable to read journal file.", error.to_string())
+        to_error_string_with_details(
+            "journal_read_failed",
+            "Unable to read journal file.",
+            error.to_string(),
+        )
     })?;
     match detect_routing_strategy(&content) {
         RoutingStrategy::Fallback => {
-            append_to_existing_file(settings, main_journal, main_journal, input)
+            append_to_existing_file(settings, main_journal, main_journal, input, format)
         }
         RoutingStrategy::Flat(includes) => {
             let target_include = flat_target_include(&includes, input);
             let target_file = resolve_relative_to_main(main_journal, &target_include);
             if target_file.exists() {
-                append_to_existing_file(settings, main_journal, &target_file, input)
+                append_to_existing_file(settings, main_journal, &target_file, input, format)
             } else {
                 append_to_new_flat_subjournal(
                     settings,
@@ -333,15 +362,16 @@ pub(crate) fn append_transaction_routed(
                     &target_file,
                     &target_include,
                     input,
+                    format,
                 )
             }
         }
         RoutingStrategy::Glob(includes) => {
             let (target_file, target_include) = glob_target_path(main_journal, &includes, input);
             if target_file.exists() {
-                append_to_existing_file(settings, main_journal, &target_file, input)
+                append_to_existing_file(settings, main_journal, &target_file, input, format)
             } else if glob_include_matches_year(&target_include, &includes) {
-                append_to_new_glob_subjournal(settings, main_journal, &target_file, input)
+                append_to_new_glob_subjournal(settings, main_journal, &target_file, input, format)
             } else {
                 append_to_new_glob_year(
                     settings,
@@ -349,6 +379,7 @@ pub(crate) fn append_transaction_routed(
                     &target_file,
                     &target_include,
                     input,
+                    format,
                 )
             }
         }
@@ -360,9 +391,10 @@ fn append_to_existing_file(
     main_journal: &Path,
     target_file: &Path,
     input: &TransactionInput,
+    format: fn(&TransactionInput) -> String,
 ) -> Result<(), String> {
     mutate_existing_file(settings, main_journal, target_file, |content| {
-        Ok(append_transaction_text(content, input))
+        Ok(append_transaction_text(content, input, format))
     })
 }
 
@@ -372,17 +404,30 @@ fn append_to_new_flat_subjournal(
     target_file: &Path,
     target_name: &str,
     input: &TransactionInput,
+    format: fn(&TransactionInput) -> String,
 ) -> Result<(), String> {
     let original_main = fs::read_to_string(main_journal).map_err(|error| {
-        to_error_string_with_details("journal_read_failed", "Unable to read journal file.", error.to_string())
+        to_error_string_with_details(
+            "journal_read_failed",
+            "Unable to read journal file.",
+            error.to_string(),
+        )
     })?;
     let updated_main = insert_include_sorted(&original_main, target_name);
 
     fs::write(main_journal, &updated_main).map_err(|error| {
-        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+        to_error_string_with_details(
+            "journal_write_failed",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
     })?;
-    fs::write(target_file, format!("{}\n", format_transaction(input))).map_err(|error| {
-        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    fs::write(target_file, format!("{}\n", format(input))).map_err(|error| {
+        to_error_string_with_details(
+            "journal_write_failed",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
     })?;
 
     if let Err(error) = validate_journal(settings, main_journal) {
@@ -405,14 +450,23 @@ fn append_to_new_glob_subjournal(
     main_journal: &Path,
     target_file: &Path,
     input: &TransactionInput,
+    format: fn(&TransactionInput) -> String,
 ) -> Result<(), String> {
     if let Some(parent) = target_file.parent() {
         fs::create_dir_all(parent).map_err(|error| {
-            to_error_string_with_details("journal_write_failed", "Unable to create journal directory.", error.to_string())
+            to_error_string_with_details(
+                "journal_write_failed",
+                "Unable to create journal directory.",
+                error.to_string(),
+            )
         })?;
     }
-    fs::write(target_file, format!("{}\n", format_transaction(input))).map_err(|error| {
-        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    fs::write(target_file, format!("{}\n", format(input))).map_err(|error| {
+        to_error_string_with_details(
+            "journal_write_failed",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
     })?;
 
     if let Err(error) = validate_journal(settings, main_journal) {
@@ -429,9 +483,14 @@ fn append_to_new_glob_year(
     target_file: &Path,
     target_include: &str,
     input: &TransactionInput,
+    format: fn(&TransactionInput) -> String,
 ) -> Result<(), String> {
     let original_main = fs::read_to_string(main_journal).map_err(|error| {
-        to_error_string_with_details("journal_read_failed", "Unable to read journal file.", error.to_string())
+        to_error_string_with_details(
+            "journal_read_failed",
+            "Unable to read journal file.",
+            error.to_string(),
+        )
     })?;
     let year_dir = target_file
         .parent()
@@ -440,13 +499,25 @@ fn append_to_new_glob_year(
     let updated_main = insert_glob_include_sorted(&original_main, target_include);
 
     fs::write(main_journal, &updated_main).map_err(|error| {
-        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+        to_error_string_with_details(
+            "journal_write_failed",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
     })?;
     fs::create_dir_all(year_dir).map_err(|error| {
-        to_error_string_with_details("journal_write_failed", "Unable to create journal directory.", error.to_string())
+        to_error_string_with_details(
+            "journal_write_failed",
+            "Unable to create journal directory.",
+            error.to_string(),
+        )
     })?;
-    fs::write(target_file, format!("{}\n", format_transaction(input))).map_err(|error| {
-        to_error_string_with_details("journal_write_failed", "Unable to write journal file.", error.to_string())
+    fs::write(target_file, format!("{}\n", format(input))).map_err(|error| {
+        to_error_string_with_details(
+            "journal_write_failed",
+            "Unable to write journal file.",
+            error.to_string(),
+        )
     })?;
 
     if let Err(error) = validate_journal(settings, main_journal) {
@@ -467,12 +538,16 @@ fn append_to_new_glob_year(
     Ok(())
 }
 
-fn append_transaction_text(content: &str, input: &TransactionInput) -> String {
+fn append_transaction_text(
+    content: &str,
+    input: &TransactionInput,
+    format: fn(&TransactionInput) -> String,
+) -> String {
     let mut updated = content.trim_end_matches(['\r', '\n']).to_string();
     if !updated.is_empty() {
         updated.push_str("\n\n");
     }
-    updated.push_str(&format_transaction(input));
+    updated.push_str(&format(input));
     updated.push('\n');
     updated
 }
