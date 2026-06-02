@@ -124,6 +124,7 @@
     "update_check_disabled": "Update checks are disabled. Enable the update checker module to check for new releases.",
     "last_checked": "Last checked {{date}}",
     "view_release": "View release",
+    "documentation": "Documentation",
     "license": "{{license}} License",
     "repository": "Repository",
     "configure_journal_title": "Configure your journal",

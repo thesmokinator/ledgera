@@ -124,6 +124,7 @@
     "update_check_disabled": "La verifica aggiornamenti è disattivata. Abilita il modulo di verifica aggiornamenti per controllare nuove versioni.",
     "last_checked": "Ultimo controllo {{date}}",
     "view_release": "Vedi release",
+    "documentation": "Documentazione",
     "license": "Licenza {{license}}",
     "repository": "Repository",
     "configure_journal_title": "Configura il journal",
