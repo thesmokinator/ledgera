@@ -367,6 +367,9 @@ mod tests {
             .iter()
             .any(|transaction| transaction.description == "Opening balances"
                 && transaction.source_file.ends_with("accounts.journal")));
+        assert!(summary.transactions.iter().any(|transaction| {
+            transaction.description == "Groceries" && transaction.display.formatted == "€25,00"
+        }));
         assert!(summary
             .transactions
             .iter()

@@ -6,11 +6,11 @@ use crate::{
             AutocompleteSuggestions,
         },
         files::load_journal_files,
-        parser::load_transactions_from_journal_via_files,
+        parser::load_transactions_from_journal_via_files_with_style,
         types::{DashboardSummary, JournalSummary, JournalTransaction},
         util::parse_journal_date,
     },
-    COMMODITY_STYLES,
+    AMOUNT_STYLE, COMMODITY_STYLES,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use std::path::Path;
@@ -25,9 +25,14 @@ pub(crate) fn read_journal_summary(
 
     let amount_style = parse_amount_style(&files);
     let commodity_styles = parse_commodity_styles(&files);
-    let _ = COMMODITY_STYLES.set(commodity_styles);
+    let _ = AMOUNT_STYLE.set(amount_style.clone());
+    let _ = COMMODITY_STYLES.set(commodity_styles.clone());
 
-    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let transactions = load_transactions_from_journal_via_files_with_style(
+        &files,
+        amount_style.clone(),
+        commodity_styles,
+    )?;
     let commodities = collect_declared_commodities(&files);
     let dashboard = build_dashboard_summary(&transactions);
     let profile = build_journal_profile(&transactions, default_commodity);
