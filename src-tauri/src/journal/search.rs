@@ -1,7 +1,8 @@
 use crate::{
+    amount_style::{parse_amount_style, parse_commodity_styles},
     journal::{
         files::{load_journal_files, require_journal_path},
-        parser::load_transactions_from_journal_via_files,
+        parser::load_transactions_from_journal_via_files_with_style,
         types::JournalTransaction,
     },
     settings::read_settings,
@@ -53,7 +54,11 @@ pub(crate) fn search_journal(
     }
 
     let files = load_journal_files(&journal_path)?;
-    let transactions = load_transactions_from_journal_via_files(&files)?;
+    let transactions = load_transactions_from_journal_via_files_with_style(
+        &files,
+        parse_amount_style(&files),
+        parse_commodity_styles(&files),
+    )?;
     let mut scored = transactions
         .into_iter()
         .filter_map(|transaction| search_journal_transaction(transaction, &normalized_query))

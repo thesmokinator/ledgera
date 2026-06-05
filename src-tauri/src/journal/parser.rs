@@ -9,9 +9,18 @@ use crate::{
         },
         util::{split_first_token, split_inline_comment},
     },
-    AMOUNT_STYLE,
 };
-use std::path::Path;
+use std::{cell::RefCell, collections::HashMap, path::Path};
+
+#[derive(Clone)]
+struct TransactionParseStyle {
+    amount_style: AmountStyle,
+    commodity_styles: HashMap<String, AmountStyle>,
+}
+
+thread_local! {
+    static TRANSACTION_PARSE_STYLE: RefCell<Option<TransactionParseStyle>> = const { RefCell::new(None) };
+}
 
 fn load_transactions_from_journal(journal_path: &Path) -> Result<Vec<JournalTransaction>, String> {
     let files = load_journal_files(journal_path)?;
@@ -28,6 +37,42 @@ pub(crate) fn load_transactions_from_journal_via_files(
     transactions.reverse();
     transactions.sort_by(|a, b| b.date.cmp(&a.date));
     Ok(transactions)
+}
+
+pub(crate) fn load_transactions_from_journal_via_files_with_style(
+    files: &[JournalFile],
+    amount_style: AmountStyle,
+    commodity_styles: HashMap<String, AmountStyle>,
+) -> Result<Vec<JournalTransaction>, String> {
+    TRANSACTION_PARSE_STYLE.with(|cell| {
+        let previous = cell.replace(Some(TransactionParseStyle {
+            amount_style,
+            commodity_styles,
+        }));
+        let result = load_transactions_from_journal_via_files(files);
+        cell.replace(previous);
+        result
+    })
+}
+
+fn active_amount_style() -> AmountStyle {
+    TRANSACTION_PARSE_STYLE
+        .with(|cell| {
+            cell.borrow()
+                .as_ref()
+                .map(|style| style.amount_style.clone())
+        })
+        .unwrap_or_else(|| crate::global_amount_style().clone())
+}
+
+fn active_style_for_commodity(commodity: &str) -> Option<AmountStyle> {
+    TRANSACTION_PARSE_STYLE
+        .with(|cell| {
+            cell.borrow()
+                .as_ref()
+                .and_then(|style| style.commodity_styles.get(commodity).cloned())
+        })
+        .or_else(|| explicit_style_for_commodity(commodity))
 }
 
 /// Parses transaction blocks without attempting to reinterpret ledger semantics.
@@ -629,8 +674,8 @@ fn normalize_quantity(value: &str, commodity: &str) -> String {
 
     let normalized = trimmed.replace(',', ".");
     match normalized.parse::<f64>() {
-        Ok(val) => explicit_style_for_commodity(commodity)
-            .unwrap_or_else(|| crate::global_amount_style().clone())
+        Ok(val) => active_style_for_commodity(commodity)
+            .unwrap_or_else(active_amount_style)
             .format(val),
         Err(_) => trimmed.to_string(),
     }
@@ -1120,7 +1165,9 @@ fn format_amount_part(value: f64, commodity: &str, styled: bool) -> String {
         if commodity.chars().all(|character| character.is_alphabetic()) {
             return format!("{} {}", format_commodity_quantity(value), commodity);
         }
-        return crate::global_amount_style().format_amount(value, commodity);
+        return active_style_for_commodity(commodity)
+            .unwrap_or_else(active_amount_style)
+            .format_amount(value, commodity);
     }
 
     if commodity.is_empty() {
@@ -1190,10 +1237,8 @@ fn parse_amount_value(amount: &str) -> f64 {
         (Some(comma), Some(dot)) => Some(comma.max(dot)),
         (Some(comma), None) => Some(comma),
         (None, Some(dot)) => {
-            let style_decimal_mark = AMOUNT_STYLE
-                .get()
-                .map(|style| style.decimal_mark.as_str())
-                .unwrap_or(".");
+            let active_style = active_amount_style();
+            let style_decimal_mark = active_style.decimal_mark.as_str();
             let fraction_len = compact[dot + 1..]
                 .chars()
                 .filter(|character| character.is_ascii_digit())
@@ -1236,7 +1281,7 @@ fn format_commodity_quantity(value: f64) -> String {
 }
 
 fn format_amount_value_styled(value: f64) -> String {
-    crate::global_amount_style().format(value)
+    active_amount_style().format(value)
 }
 
 /// Formats a numeric string using the journal's display style.
