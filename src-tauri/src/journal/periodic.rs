@@ -511,7 +511,7 @@ pub(crate) fn generate_recurring_transactions(
             continue;
         }
         for date_str in &pending {
-            let txn_input = rule_to_transaction_input(rule, date_str);
+            let txn_input = rule_to_transaction_input(rule, date_str, &settings.default_commodity);
             append_transaction_routed_preserving_quantities(&settings, &journal_path, &txn_input)
                 .map_err(|e| {
                     logs::log_error(
@@ -638,7 +638,11 @@ fn validate_journal(settings: &AppSettings, journal_path: &Path) -> Result<(), S
     }
 }
 
-fn rule_to_transaction_input(rule: &PeriodicRule, date_str: &str) -> TransactionInput {
+fn rule_to_transaction_input(
+    rule: &PeriodicRule,
+    date_str: &str,
+    default_commodity: &str,
+) -> TransactionInput {
     let comment = format!("rule-id:{}", rule.rule_id);
     TransactionInput {
         mode: String::new(),
@@ -652,7 +656,11 @@ fn rule_to_transaction_input(rule: &PeriodicRule, date_str: &str) -> Transaction
             .map(|p| PostingInput {
                 account: p.account.clone(),
                 amount: p.amount.clone(),
-                commodity: p.commodity.clone(),
+                commodity: if p.commodity.trim().is_empty() && !p.amount.trim().is_empty() {
+                    default_commodity.to_string()
+                } else {
+                    p.commodity.clone()
+                },
                 unit_price: p.unit_price.clone(),
                 comment: if !p.comment.is_empty() && !comment.is_empty() {
                     format!("{}; {}", comment, p.comment)
