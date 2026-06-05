@@ -48,7 +48,12 @@ export function useTransactionActions({
   }
 
   async function invalidateJournalData() {
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+      queryClient.invalidateQueries({ queryKey: ["accounts-overview"] }),
+      queryClient.invalidateQueries({ queryKey: ["balances"] }),
+      queryClient.invalidateQueries({ queryKey: ["investments-overview"] }),
+    ]);
   }
 
   const createTransactionMutation = useMutation({
