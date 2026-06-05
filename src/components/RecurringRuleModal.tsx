@@ -35,14 +35,14 @@ const PERIOD_OPTIONS = [
 
 const BUILTIN_PERIODS = new Set(PERIOD_OPTIONS.filter((o) => o.value !== "custom").map((o) => o.value));
 
-function emptyForm(): RecurringFormValues {
+function emptyForm(defaultCommodity: string): RecurringFormValues {
   return {
     ruleId: "",
     periodExpr: "monthly",
     _customPeriod: "",
     description: "",
     postings: [
-      { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
+      { account: "", amount: "", commodity: defaultCommodity, unitPrice: "", comment: "" },
       { account: "", amount: "", commodity: "", unitPrice: "", comment: "" },
     ],
     status: "",
@@ -52,7 +52,7 @@ function emptyForm(): RecurringFormValues {
   };
 }
 
-function ruleToForm(rule: PeriodicRule): RecurringFormValues {
+function ruleToForm(rule: PeriodicRule, defaultCommodity: string): RecurringFormValues {
   return {
     ruleId: rule.ruleId,
     periodExpr: BUILTIN_PERIODS.has(rule.periodExpr) ? rule.periodExpr : "custom",
@@ -61,7 +61,7 @@ function ruleToForm(rule: PeriodicRule): RecurringFormValues {
     postings: rule.postings.map((p) => ({
       account: p.account,
       amount: p.amount,
-      commodity: p.commodity,
+      commodity: p.commodity || defaultCommodity,
       unitPrice: p.unitPrice,
       comment: p.comment,
     })),
@@ -99,6 +99,7 @@ export function RecurringRuleModal({
   const [form] = Form.useForm<RecurringFormValues>();
   const { submitRule, isSaving, saveError, clearSaveError } = useRecurringRuleActions({
     editingRule: rule,
+    defaultCommodity,
     onSaved,
   });
   const [postingMode, setPostingMode] = useState<TransactionType>("movement");
@@ -111,7 +112,7 @@ export function RecurringRuleModal({
   useEffect(() => {
     if (open) {
       if (rule) {
-        const initial = ruleToForm(rule);
+        const initial = ruleToForm(rule, defaultCommodity);
         form.setFieldsValue(initial);
         setPostingMode("advanced");
       } else {
@@ -172,7 +173,7 @@ export function RecurringRuleModal({
         layout="vertical"
         onFinish={handleFinish}
         autoComplete="off"
-        initialValues={emptyForm()}
+        initialValues={emptyForm(defaultCommodity)}
       >
         <Form.Item
           name="ruleId"
