@@ -360,6 +360,7 @@
     "delete_title": "Elimina regola periodica",
     "delete_message": "Rimuovere la regola periodica \"{{description}}\"?",
     "rule_name_required": "Il nome regola è obbligatorio.",
+    "rule_name_invalid": "Usa un identificatore regola singolo, senza spazi.",
     "period_required": "Il periodo è obbligatorio.",
     "period_invalid": "Espressione periodo non valida. Controlla la sintassi e riprova.",
     "save_failed": "Salvataggio regola periodica fallito.",

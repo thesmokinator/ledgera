@@ -142,14 +142,7 @@ export function RecurringRoute({
                 render: (ruleId: string, rule) => (
                   <Space>
                     {rule.status && <Tag color={rule.status === "*" ? "green" : "orange"}>{rule.status}</Tag>}
-                    <Space direction="vertical" size={0}>
-                      <span>{ruleId}</span>
-                      {rule.description && (
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                          {rule.description}
-                        </Typography.Text>
-                      )}
-                    </Space>
+                    <span>{ruleId}</span>
                   </Space>
                 ),
               },

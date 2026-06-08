@@ -111,19 +111,19 @@ export function RecurringRuleModal({
   const showCustomPeriod = selectedPeriod === "custom";
   useEffect(() => {
     if (open) {
+      form.resetFields();
       if (rule) {
         const initial = ruleToForm(rule, defaultCommodity);
         form.setFieldsValue(initial);
         setPostingMode("advanced");
       } else {
-        form.resetFields();
         form.setFieldsValue({ periodExpr: "monthly" });
         setPostingMode("movement");
       }
       clearSaveError();
       setPeriodError(null);
     }
-  }, [open, rule, form, clearSaveError]);
+  }, [open, rule, defaultCommodity, form, clearSaveError]);
 
   const handleCustomPeriodBlur = useCallback(async () => {
     const expr = form.getFieldValue("_customPeriod")?.trim();
@@ -178,7 +178,13 @@ export function RecurringRuleModal({
         <Form.Item
           name="ruleId"
           label={t("recurring.rule_name")}
-          rules={[{ required: true, message: t("recurring.rule_name_required") }]}
+          rules={[
+            { required: true, whitespace: true, message: t("recurring.rule_name_required") },
+            {
+              pattern: /^\S+$/,
+              message: t("recurring.rule_name_invalid"),
+            },
+          ]}
         >
           <Input placeholder={t("recurring.rule_name_placeholder")} autoFocus={!isEditing} />
         </Form.Item>

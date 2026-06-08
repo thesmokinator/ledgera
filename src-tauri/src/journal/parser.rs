@@ -534,11 +534,18 @@ fn parse_periodic_rule_block(
     let status = String::new();
     let code = String::new();
 
-    let postings = raw
-        .lines()
-        .skip(1)
-        .filter_map(parse_posting)
-        .collect::<Vec<_>>();
+    let mut postings = Vec::new();
+    for line in raw.lines().skip(1) {
+        let Some(posting) = parse_posting(line) else {
+            continue;
+        };
+        if posting_comment_rule_id(&posting.comment)
+            .is_some_and(|posting_rule_id| posting_rule_id != rule_id)
+        {
+            break;
+        }
+        postings.push(posting);
+    }
 
     let source_file = source_path.to_string_lossy().to_string();
     Some(PeriodicRule {
@@ -613,6 +620,17 @@ fn extract_rule_id_from_comment(comment: &str) -> (String, String) {
     } else {
         (String::new(), trimmed.to_string())
     }
+}
+
+fn posting_comment_rule_id(comment: &str) -> Option<String> {
+    let trimmed = comment.trim();
+    let rest = trimmed.strip_prefix("rule-id:")?;
+    Some(
+        rest.split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_string(),
+    )
 }
 
 /// Formats a periodic rule into its journal text representation.
@@ -1577,6 +1595,18 @@ mod tests {
 
         assert!(result.contains("50,00 EUR"));
         assert!(!result.contains("50.00 EUR"));
+    }
+
+    #[test]
+    fn parse_periodic_rules_stops_at_foreign_rule_id_posting_comment() {
+        let content = "~ monthly from 2026-06-05  ; rule-id:allianz Assicurazione Vita\n    assets:bank:fineco  50,00 EUR\n    expenses:insurance:life~ monthly from 2026-06-26  ; rule-id:apple Apple Music\n    assets:bank:fineco  2,99 EUR\n";
+
+        let rules = parse_periodic_rules(content, std::path::Path::new("recurring.journal"));
+
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].rule_id, "allianz");
+        assert_eq!(rules[0].postings.len(), 1);
+        assert_eq!(rules[0].postings[0].account, "assets:bank:fineco");
     }
 
     #[test]
