@@ -1,5 +1,5 @@
 use crate::{
-    app_error::to_error_string_with_details,
+    app_error::{to_error_string_with_details, to_validation_error_string, FieldError},
     hledger::hledger_executable,
     journal::{
         files::{parse_include_directive, require_journal_path},
@@ -93,6 +93,7 @@ pub(crate) fn create_periodic_rule(
         );
         e
     })?;
+    validate_periodic_rule_input(&input)?;
 
     let formatted = format_periodic_rule_text(&input);
     append_to_recurring_file(&settings, &journal_path, &recurring_path, &formatted).map_err(
@@ -156,6 +157,7 @@ pub(crate) fn update_periodic_rule(
         );
         e
     })?;
+    validate_periodic_rule_input(&input)?;
 
     let content = fs::read_to_string(&recurring_path).map_err(|error| {
         let err = to_error_string_with_details(
@@ -575,6 +577,21 @@ fn recurring_path_for(journal_path: &Path) -> PathBuf {
     journal_path.with_file_name(RECURRING_FILENAME)
 }
 
+fn validate_periodic_rule_input(input: &PeriodicRuleInput) -> Result<(), String> {
+    let rule_id = input.rule_id.trim();
+    if rule_id.is_empty() || rule_id.chars().any(char::is_whitespace) {
+        return Err(to_validation_error_string(
+            "periodic_rule_validation_failed",
+            "Recurring rule validation failed.",
+            vec![FieldError::new(
+                ["ruleId"],
+                "Use a single rule identifier without spaces.",
+            )],
+        ));
+    }
+    Ok(())
+}
+
 fn append_to_recurring_file(
     settings: &AppSettings,
     main_journal: &Path,
@@ -582,8 +599,19 @@ fn append_to_recurring_file(
     text: &str,
 ) -> Result<(), String> {
     let original = fs::read_to_string(recurring_path).unwrap_or_default();
-    let updated = format!("{}{}\n", original.trim_end(), text);
+    let updated = append_recurring_text(&original, text);
     mutate_recurring_file(settings, main_journal, recurring_path, &updated)
+}
+
+fn append_recurring_text(original: &str, text: &str) -> String {
+    let trimmed_original = original.trim_end();
+    let trimmed_text = text.trim();
+
+    if trimmed_original.is_empty() {
+        format!("{}\n", trimmed_text)
+    } else {
+        format!("{}\n{}\n", trimmed_original, trimmed_text)
+    }
 }
 
 fn mutate_recurring_file(
@@ -856,6 +884,49 @@ fn custom_period_occurrences(
     dates.sort();
     dates.dedup();
     Ok(dates)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{append_recurring_text, validate_periodic_rule_input};
+    use crate::journal::types::PeriodicRuleInput;
+
+    #[test]
+    fn validate_periodic_rule_input_rejects_rule_id_with_spaces() {
+        let input = PeriodicRuleInput {
+            rule_id: "apple music".to_string(),
+            period_expr: "monthly".to_string(),
+            description: "Apple Music".to_string(),
+            postings: Vec::new(),
+            status: String::new(),
+            code: String::new(),
+            start_date: Some("2026-06-26".to_string()),
+            end_date: None,
+            comment: String::new(),
+        };
+
+        assert!(validate_periodic_rule_input(&input).is_err());
+    }
+
+    #[test]
+    fn append_recurring_text_writes_first_rule_with_trailing_newline() {
+        let rule = "~ monthly from 2026-01-01\n    assets:bank  -10 EUR\n    expenses:fees";
+
+        let result = append_recurring_text("", rule);
+
+        assert_eq!(result, format!("{}\n", rule));
+    }
+
+    #[test]
+    fn append_recurring_text_separates_existing_rule_from_new_rule() {
+        let existing = "~ monthly from 2026-01-01\n    assets:bank  -10 EUR\n    expenses:fees\n";
+        let next = "~ yearly from 2026-02-01\n    assets:bank  -100 EUR\n    expenses:insurance";
+
+        let result = append_recurring_text(existing, next);
+
+        assert_eq!(result, format!("{}{}\n", existing, next));
+        assert!(result.contains("expenses:fees\n~ yearly"));
+    }
 }
 
 fn get_generated_dates(

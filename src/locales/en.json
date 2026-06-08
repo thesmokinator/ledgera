@@ -360,6 +360,7 @@
     "delete_title": "Delete recurring rule",
     "delete_message": "Remove recurring rule \"{{description}}\"?",
     "rule_name_required": "Rule name is required.",
+    "rule_name_invalid": "Use a single rule identifier without spaces.",
     "period_required": "Period is required.",
     "period_invalid": "Invalid period expression. Check syntax and try again.",
     "save_failed": "Failed to save recurring rule.",
