@@ -248,6 +248,28 @@ describe("autoCalculateBalancingAmounts", () => {
     const result = autoCalculateBalancingAmounts(postings, "EUR");
     expect(result[1].amount).toBe("-1500.00");
     expect(result[1].commodity).toBe("EUR");
+    expect(result[0].unitPrice).toBe("150 EUR");
+  });
+
+  it("enriches unitPrice with balancing commodity when missing", () => {
+    const postings = [
+      { account: "a", amount: "205", commodity: "XEON", unitPrice: "149,38", comment: "" },
+      { account: "b", amount: "", commodity: "EUR", unitPrice: "", comment: "" },
+    ];
+    const result = autoCalculateBalancingAmounts(postings, "EUR");
+    expect(result[1].amount).toBe("-30622.90");
+    expect(result[1].commodity).toBe("EUR");
+    expect(result[0].unitPrice).toBe("149,38 EUR");
+  });
+
+  it("does not modify unitPrice when it already contains commodity", () => {
+    const postings = [
+      { account: "a", amount: "10", commodity: "VWCE", unitPrice: "150 USD", comment: "" },
+      { account: "b", amount: "", commodity: "USD", unitPrice: "", comment: "" },
+    ];
+    const result = autoCalculateBalancingAmounts(postings, "USD");
+    expect(result[0].unitPrice).toBe("150 USD");
+    expect(result[1].commodity).toBe("USD");
   });
 
   it("does nothing if no posting has unitPrice", () => {
