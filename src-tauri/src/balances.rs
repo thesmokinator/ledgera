@@ -67,33 +67,35 @@ pub(crate) fn parse_balance_output(
         if apply_exclude && exclude_set.contains(account.as_str()) {
             continue;
         }
-        if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
-            let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
-            if AMOUNT_STYLE.get().is_none() {
-                let style = AmountStyle::from_hledger_json(bal);
-                if AMOUNT_STYLE.set(style).is_err() {
-                    eprintln!("[warn] AMOUNT_STYLE already set by another balance query");
+        if let Some(amounts) = arr[3].as_array() {
+            for bal in amounts {
+                let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
+                if AMOUNT_STYLE.get().is_none() {
+                    let style = AmountStyle::from_hledger_json(bal);
+                    if AMOUNT_STYLE.set(style).is_err() {
+                        eprintln!("[warn] AMOUNT_STYLE already set by another balance query");
+                    }
                 }
-            }
-            let qty = bal["aquantity"]
-                .get("floatingPoint")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
-            let effective_commodity = if comm.is_empty() {
-                settings.default_commodity.trim().to_string()
-            } else {
-                comm
-            };
-            let key = (account, effective_commodity);
-            match agg.get_mut(&key) {
-                Some(acc) => {
-                    acc.qty += qty;
-                }
-                None => {
-                    agg.insert(key, Accum {
-                        qty,
-                        bal: bal.clone(),
-                    });
+                let qty = bal["aquantity"]
+                    .get("floatingPoint")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let effective_commodity = if comm.is_empty() {
+                    settings.default_commodity.trim().to_string()
+                } else {
+                    comm
+                };
+                let key = (account.clone(), effective_commodity);
+                match agg.get_mut(&key) {
+                    Some(acc) => {
+                        acc.qty += qty;
+                    }
+                    None => {
+                        agg.insert(key, Accum {
+                            qty,
+                            bal: bal.clone(),
+                        });
+                    }
                 }
             }
         }
