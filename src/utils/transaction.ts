@@ -106,11 +106,21 @@ export function autoCalculateBalancingAmounts(
   );
   if (balanceIndex === -1) return result;
 
+  const balanceCommodity =
+    priceCommodity || result[balanceIndex].commodity || defaultCommodity;
+
   result[balanceIndex] = {
     ...result[balanceIndex],
     amount: (-total).toFixed(2),
-    commodity:
-      priceCommodity || result[balanceIndex].commodity || defaultCommodity,
+    commodity: balanceCommodity,
   };
+
+  if (!priceCommodity && balanceCommodity) {
+    result[pricedIndex] = {
+      ...result[pricedIndex],
+      unitPrice: `${priced.unitPrice.trim()} ${balanceCommodity}`,
+    };
+  }
+
   return result;
 }

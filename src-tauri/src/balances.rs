@@ -49,7 +49,15 @@ pub(crate) fn parse_balance_output(
         .filter(|s| !s.is_empty())
         .collect();
 
-    let mut result: Vec<Balance> = Vec::new();
+    // Aggregate by (account, commodity) — hledger may return multiple lots
+    // for the same account when cost annotations (@) are present.
+    use std::collections::HashMap;
+    struct Accum {
+        qty: f64,
+        bal: serde_json::Value,
+    }
+    let mut agg: HashMap<(String, String), Accum> = HashMap::new();
+
     for row in rows {
         let arr = match row.as_array() {
             Some(a) if a.len() >= 4 => a,
@@ -59,8 +67,8 @@ pub(crate) fn parse_balance_output(
         if apply_exclude && exclude_set.contains(account.as_str()) {
             continue;
         }
-        let (amount, commodity, formatted) =
-            if let Some(bal) = arr[3].as_array().and_then(|a| a.first()) {
+        if let Some(amounts) = arr[3].as_array() {
+            for bal in amounts {
                 let comm = bal["acommodity"].as_str().unwrap_or("").to_string();
                 if AMOUNT_STYLE.get().is_none() {
                     let style = AmountStyle::from_hledger_json(bal);
@@ -72,34 +80,52 @@ pub(crate) fn parse_balance_output(
                     .get("floatingPoint")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
-                // If hledger didn't report a commodity, fall back to the
-                // user-configured default so the formatted string always
-                // includes a commodity when one is expected.
                 let effective_commodity = if comm.is_empty() {
                     settings.default_commodity.trim().to_string()
                 } else {
                     comm
                 };
-                let fmt = format_hledger_display_amount(qty, &effective_commodity, bal);
-                (qty, effective_commodity, fmt)
-            } else {
-                let default_comm = settings.default_commodity.trim().to_string();
-                let fmt = if default_comm.is_empty() {
-                    "0".to_string()
-                } else {
-                    crate::global_amount_style().format_amount(0.0, &default_comm)
-                };
-                (0.0, default_comm, fmt)
-            };
-        let tint = crate::tint(amount).to_string();
-        result.push(Balance {
-            account,
-            amount,
-            commodity,
-            formatted,
-            tint,
-        });
+                let key = (account.clone(), effective_commodity);
+                match agg.get_mut(&key) {
+                    Some(acc) => {
+                        acc.qty += qty;
+                    }
+                    None => {
+                        agg.insert(key, Accum {
+                            qty,
+                            bal: bal.clone(),
+                        });
+                    }
+                }
+            }
+        }
     }
+
+    let mut result: Vec<Balance> = agg
+        .into_iter()
+        .map(|((account, commodity), accum)| {
+            let effective_comm = if commodity.is_empty() {
+                settings.default_commodity.trim().to_string()
+            } else {
+                commodity
+            };
+            let formatted = if effective_comm.is_empty() {
+                accum.qty.to_string()
+            } else {
+                format_hledger_display_amount(accum.qty, &effective_comm, &accum.bal)
+            };
+            let tint = crate::tint(accum.qty).to_string();
+            Balance {
+                account,
+                amount: accum.qty,
+                commodity: effective_comm,
+                formatted,
+                tint,
+            }
+        })
+        .collect();
+
+    result.sort_by(|a, b| a.account.cmp(&b.account));
     Ok(result)
 }
 pub(crate) fn load_balances_for_settings(

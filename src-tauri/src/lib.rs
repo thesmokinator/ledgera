@@ -818,4 +818,41 @@ mod tests {
         assert_eq!(tint(0.0), "neutral");
         assert_eq!(tint(-0.0), "neutral");
     }
+
+    #[test]
+    fn z_aggregates_multiple_amount_lots_for_same_account() {
+        let json = r#"[
+  [
+    [
+      "assets:investments:xeon",
+      "assets:investments:xeon",
+      0,
+      [
+        {
+          "acommodity": "XEON",
+          "aquantity": { "floatingPoint": 209.0 },
+          "astyle": { "ascommodityside": "R", "ascommodityspaced": true, "asdecimalmark": ",", "asdigitgroups": null, "asprecision": 2, "asrounding": "HardRounding" }
+        },
+        {
+          "acommodity": "XEON",
+          "aquantity": { "floatingPoint": -205.0 },
+          "astyle": { "ascommodityside": "R", "ascommodityspaced": true, "asdecimalmark": ",", "asdigitgroups": null, "asprecision": 2, "asrounding": "HardRounding" }
+        }
+      ]
+    ]
+  ],
+  [ { }, { } ]
+]"#;
+        let settings = AppSettings {
+            journal_path: "test".to_string(),
+            hledger_path: "true".to_string(),
+            ..Default::default()
+        };
+        let result = balances::parse_balance_output(json, &settings, false).unwrap();
+        assert_eq!(result.len(), 1, "should aggregate multiple lots into one entry");
+        let balance = &result[0];
+        assert_eq!(balance.account, "assets:investments:xeon");
+        assert_eq!(balance.amount, 4.0);
+        assert_eq!(balance.commodity, "XEON");
+    }
 }

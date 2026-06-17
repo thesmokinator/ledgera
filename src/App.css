@@ -284,12 +284,13 @@ button {
 }
 
 .app-main {
+    flex: 1;
+    min-height: 0;
     background: transparent !important;
 }
 
 .app-content {
-    padding: 24px 28px 48px;
-    min-height: 100%;
+    padding: 24px 28px;
     overflow-y: auto;
 }
 
