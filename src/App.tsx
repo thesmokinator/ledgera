@@ -13,6 +13,7 @@ import {
   PieChartOutlined,
   ScheduleOutlined,
   SettingOutlined,
+  FundOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
 
@@ -222,7 +223,8 @@ function App() {
         { key: "accounts", label: "common.accounts", icon: <BankOutlined />, disabled: !hasJournal, shortcut: navShortcut(2) },
         { key: "balances", label: "common.balances", icon: <PieChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(3) },
         { key: "reports", label: "common.reports", icon: <BarChartOutlined />, disabled: !hasJournal, shortcut: navShortcut(4) },
-        { key: "recurring", label: "common.recurring", icon: <ScheduleOutlined />, disabled: !hasJournal, shortcut: navShortcut(5) },
+        { key: "budget", label: "common.budget", icon: <FundOutlined />, disabled: !hasJournal, shortcut: navShortcut(5) },
+        { key: "recurring", label: "common.recurring", icon: <ScheduleOutlined />, disabled: !hasJournal, shortcut: navShortcut(6) },
       ];
 
       if (activeSettings.modules.gitSync.enabled) {
@@ -238,14 +240,14 @@ function App() {
           label: "common.sync",
           icon: <SyncOutlined />,
           disabled: !hasJournal,
-          shortcut: navShortcut(6),
+          shortcut: navShortcut(7),
           badge: syncBadge,
           badgeTone: summary.tone === "danger" ? "danger" : "warning",
         });
       }
 
       if (activeSettings.powerUser) {
-        const logsIndex = activeSettings.modules.gitSync.enabled ? 7 : 6;
+        const logsIndex = activeSettings.modules.gitSync.enabled ? 8 : 7;
         items.push({ key: "logs", label: "logs.title", icon: <FileTextOutlined />, shortcut: navShortcut(logsIndex) });
       }
 

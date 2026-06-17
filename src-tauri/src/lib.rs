@@ -8,6 +8,7 @@ mod amount_format;
 mod amount_style;
 mod app_error;
 mod balances;
+mod budget;
 mod hledger;
 mod investments;
 mod journal;
@@ -127,6 +128,7 @@ pub fn run() {
             logs::clear_logs,
             investments::get_investments_overview,
             reports::run_report,
+            budget::run_budget_report,
             balances::get_balances,
             accounts::get_accounts_overview,
         ])

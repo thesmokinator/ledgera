@@ -4,6 +4,7 @@
     "accounts": "Conti",
     "balances": "Saldi",
     "reports": "Report",
+    "budget": "Budget",
     "recurring": "Ricorrenti",
     "sync": "Sync",
     "logs": "Log",
@@ -366,5 +367,15 @@
     "save_failed": "Salvataggio regola periodica fallito.",
     "table_period": "Periodo",
     "not_set": "Non impostata"
+  },
+  "budget": {
+    "title": "Budget",
+    "select_and_generate": "Seleziona un ambito e un intervallo, poi clicca Genera per confrontare gli importi effettivi con gli obiettivi di budget.",
+    "empty": "Nessun obiettivo di budget trovato. Crea transazioni periodiche (~ monthly) per definire i tuoi obiettivi di budget.",
+    "generating": "Generazione report budget…",
+    "generate": "Genera",
+    "total": "Totale",
+    "period_actual": "Effettivo",
+    "period_budget": "Budget"
   }
 }

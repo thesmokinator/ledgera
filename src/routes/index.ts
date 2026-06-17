@@ -1,5 +1,6 @@
 export { AccountsRoute } from "./AccountsRoute";
 export { BalancesRoute } from "./BalancesRoute";
+export { BudgetRoute } from "./BudgetRoute";
 export { LogsRoute } from "./LogsRoute";
 export { RecurringRoute } from "./RecurringRoute";
 export { ReportsRoute } from "./ReportsRoute";

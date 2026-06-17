@@ -1,0 +1,55 @@
+; Budget test journal for hledger --budget feature
+commodity €
+commodity $
+
+; ── Actual transactions ──────────────────────────────────────────
+
+2026-01-02 * Client retainer
+    assets:bank:checking                         €2,400.00
+    income:consulting                           -€2,400.00
+
+2026-01-03 * Grocery store
+    expenses:food:groceries                        €86.45
+    liabilities:credit-card                       -€86.45
+
+2026-01-05 ! Rent payment
+    expenses:rent                               €1,250.00
+    assets:bank:checking                       -€1,250.00
+
+2026-01-10 * Salary
+    assets:bank:checking                         €3,200.00
+    income:salary                               -€3,200.00
+
+2026-01-15 Team lunch
+    expenses:meals                                €110.00
+    liabilities:credit-card                      -€110.00
+
+2026-02-01 * (FX-001) USD SaaS subscription
+    expenses:software                              $29.00
+    assets:bank:checking
+
+2026-02-03 * Groceries
+    expenses:food:groceries                       €210.00
+    liabilities:credit-card                      -€210.00
+
+2026-02-05 ! Rent
+    expenses:rent                               €1,250.00
+    assets:bank:checking                       -€1,250.00
+
+2026-02-10 * Salary
+    assets:bank:checking                         €3,200.00
+    income:salary                               -€3,200.00
+
+2026-02-14 Team dinner
+    expenses:meals                                €142.30
+    liabilities:credit-card                      -€142.30
+
+; ── Budget goals (periodic transaction rules) ─────────────────────
+
+~ monthly from 2026-01
+    expenses:food:groceries                       €200.00
+    expenses:meals                                €100.00
+    expenses:rent                               €1,300.00
+    expenses:software                              $50.00
+    income:consulting                           -€3,000.00
+    income:salary                               -€3,200.00

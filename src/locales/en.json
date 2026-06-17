@@ -1,9 +1,20 @@
 {
+  "budget": {
+    "title": "Budget",
+    "select_and_generate": "Select a scope and interval, then click Generate to compare actuals against budget goals.",
+    "empty": "No budget goals found. Create periodic transactions (~ monthly) to define your budget goals.",
+    "generating": "Generating budget report…",
+    "generate": "Generate",
+    "total": "Total",
+    "period_actual": "Actual",
+    "period_budget": "Budget"
+  },
   "common": {
     "transactions": "Transactions",
     "accounts": "Accounts",
     "balances": "Balances",
     "reports": "Reports",
+    "budget": "Budget",
     "recurring": "Recurring",
     "sync": "Sync",
     "logs": "Logs",

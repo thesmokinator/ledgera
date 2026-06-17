@@ -5,6 +5,7 @@ import { CourtesyState } from "./CourtesyState";
 import {
   AccountsRoute,
   BalancesRoute,
+  BudgetRoute,
   LogsRoute,
   RecurringRoute,
   ReportsRoute,
@@ -142,6 +143,7 @@ export function AppContent({
         />
       ),
       logs: <LogsRoute />,
+      budget: <BudgetRoute />,
       reports: <ReportsRoute showDetailedTable={activeSettings.modules.developerTools.enabled} />,
       recurring: (
         <RecurringRoute
