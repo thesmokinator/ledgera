@@ -98,17 +98,20 @@ pub(crate) async fn get_investments_overview(
     if holdings.is_empty() || !settings.fetch_prices {
         return Ok(holdings
             .into_iter()
-            .map(|h| InvestmentOverview {
-                commodity: h.commodity.clone(),
-                account: h.account,
-                quantity: h.amount,
-                quantity_formatted: h.formatted,
-                price: None,
-                price_formatted: None,
-                currency: None,
-                market_value_formatted: None,
-                tint: h.tint,
-                error: None,
+            .map(|h| {
+                let commodity_style = style_for_commodity(&h.commodity);
+                InvestmentOverview {
+                    commodity: h.commodity.clone(),
+                    account: h.account,
+                    quantity: h.amount,
+                    quantity_formatted: commodity_style.format(h.amount),
+                    price: None,
+                    price_formatted: None,
+                    currency: None,
+                    market_value_formatted: None,
+                    tint: h.tint,
+                    error: None,
+                }
             })
             .collect());
     }
@@ -142,7 +145,7 @@ pub(crate) async fn get_investments_overview(
                 commodity: h.commodity.clone(),
                 account: h.account,
                 quantity: h.amount,
-                quantity_formatted: h.formatted,
+                quantity_formatted: commodity_style.format(h.amount),
                 price,
                 price_formatted,
                 currency,

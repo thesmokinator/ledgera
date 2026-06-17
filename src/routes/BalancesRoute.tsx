@@ -107,8 +107,8 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
       {fetchPrices ? (
         <Card className={styles.card} title={t("balances.investments")}>
           {isInitialLoadingInvestments ? (
-            <Table<InvestmentOverview>
-              rowKey="commodity"
+              <Table<InvestmentOverview>
+                  rowKey={(r) => `${r.commodity}-${r.account}`}
               loading
               dataSource={[]}
               pagination={false}
@@ -118,8 +118,8 @@ export function BalancesRoute({ fetchPrices }: { fetchPrices: boolean }) {
           ) : investments.length === 0 ? (
             <Empty description={t("balances.empty")} />
           ) : (
-            <Table<InvestmentOverview>
-              rowKey="commodity"
+              <Table<InvestmentOverview>
+                  rowKey={(r) => `${r.commodity}-${r.account}`}
               loading={investmentsQuery.isFetching}
               dataSource={investments}
               pagination={false}
