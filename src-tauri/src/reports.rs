@@ -19,7 +19,7 @@ use std::{
 };
 use tauri::AppHandle;
 
-const REPORT_TIMEOUT: Duration = Duration::from_secs(30);
+pub(crate) const REPORT_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -700,7 +700,7 @@ fn join_pipe_reader(handle: thread::JoinHandle<Vec<u8>>) -> Vec<u8> {
     handle.join().unwrap_or_default()
 }
 
-fn run_command_with_timeout(mut cmd: Command, timeout: Duration) -> Result<Output, String> {
+pub(crate) fn run_command_with_timeout(mut cmd: Command, timeout: Duration) -> Result<Output, String> {
     let mut child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -763,9 +763,9 @@ fn run_command_with_timeout(mut cmd: Command, timeout: Duration) -> Result<Outpu
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ReportDateRange {
-    begin: Option<String>,
-    end: Option<String>,
+pub(crate) struct ReportDateRange {
+    pub(crate) begin: Option<String>,
+    pub(crate) end: Option<String>,
 }
 
 fn report_error(message: &str, details: impl Into<String>) -> String {
@@ -782,7 +782,7 @@ fn validate_report_type(report_type: &str) -> Result<(), String> {
     }
 }
 
-fn validate_grouping(interval: &str) -> Result<(), String> {
+pub(crate) fn validate_grouping(interval: &str) -> Result<(), String> {
     match interval {
         "" | "-M" | "-Q" | "-Y" => Ok(()),
         _ => Err(report_error(
@@ -835,7 +835,7 @@ fn parse_scope_date(field: &str, value: Option<&str>) -> Result<NaiveDate, Strin
     })
 }
 
-fn resolve_report_date_range(
+pub(crate) fn resolve_report_date_range(
     scope: &str,
     begin_date: Option<&str>,
     end_date: Option<&str>,
