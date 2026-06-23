@@ -1,4 +1,5 @@
 import {
+  Alert,
   AutoComplete,
   Button,
   Card,
@@ -25,13 +26,14 @@ import {
 } from "@ant-design/icons";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import packageJson from "../../package.json";
 import { formatCount, formatFileSize } from "../utils/format";
 import { parseError } from "../utils/error";
+import { callCommand } from "../utils/command";
 import { supportedLanguages } from "../utils/language";
-import type { AppSettings, HledgerStatus, JournalSummary, UpdateStatus } from "./types";
+import type { AppSettings, GitCryptStatus, HledgerStatus, JournalSummary, UpdateStatus } from "./types";
 import styles from "./SettingsRoute.module.css";
 
 const projectRepositoryUrl = packageJson.repository.url.replace(/\.git$/, "");
@@ -113,7 +115,14 @@ export function SettingsRoute({
   onValuesChange: (changed: Partial<AppSettings>, values: AppSettings) => void;
 }) {
   const { t } = useTranslation();
+  const [gitCryptStatus, setGitCryptStatus] = useState<GitCryptStatus | null>(null);
   const licenseUrl = `${projectRepositoryUrl}/blob/main/LICENSE.md`;
+
+  useEffect(() => {
+    callCommand<GitCryptStatus>("git_crypt_status")
+      .then(setGitCryptStatus)
+      .catch(() => setGitCryptStatus(null));
+  }, []);
 
   const stats = journalSummary
     ? {
@@ -271,6 +280,17 @@ export function SettingsRoute({
                 <Switch />
               </Form.Item>
             </div>
+            <div className={styles.developer_settings}>
+              <div>
+                <Typography.Text strong>{t("settings.module_auto_generate_recurring")}</Typography.Text>
+                <Typography.Paragraph type="secondary">
+                  {t("settings.module_auto_generate_recurring_help")}
+                </Typography.Paragraph>
+              </div>
+              <Form.Item name={["modules", "autoGenerateRecurring"]} valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+            </div>
 
             <Form.Item
               label={t("settings.exclude_balances")}
@@ -361,9 +381,6 @@ export function SettingsRoute({
           title={<CardTitle icon={<SettingOutlined />} label={t("settings.modules")} />}
         >
           <div className={styles.preferences_stack}>
-            <Typography.Paragraph type="secondary">
-              {t("settings.modules_help")}
-            </Typography.Paragraph>
             <div className={styles.developer_settings}>
               <div>
                 <Typography.Text strong>{t("settings.module_market_prices")}</Typography.Text>
@@ -454,6 +471,22 @@ export function SettingsRoute({
               <div>
                 <Space size="small">
                   <Typography.Text strong>{t("settings.module_git_sync")}</Typography.Text>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(prev, cur) =>
+                      prev.modules?.gitSync?.enabled !== cur.modules?.gitSync?.enabled
+                    }
+                  >
+                    {({ getFieldValue }) =>
+                      getFieldValue(["modules", "gitSync", "enabled"]) && gitCryptStatus ? (
+                        <Tag color={gitCryptStatus.enabled ? "success" : "default"}>
+                          {gitCryptStatus.enabled
+                            ? t("settings.encryption_enabled")
+                            : t("settings.encryption_disabled")}
+                        </Tag>
+                      ) : null
+                    }
+                  </Form.Item>
                 </Space>
                 <Typography.Paragraph type="secondary">
                   {t("settings.module_git_sync_help")}
@@ -471,27 +504,26 @@ export function SettingsRoute({
             >
               {({ getFieldValue }) =>
                 getFieldValue(["modules", "gitSync", "enabled"]) ? (
-                  <Form.Item
-                    label={t("settings.module_git_sync_commit_message")}
-                    name={["modules", "gitSync", "commitMessage"]}
-                    rules={[{ required: true, whitespace: true, message: t("settings.module_git_sync_commit_message_required") }]}
-                  >
-                    <Input maxLength={200} showCount />
-                  </Form.Item>
+                  <>
+                    <Form.Item
+                      label={t("settings.module_git_sync_commit_message")}
+                      name={["modules", "gitSync", "commitMessage"]}
+                      rules={[{ required: true, whitespace: true, message: t("settings.module_git_sync_commit_message_required") }]}
+                    >
+                      <Input maxLength={200} showCount />
+                    </Form.Item>
+                    {gitCryptStatus && !gitCryptStatus.enabled ? (
+                      <Alert
+                        type="warning"
+                        message={t("settings.encryption_warning")}
+                        showIcon
+                        style={{ marginTop: 8 }}
+                      />
+                    ) : null}
+                  </>
                 ) : null
               }
             </Form.Item>
-            <div className={styles.developer_settings}>
-              <div>
-                <Typography.Text strong>{t("settings.module_auto_generate_recurring")}</Typography.Text>
-                <Typography.Paragraph type="secondary">
-                  {t("settings.module_auto_generate_recurring_help")}
-                </Typography.Paragraph>
-              </div>
-              <Form.Item name={["modules", "autoGenerateRecurring"]} valuePropName="checked" noStyle>
-                <Switch />
-              </Form.Item>
-            </div>
           </div>
         </Card>
 

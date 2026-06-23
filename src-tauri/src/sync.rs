@@ -389,15 +389,26 @@ fn run_git_checked(cwd: &Path, args: &[&str]) -> Result<GitOutput, String> {
 }
 
 fn run_git(cwd: &Path, args: &[&str]) -> Result<GitOutput, String> {
-    let output = Command::new("git")
-        .args(args)
+    let mut cmd = Command::new("git");
+    cmd.args(args)
         .current_dir(cwd)
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_ASKPASS", "true")
         .env("GCM_INTERACTIVE", "never")
-        .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
-        .output()
-        .map_err(|error| {
+        .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes");
+
+    if let Some(gc_path) = crate::git_crypt::find_git_crypt_path() {
+        if let Some(parent) = gc_path.parent() {
+            let parent_str = parent.to_string_lossy();
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            let separator = if cfg!(windows) { ";" } else { ":" };
+            if !current_path.split(separator).any(|p| p == parent_str.as_ref()) {
+                cmd.env("PATH", format!("{}{}{}", parent_str, separator, current_path));
+            }
+        }
+    }
+
+    let output = cmd.output().map_err(|error| {
             to_error_string_with_details(
                 "git_not_available",
                 "Git is not available. Install Git or make it available in PATH.",

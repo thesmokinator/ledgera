@@ -9,6 +9,7 @@ mod amount_style;
 mod app_error;
 mod balances;
 mod budget;
+mod git_crypt;
 mod hledger;
 mod investments;
 mod journal;
@@ -130,6 +131,7 @@ pub fn run() {
             reports::run_report,
             budget::run_budget_report,
             balances::get_balances,
+            git_crypt::git_crypt_status,
             accounts::get_accounts_overview,
         ])
         .run(tauri::generate_context!())
