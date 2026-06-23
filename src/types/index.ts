@@ -414,3 +414,9 @@ export type BudgetReport = {
   periodColumns: string[];
   rows: BudgetRow[];
 };
+
+export type GitCryptStatus = {
+  installed: boolean;
+  enabled: boolean;
+};
+

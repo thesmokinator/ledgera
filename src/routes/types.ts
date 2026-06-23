@@ -39,4 +39,5 @@ export type {
   PeriodicRuleInput,
   PendingRecurringDates,
   GenerateResult,
+  GitCryptStatus,
 } from "../types";
