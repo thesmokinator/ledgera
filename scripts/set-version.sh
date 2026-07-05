@@ -24,6 +24,7 @@ case "$VERSION" in
     ;;
 esac
 
+# --- JS / npm side ---
 node - "$VERSION" <<'NODE'
 const fs = require("node:fs");
 
@@ -43,28 +44,23 @@ if (packageLock.packages?.[""]) {
   packageLock.packages[""].version = version;
 }
 writeJson("package-lock.json", packageLock);
-
-function replaceOne(path, pattern, replacement, description) {
-  const input = fs.readFileSync(path, "utf8");
-  if (!pattern.test(input)) {
-    throw new Error(`Could not find ${description} in ${path}`);
-  }
-  fs.writeFileSync(path, input.replace(pattern, replacement));
-}
-
-replaceOne(
-  "src-tauri/Cargo.toml",
-  /(\[package\][\s\S]*?\nversion = ")[^"]+(")/,
-  `$1${version}$2`,
-  "package version",
-);
-
-replaceOne(
-  "src-tauri/Cargo.lock",
-  /(\[\[package\]\]\nname = "ledgera"\nversion = ")[^"]+(")/,
-  `$1${version}$2`,
-  "ledgera package version",
-);
 NODE
+
+# --- Rust / Cargo side ---
+if ! command -v cargo &>/dev/null; then
+  echo "cargo is required but not installed" >&2
+  exit 1
+fi
+
+if ! cargo set-version --help &>/dev/null 2>&1; then
+  echo "cargo-edit (cargo-set-version) is required but not installed" >&2
+  echo "Install it with: cargo install cargo-edit" >&2
+  exit 1
+fi
+
+cargo set-version \
+  --manifest-path src-tauri/Cargo.toml \
+  --package ledgera \
+  "$VERSION"
 
 echo "Updated Ledgera version to $VERSION"
