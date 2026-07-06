@@ -93,13 +93,13 @@ export function useTransactionModal({
           amount: makeMovementInputAmount(firstPosting.amount || secondPosting.amount),
           commodity: firstPosting.commodity || secondPosting.commodity,
           unitPrice: "",
+          comment: "",
         },
         {
           ...secondPosting,
           amount: "",
           commodity: "",
           unitPrice: "",
-          comment: "",
         },
       ];
     }

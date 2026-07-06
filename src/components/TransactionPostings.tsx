@@ -123,7 +123,7 @@ export function MovementFields({
           <AutoComplete options={commodityOptions} placeholder={defaultCommodity || "EUR"} filterOption />
         </Form.Item>
       </div>
-      <Form.Item name={["postings", 0, "comment"]} rules={[singleLineRule(t("transactions.single_line_field"))]}>
+      <Form.Item name={["postings", 1, "comment"]} rules={[singleLineRule(t("transactions.single_line_field"))]}>
         <AutoComplete options={commentOptions} placeholder={t("transactions.comment_placeholder")} filterOption />
       </Form.Item>
     </div>

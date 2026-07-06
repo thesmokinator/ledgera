@@ -1,4 +1,4 @@
-import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { LeftOutlined, RightOutlined, WarningOutlined } from "@ant-design/icons";
 import { Button, Card, Tabs, Typography } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { callCommand } from "../utils/command";
@@ -159,7 +159,14 @@ export function TransactionsRoute({
           },
           {
             key: "scheduled",
-            label: t("dashboard.scheduled_transactions_tab"),
+            label: (
+              <span>
+                {t("dashboard.scheduled_transactions_tab")}
+                {scheduledTransactions.length > 0 && (
+                  <WarningOutlined style={{ marginLeft: 6, fontSize: 14, color: "#faad14" }} />
+                )}
+              </span>
+            ),
             children: (
               <TransactionsTable
                 transactions={scheduledTransactions}

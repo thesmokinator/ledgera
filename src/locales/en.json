@@ -1,20 +1,9 @@
 {
-  "budget": {
-    "title": "Budget",
-    "select_and_generate": "Select a scope and interval, then click Generate to compare actuals against budget goals.",
-    "empty": "No budget goals found. Create periodic transactions (~ monthly) to define your budget goals.",
-    "generating": "Generating budget report…",
-    "generate": "Generate",
-    "total": "Total",
-    "period_actual": "Actual",
-    "period_budget": "Budget"
-  },
   "common": {
     "transactions": "Transactions",
     "accounts": "Accounts",
     "balances": "Balances",
     "reports": "Reports",
-    "budget": "Budget",
     "recurring": "Recurring",
     "sync": "Sync",
     "logs": "Logs",
@@ -339,6 +328,10 @@
     "detailed_table": "Detailed hledger table"
   },
   "recurring": {
+    "auto_generate_title": "Recurring transactions available",
+    "auto_generate_message": "{{count}} pending transaction{{count, plural, one{} other{s}}} from {{rules}} recurring rule{{rules, plural, one{} other{s}}} ready to be generated for this month.",
+    "auto_generate_later": "Later",
+    "auto_generate_dont_ask": "Don't ask again this month",
     "empty": "No recurring rules defined.",
     "empty_description": "Create your first recurring transaction to automate periodic entries.",
     "new_rule": "New rule",
