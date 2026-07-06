@@ -24,7 +24,7 @@ describe("transactionTemplateValidationFields", () => {
       ["postings", 0, "account"],
       ["postings", 0, "amount"],
       ["postings", 0, "commodity"],
-      ["postings", 0, "comment"],
+      ["postings", 1, "comment"],
       ["postings", 1, "account"],
     ]);
   });

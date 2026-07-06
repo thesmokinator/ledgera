@@ -4,7 +4,6 @@
     "accounts": "Conti",
     "balances": "Saldi",
     "reports": "Report",
-    "budget": "Budget",
     "recurring": "Ricorrenti",
     "sync": "Sync",
     "logs": "Log",
@@ -329,6 +328,10 @@
     "detailed_table": "Tabella hledger dettagliata"
   },
   "recurring": {
+    "auto_generate_title": "Transazioni ricorrenti disponibili",
+    "auto_generate_message": "{{count}} transazione{{count, plural, one{} other{i}}} in attesa da {{rules}} regola{{rules, plural, one{} other{}}} ricorrente{{rules, plural, one{} other{i}}} da generare per questo mese.",
+    "auto_generate_later": "Più tardi",
+    "auto_generate_dont_ask": "Non chiedere più fino al mese prossimo",
     "empty": "Nessuna regola periodica definita.",
     "empty_description": "Crea la tua prima transazione ricorrente per automatizzare le scritture periodiche.",
     "new_rule": "Nuova regola",
@@ -369,15 +372,5 @@
     "save_failed": "Salvataggio regola periodica fallito.",
     "table_period": "Periodo",
     "not_set": "Non impostata"
-  },
-  "budget": {
-    "title": "Budget",
-    "select_and_generate": "Seleziona un ambito e un intervallo, poi clicca Genera per confrontare gli importi effettivi con gli obiettivi di budget.",
-    "empty": "Nessun obiettivo di budget trovato. Crea transazioni periodiche (~ monthly) per definire i tuoi obiettivi di budget.",
-    "generating": "Generazione report budget…",
-    "generate": "Genera",
-    "total": "Totale",
-    "period_actual": "Effettivo",
-    "period_budget": "Budget"
   }
 }

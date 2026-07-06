@@ -3,7 +3,7 @@ import type { Dayjs } from "dayjs";
 export type ThemePreference = "system" | "dark" | "light";
 export type LanguagePreference = "system" | "en" | "it";
 
-export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs" | "reports" | "recurring" | "budget";
+export type AppView = "transactions" | "accounts" | "balances" | "sync" | "settings" | "logs" | "reports" | "recurring";
 
 export type AppModuleSettings = {
   enabled: boolean;
@@ -334,7 +334,7 @@ export type NavigationItem = {
   icon: React.ReactNode;
   disabled?: boolean;
   shortcut?: string;
-  badge?: string;
+  badge?: React.ReactNode;
   badgeTone?: "warning" | "danger";
 };
 
@@ -381,38 +381,6 @@ export type PendingRecurringDates = {
 export type GenerateResult = {
   generated: number;
   rules: string[];
-};
-
-export type BudgetPeriodAmount = {
-  period: string;
-  actual: number;
-  budget: number;
-  remaining: number;
-  pctUsed: number;
-  commodity: string;
-  actualFormatted: string;
-  budgetFormatted: string;
-  remainingFormatted: string;
-  tint: AmountTint;
-};
-
-export type BudgetRow = {
-  account: string;
-  periods: BudgetPeriodAmount[];
-  totalActual: number;
-  totalBudget: number;
-  totalRemaining: number;
-  totalPctUsed: number;
-  commodity: string;
-  totalActualFormatted: string;
-  totalBudgetFormatted: string;
-  totalRemainingFormatted: string;
-  tint: AmountTint;
-};
-
-export type BudgetReport = {
-  periodColumns: string[];
-  rows: BudgetRow[];
 };
 
 export type GitCryptStatus = {
