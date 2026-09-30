@@ -79,7 +79,7 @@ jobs:
           - platform: macos
             os: macos-latest
           - platform: linux
-            os: ubuntu-latest
+            os: ubuntu-22.04
           - platform: windows
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}
