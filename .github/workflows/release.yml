@@ -1,3 +1,4 @@
+# Builds and publishes GitHub Releases for v* tags.
 name: Release
 
 on:
